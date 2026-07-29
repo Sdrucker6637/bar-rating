@@ -10,7 +10,6 @@
 <!-- React (no build step needed) -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <!-- Firebase (free tier) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -47,7 +46,7 @@
   const db = firebase.firestore();
 </script>
 
-<script type="text/babel" data-presets="react">
+<script data-presets="react">
 const { useState, useEffect, useMemo, useCallback } = React;
 
 // ---------- Seed data (from the original spreadsheet) ----------
