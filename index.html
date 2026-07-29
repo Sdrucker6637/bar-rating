@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tour de Alcoholism</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- React (no build step needed) -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Firebase (free tier) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  body { margin: 0; }
+  /* ====== PASTE YOUR CONFIG BELOW, THEN THE REST OF THE STYLES/APP HANDLE THEMSELVES ====== */
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  // ======================================================================
+  // 1. PASTE YOUR FIREBASE CONFIG HERE (see README.md for how to get this)
+  // ======================================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyB10NK8lIz26T6NzObu421kg7wX6YQoFxg",
+    authDomain: "bar-rating.firebaseapp.com",
+    projectId: "bar-rating",
+    storageBucket: "bar-rating.firebasestorage.app",
+    messagingSenderId: "372554240407",
+    appId: "1:372554240407:web:103646f876f9c8416234d2"
+  };
+
+  // ======================================================================
+  // 2. PASTE YOUR GEMINI API KEY HERE (see README.md — free, from Google AI Studio)
+  // ======================================================================
+  const GEMINI_API_KEY = "AQ.Ab8RN6JJqiAexV5jW7ZGsOPGHwd0dVsQan76pQY222yxRc_ciQ";
+  const GEMINI_MODEL = "gemini-2.5-flash"; // free-tier model with Google Search grounding
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const db = firebase.firestore();
+</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+// ---------- Seed data (from the original spreadsheet) ----------
+const base = { neighborhood: "", description: "", tags: [], happyHour: "", capacity: null, mapsLink: "", detailsFetched: false, notes: "" };
+const seedBars = [
+  { id: "b1", name: "ShyShy", status: "visited", vibe: 8, value: 7, service: 9, food: 6, drinks: 7, bathroomBonus: 0, notes: "", ...base },
+  { id: "b2", name: "Jungle Bird", status: "visited", vibe: 6, value: 6, service: 7, food: 9, drinks: 7, bathroomBonus: 0, notes: "Spacious but really loud, nice food, options bad", ...base },
+  { id: "b3", name: "P.S. Kitchen", status: "visited", vibe: 4, value: 5, service: 5, food: 7, drinks: 7, bathroomBonus: 0, notes: "Vegan restaurant, decent food, decent drinks, super loud", ...base },
+  { id: "b4", name: "Rose Vale", status: "visited", vibe: 10, value: 7, service: 6, food: 6.5, drinks: 7, bathroomBonus: 0, notes: "", ...base },
+  { id: "b5", name: "Fig 19", status: "visited", vibe: 9, value: 7, service: 8, food: 3, drinks: 9, bathroomBonus: 0, notes: "", ...base },
+  { id: "b6", name: "Sir Henrys", status: "visited", vibe: 5.5, value: 7, service: 7, food: 7, drinks: 7, bathroomBonus: 2, notes: "", ...base },
+  { id: "b7", name: "The WooWoo", status: "visited", vibe: 9, value: 7.5, service: 6, food: 6, drinks: 6, bathroomBonus: 0, notes: "", ...base },
+  { id: "b8", name: "Malachy Back Room", status: "visited", vibe: 4, value: 10, service: 10, food: 4.5, drinks: 8, bathroomBonus: 0, notes: "", ...base },
+  { id: "b9", name: "Pineapple Club", status: "visited", vibe: 7, value: 8, service: 8, food: 5, drinks: 6, bathroomBonus: 0, notes: "", ...base },
+  { id: "b10", name: "Mr. Paradise", status: "visited", vibe: 6.5, value: 5, service: 6, food: 8, drinks: 6.5, bathroomBonus: 0, notes: "", ...base },
+  { id: "b11", name: "Banshee", status: "visited", vibe: 8.5, value: 8.5, service: 6, food: 3.5, drinks: 7, bathroomBonus: 0, notes: "really nice atmosphere but the food was very mid", ...base },
+  { id: "b12", name: "Old Town Bar", status: "visited", vibe: 6.5, value: 3.5, service: 6, food: 6.5, drinks: 7, bathroomBonus: 0, notes: "", ...base },
+  { id: "b13", name: "Lillie's Victorian Establishment", status: "visited", vibe: 9, value: 6, service: 9, food: 6.5, drinks: 6, bathroomBonus: 0, notes: "", ...base },
+  { id: "b14", name: "929", status: "visited", vibe: 9, value: 5.5, service: 8, food: 8.5, drinks: 8, bathroomBonus: 0, notes: "20/10, hot guy there", ...base },
+  { id: "b15", name: "Célon (Bryant Park Hotel Basement)", status: "visited", vibe: 9, value: 4, service: 9, food: 8, drinks: 8, bathroomBonus: 0, notes: "", ...base },
+  { id: "b16", name: "Sid Golds Request Room", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/f6FM5FQSTSxA8L8F6" },
+  { id: "b17", name: "Please Don't Tell (Hotdog Speakeasy)", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/Y1ZcLk9hWY8mk5Vv9?g_st=ac" },
+  { id: "b18", name: "A10 Kitchen", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/L16byLwbc1kHYUYr5" },
+  { id: "b19", name: "Ten Degrees", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/mYhdYHCaMBDSKwm6A?g_st=ac" },
+  { id: "b20", name: "Angels Share", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/FPoVDSXT5j3a8qHw9?g_st=ac" },
+  { id: "b21", name: "Katana Kitten", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/8o7mvD7TGBkBHoHGA" },
+  { id: "b22", name: "Izakaya MEW", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/hc3V1X4nY4vrAoBz6?g_st=ac" },
+  { id: "b23", name: "Lucky Cat", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/dU2moYJoBgjvcQ966?g_st=ac" },
+  { id: "b24", name: "Ippudo NY", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/j1p1VbJUSEbTvKZW6?g_st=ac" },
+];
+
+const DOC_PATH = { collection: "tourDeAlcoholism", doc: "sharedList" };
+
+function avgWithFood(b) {
+  const vals = [b.vibe, b.value, b.service, b.food, b.drinks].filter((v) => v !== null && v !== "" && !isNaN(v));
+  if (vals.length < 5) return null;
+  return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
+}
+function avgWithoutFood(b) {
+  const vals = [b.vibe, b.value, b.service, b.drinks].filter((v) => v !== null && v !== "" && !isNaN(v));
+  if (vals.length < 4) return null;
+  return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
+}
+function fmt(n) {
+  return n === null || n === undefined || isNaN(n) ? "—" : Number(n).toFixed(2);
+}
+
+// ---------- Gemini API helpers (live Google Search grounding) ----------
+function safeParse(text, isArray) {
+  const cleaned = (text || "").replace(/```json|```/g, "").trim();
+  try { return JSON.parse(cleaned); } catch (e) {}
+  const re = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+  const m = cleaned.match(re);
+  if (m) { try { return JSON.parse(m[0]); } catch (e) {} }
+  return null;
+}
+
+async function callGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      tools: [{ google_search: {} }],
+    }),
+  });
+  const data = await response.json();
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  return parts.map((p) => p.text || "").join("\n");
+}
+
+async function fetchBarDetails(name, hint) {
+  const prompt = `You are a concierge with live web search. Find the real bar called "${name}"${hint ? ` (near ${hint})` : ""} in New York City. Search the web to confirm it. Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
+{"mapsLink": "a google maps search url for it", "neighborhood": "short neighborhood name", "description": "two sentences covering the vibe, typical price range ($, $$, $$$, or $$$$), and location", "tags": ["3 to 5 short lowercase vibe words like cozy, loud, speakeasy, dancing, classy, dive, games"], "happyHour": "short description of happy hour deal with days/times, or null if none found", "capacityHint": an integer estimate of how many people comfortably fit for a casual visit}
+If you cannot find a confirmed real match, make a reasonable best-effort guess from the name and keep the description honest about the uncertainty.`;
+  try {
+    const text = await callGemini(prompt);
+    return safeParse(text, false);
+  } catch (e) { return null; }
+}
+
+async function fetchBarSuggestions(vibeQuery, groupSize, excludeNames) {
+  const prompt = `You are a concierge with live web search. Suggest 4 real, currently open bars in New York City matching this vibe request: "${vibeQuery || "a great night out"}". They should comfortably work for a group of about ${groupSize} people. Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary: an array of up to 4 objects, each in exactly this shape:
+{"name": "string", "neighborhood": "short neighborhood name", "description": "two sentences covering vibe, price range ($ $$ $$$ $$$$), and location", "tags": ["3 to 5 short lowercase vibe words"], "happyHour": "short string or null", "capacityHint": integer, "mapsLink": "a google maps search url for it"}`;
+  try {
+    const text = await callGemini(prompt);
+    const parsed = safeParse(text, true);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) { return []; }
+}
+
+const emptyVisitedForm = { id: null, name: "", vibe: "", value: "", service: "", food: "", drinks: "", bathroomBonus: "", notes: "" };
+const emptyWishForm = { id: null, name: "", neighborhood: "", notes: "" };
+
+function App() {
+  const [bars, setBars] = useState(null);
+  const [groupSize, setGroupSizeState] = useState(4);
+  const [loading, setLoading] = useState(true);
+  const [connError, setConnError] = useState(false);
+  const [tab, setTab] = useState("leaderboard");
+  const [search, setSearch] = useState("");
+  const [foodMode, setFoodMode] = useState("with");
+  const [showVisitedForm, setShowVisitedForm] = useState(false);
+  const [visitedForm, setVisitedForm] = useState(emptyVisitedForm);
+  const [showWishForm, setShowWishForm] = useState(false);
+  const [wishForm, setWishForm] = useState(emptyWishForm);
+  const [saveError, setSaveError] = useState(false);
+
+  const [vibeQuery, setVibeQuery] = useState("");
+  const [fitsGroupOnly, setFitsGroupOnly] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchDone, setSearchDone] = useState(false);
+
+  const [detailsModal, setDetailsModal] = useState(null);
+  const [fetchingIds, setFetchingIds] = useState(new Set());
+
+  const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
+
+  // live sync from Firestore — updates instantly for everyone with this page open
+  useEffect(() => {
+    const unsub = docRef.onSnapshot(
+      (snap) => {
+        if (snap.exists) {
+          const data = snap.data();
+          setBars(data.bars || []);
+          if (data.groupSize) setGroupSizeState(data.groupSize);
+        } else {
+          docRef.set({ bars: seedBars, groupSize: 4 }).catch(() => setConnError(true));
+          setBars(seedBars);
+        }
+        setLoading(false);
+      },
+      (err) => { console.error(err); setConnError(true); setBars(seedBars); setLoading(false); }
+    );
+    return () => unsub();
+    // eslint-disable-next-line
+  }, []);
+
+  const persist = useCallback((next) => {
+    setBars(next);
+    docRef.set({ bars: next }, { merge: true }).then(() => setSaveError(false)).catch(() => setSaveError(true));
+    // eslint-disable-next-line
+  }, []);
+
+  const persistGroup = useCallback((n) => {
+    setGroupSizeState(n);
+    docRef.set({ groupSize: n }, { merge: true }).catch(() => {});
+    // eslint-disable-next-line
+  }, []);
+
+  const updateBar = useCallback((id, patch) => {
+    setBars((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, ...patch } : b));
+      docRef.set({ bars: next }, { merge: true }).catch(() => setSaveError(true));
+      return next;
+    });
+    // eslint-disable-next-line
+  }, []);
+
+  const runDetailsFetch = useCallback((bar) => {
+    setFetchingIds((s) => new Set(s).add(bar.id));
+    fetchBarDetails(bar.name, bar.neighborhood).then((data) => {
+      if (data) {
+        updateBar(bar.id, {
+          mapsLink: data.mapsLink || bar.mapsLink,
+          neighborhood: data.neighborhood || bar.neighborhood,
+          description: data.description || bar.description,
+          tags: data.tags && data.tags.length ? data.tags : bar.tags,
+          happyHour: data.happyHour !== undefined ? data.happyHour : bar.happyHour,
+          capacity: data.capacityHint || bar.capacity,
+          detailsFetched: true,
+        });
+      } else {
+        updateBar(bar.id, { detailsFetched: true });
+      }
+      setFetchingIds((s) => { const n = new Set(s); n.delete(bar.id); return n; });
+      setDetailsModal((dm) => (dm && dm.bar.id === bar.id ? { ...dm, loading: false } : dm));
+    });
+  }, [updateBar]);
+
+  function openDetails(bar) {
+    setDetailsModal({ bar, loading: !bar.detailsFetched });
+    if (!bar.detailsFetched && !fetchingIds.has(bar.id)) runDetailsFetch(bar);
+  }
+  function refreshDetails(bar) {
+    setDetailsModal({ bar, loading: true });
+    runDetailsFetch({ ...bar, detailsFetched: false });
+  }
+
+  const visited = useMemo(() => (bars || []).filter((b) => b.status === "visited"), [bars]);
+  const toTry = useMemo(() => (bars || []).filter((b) => b.status === "to-try"), [bars]);
+
+  const filteredVisited = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = visited.filter((b) => {
+      if (!q) return true;
+      return b.name.toLowerCase().includes(q) || (b.notes || "").toLowerCase().includes(q) || (b.tags || []).some((t) => t.toLowerCase().includes(q));
+    });
+    list.sort((a, b) => {
+      const av = foodMode === "with" ? avgWithFood(a) : avgWithoutFood(a);
+      const bv = foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
+      return (bv || 0) - (av || 0);
+    });
+    return list;
+  }, [visited, search, foodMode]);
+
+  const filteredToTry = useMemo(() => {
+    const q = vibeQuery.trim().toLowerCase();
+    return toTry.filter((b) => {
+      if (fitsGroupOnly && b.capacity && Number(b.capacity) < groupSize) return false;
+      if (!q) return true;
+      return b.name.toLowerCase().includes(q) || (b.description || "").toLowerCase().includes(q) || (b.tags || []).some((t) => t.toLowerCase().includes(q));
+    });
+  }, [toTry, vibeQuery, fitsGroupOnly, groupSize]);
+
+  async function runSearch() {
+    setSearching(true);
+    setSearchDone(false);
+    const exclude = (bars || []).map((b) => b.name);
+    const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude);
+    const filtered = fitsGroupOnly ? results.filter((r) => !r.capacityHint || r.capacityHint >= groupSize) : results;
+    setSearchResults(filtered);
+    setSearching(false);
+    setSearchDone(true);
+  }
+
+  function addSuggestionToWishlist(s) {
+    const record = {
+      id: `b${Date.now()}`, name: s.name, status: "to-try",
+      vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "",
+      neighborhood: s.neighborhood || "", description: s.description || "", tags: s.tags || [],
+      happyHour: s.happyHour || "", capacity: s.capacityHint || null, mapsLink: s.mapsLink || "", detailsFetched: true,
+    };
+    persist([...(bars || []), record]);
+    setSearchResults((prev) => prev.filter((r) => r.name !== s.name));
+  }
+
+  function saveVisitedForm(e) {
+    e.preventDefault();
+    if (!visitedForm.name.trim()) return;
+    const cleanNum = (v) => (v === "" || v === null ? null : Number(v));
+    const isNew = !visitedForm.id;
+    const id = visitedForm.id || `b${Date.now()}`;
+    const patch = {
+      name: visitedForm.name.trim(), status: "visited",
+      vibe: cleanNum(visitedForm.vibe), value: cleanNum(visitedForm.value), service: cleanNum(visitedForm.service),
+      food: cleanNum(visitedForm.food), drinks: cleanNum(visitedForm.drinks),
+      bathroomBonus: cleanNum(visitedForm.bathroomBonus) || 0, notes: visitedForm.notes.trim(),
+    };
+    let next, record;
+    if (isNew) {
+      record = { ...base, ...patch, id, tags: [] };
+      next = [...bars, record];
+    } else {
+      next = bars.map((b) => (b.id === id ? { ...b, ...patch } : b));
+      record = next.find((b) => b.id === id);
+    }
+    persist(next);
+    setShowVisitedForm(false);
+    setVisitedForm(emptyVisitedForm);
+    if (!record.detailsFetched) runDetailsFetch(record);
+  }
+
+  function saveWishForm(e) {
+    e.preventDefault();
+    if (!wishForm.name.trim()) return;
+    const isNew = !wishForm.id;
+    const id = wishForm.id || `b${Date.now()}`;
+    const patch = { name: wishForm.name.trim(), status: "to-try", notes: wishForm.notes.trim() };
+    let next, record;
+    if (isNew) {
+      record = { ...base, ...patch, id, tags: [], vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0 };
+      next = [...bars, record];
+    } else {
+      next = bars.map((b) => (b.id === id ? { ...b, ...patch } : b));
+      record = next.find((b) => b.id === id);
+    }
+    persist(next);
+    setShowWishForm(false);
+    setWishForm(emptyWishForm);
+    if (!record.detailsFetched) runDetailsFetch(record);
+  }
+
+  function markVisited(b) {
+    setVisitedForm({ id: b.id, name: b.name, vibe: "", value: "", service: "", food: "", drinks: "", bathroomBonus: "", notes: b.notes || "" });
+    setShowVisitedForm(true);
+  }
+  function editVisited(b) {
+    setVisitedForm({ id: b.id, name: b.name, vibe: b.vibe ?? "", value: b.value ?? "", service: b.service ?? "", food: b.food ?? "", drinks: b.drinks ?? "", bathroomBonus: b.bathroomBonus ?? "", notes: b.notes || "" });
+    setShowVisitedForm(true);
+  }
+  function removeBar(id) { persist(bars.filter((b) => b.id !== id)); }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0E0D10", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "#B8965F", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.85rem", letterSpacing: "0.05em" }}>
+          {connError ? "couldn't connect — check your Firebase config in index.html" : "setting the table…"}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tda-root">
+      <style>{`
+        .tda-root { min-height: 100vh; background: linear-gradient(180deg, #14121A 0%, #0E0D10 55%); color: #EDE6D9; font-family: 'Inter', sans-serif; padding-bottom: 4rem; }
+        .tda-container { max-width: 980px; margin: 0 auto; padding: 0 1.25rem; }
+        .tda-header { padding: 3rem 0 1.75rem; text-align: center; border-bottom: 1px solid #262029; }
+        .tda-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: clamp(1.9rem, 5.5vw, 2.9rem); letter-spacing: -0.01em; color: #EDE6D9; margin: 0; }
+        .tda-title .accent { color: #C9A876; font-style: italic; font-weight: 500; }
+        .tda-sub { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #857C8E; margin-top: 0.7rem; }
+
+        .tda-tabs { display: flex; gap: 0.5rem; justify-content: center; margin: 1.75rem 0; flex-wrap: wrap; }
+        .tda-tab { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.6rem 1.3rem; border-radius: 3px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; transition: all 0.15s ease; }
+        .tda-tab:hover { border-color: #B8965F; color: #EDE6D9; }
+        .tda-tab.active { background: #B8965F; color: #16130F; border-color: #B8965F; font-weight: 600; }
+
+        .tda-champion { border: 1px solid #B8965F; border-radius: 4px; padding: 1.1rem 1.4rem; margin: 1.75rem 0 1.25rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; background: linear-gradient(135deg, rgba(184,150,95,0.08), transparent); flex-wrap: wrap; }
+        .tda-champion-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: #C9A876; }
+        .tda-champion-name { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.6rem; margin-top: 0.25rem; }
+        .tda-champion-score { font-family: 'IBM Plex Mono', monospace; font-size: 2rem; color: #C9A876; font-weight: 600; }
+
+        .tda-controls { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 1rem 0; background: #17141B; border: 1px solid #262029; border-radius: 8px; padding: 0.9rem 1rem; }
+        .tda-input, .tda-select { background: #0E0D10; border: 1px solid #302938; color: #EDE6D9; border-radius: 5px; padding: 0.5rem 0.7rem; font-family: 'Inter', sans-serif; font-size: 0.85rem; }
+        .tda-input:focus, .tda-select:focus { outline: none; border-color: #B8965F; }
+        .tda-toggle { display: inline-flex; border: 1px solid #302938; border-radius: 999px; overflow: hidden; }
+        .tda-toggle button { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 0.4rem 0.85rem; background: transparent; color: #A79EB2; border: none; cursor: pointer; }
+        .tda-toggle button.active { background: #B8965F; color: #16130F; font-weight: 600; }
+        .tda-chip { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 0.38rem 0.75rem; border-radius: 999px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; }
+        .tda-chip.active { background: #3F5D4E; border-color: #3F5D4E; color: #EDE6D9; }
+        .tda-group-stepper { display: flex; align-items: center; gap: 0.4rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
+        .tda-group-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid #302938; background: #0E0D10; color: #B8965F; cursor: pointer; font-size: 1rem; line-height: 1; }
+
+        .tda-list { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 1rem; }
+        .tda-card { background: #17141B; border: 1px solid #262029; border-radius: 8px; padding: 1rem 1.2rem; }
+        .tda-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; }
+        .tda-rank { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; font-weight: 600; border: 1.5px solid #302938; color: #A79EB2; margin-right: 0.6rem; flex-shrink: 0; }
+        .tda-rank.gold { border-color: #C9A876; color: #C9A876; }
+        .tda-rank.silver { border-color: #B9B6BC; color: #C9C6CE; }
+        .tda-rank.bronze { border-color: #A9784F; color: #C08E5F; }
+        .tda-name-row { display: flex; align-items: center; }
+        .tda-card-name { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.1rem; cursor: pointer; }
+        .tda-card-name:hover { color: #C9A876; }
+        .tda-card-badges { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.3rem; margin-left: 2.5rem; }
+        .tda-avg { font-family: 'IBM Plex Mono', monospace; font-size: 1.3rem; font-weight: 600; color: #C9A876; text-align: right; }
+        .tda-avg-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #857C8E; text-align: right; }
+        .tda-stats { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.7rem; margin-left: 2.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; color: #A79EB2; }
+        .tda-stats span b { color: #EDE6D9; }
+        .tda-comment { margin-top: 0.5rem; margin-left: 2.5rem; font-size: 0.85rem; color: #A79EB2; font-style: italic; }
+        .tda-tags { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+        .tda-tag { font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; padding: 0.14rem 0.55rem; border-radius: 999px; background: #262029; color: #A79EB2; }
+        .tda-card-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; margin-left: 2.5rem; flex-wrap: wrap; }
+        .tda-link-btn, .tda-edit-btn, .tda-del-btn, .tda-visit-btn { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; padding: 0.35rem 0.7rem; border-radius: 5px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; text-decoration: none; }
+        .tda-link-btn:hover, .tda-edit-btn:hover, .tda-visit-btn:hover { border-color: #B8965F; color: #EDE6D9; }
+        .tda-del-btn:hover { border-color: #9A4B4B; color: #C77676; }
+        .tda-fetching { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: #857C8E; margin-left: 2.5rem; margin-top: 0.4rem; }
+
+        .tda-add-btn { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; padding: 0.6rem 1.1rem; border-radius: 5px; border: 1px dashed #302938; background: transparent; color: #B8965F; cursor: pointer; width: 100%; margin-top: 0.75rem; }
+        .tda-add-btn:hover { border-color: #B8965F; background: rgba(184,150,95,0.05); }
+
+        .tda-search-panel { background: #17141B; border: 1px solid #262029; border-radius: 8px; padding: 1.1rem; margin: 1rem 0; }
+        .tda-search-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+        .tda-find-btn { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; padding: 0.6rem 1.2rem; border-radius: 999px; border: none; background: #B8965F; color: #16130F; font-weight: 600; cursor: pointer; }
+        .tda-find-btn:hover { background: #C9A876; }
+        .tda-find-btn:disabled { opacity: 0.5; cursor: default; }
+
+        .tda-suggestion-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-top: 1.1rem; }
+        .tda-suggestion-card { border: 1px solid #302938; border-radius: 8px; padding: 0.9rem; background: #0E0D10; }
+        .tda-suggestion-name { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.05rem; }
+        .tda-suggestion-hood { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: #857C8E; margin-top: 0.1rem; }
+        .tda-suggestion-desc { font-size: 0.82rem; color: #A79EB2; margin-top: 0.5rem; line-height: 1.4; }
+        .tda-suggestion-add { margin-top: 0.7rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 0.4rem 0.8rem; border-radius: 5px; border: 1px solid #3F5D4E; background: transparent; color: #7FA88E; cursor: pointer; width: 100%; }
+        .tda-suggestion-add:hover { background: #3F5D4E; color: #EDE6D9; }
+
+        .tda-empty { text-align: center; padding: 2.5rem 1rem; color: #857C8E; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
+        .tda-section-heading { display: flex; align-items: center; gap: 0.8rem; margin: 2.25rem 0 0.25rem; }
+        .tda-section-heading h2 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.15rem; margin: 0; color: #EDE6D9; white-space: nowrap; }
+        .tda-section-heading .tda-rule { flex: 1; height: 1px; background: #262029; }
+        .tda-section-count { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: #857C8E; }
+
+        .tda-modal-backdrop { position: fixed; inset: 0; background: rgba(6,5,7,0.8); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
+        .tda-modal { background: #17141B; border: 1px solid #302938; border-radius: 10px; padding: 1.5rem; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; }
+        .tda-modal h3 { font-family: 'Fraunces', serif; font-weight: 500; margin-top: 0; }
+        .tda-field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; }
+        .tda-field label { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: #857C8E; }
+        .tda-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+        .tda-modal-actions { display: flex; gap: 0.6rem; margin-top: 1rem; }
+        .tda-primary-btn { flex: 1; font-family: 'IBM Plex Mono', monospace; font-weight: 600; padding: 0.65rem; border-radius: 5px; border: none; background: #B8965F; color: #16130F; cursor: pointer; }
+        .tda-secondary-btn { flex: 1; font-family: 'IBM Plex Mono', monospace; padding: 0.65rem; border-radius: 5px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; }
+
+        .tda-details-hood { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: #C9A876; text-transform: uppercase; letter-spacing: 0.08em; }
+        .tda-details-desc { margin-top: 0.7rem; line-height: 1.55; color: #D8D1C4; font-size: 0.92rem; }
+        .tda-details-row { margin-top: 0.9rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: #A79EB2; display: flex; flex-direction: column; gap: 0.35rem; }
+        .tda-spinner { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: #857C8E; padding: 1.5rem 0; text-align: center; }
+
+        .tda-footnote { text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: #5D5666; margin-top: 2.5rem; }
+      `}</style>
+
+      <div className="tda-container">
+        <div className="tda-header">
+          <h1 className="tda-title">Tour de <span className="accent">Alcoholism</span></h1>
+          <div className="tda-sub">a running record of the bars we've survived</div>
+        </div>
+
+        <div className="tda-tabs">
+          <button className={`tda-tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>Current Leaderboard</button>
+          <button className={`tda-tab ${tab === "find" ? "active" : ""}`} onClick={() => setTab("find")}>Find a New Bar</button>
+        </div>
+
+        {tab === "leaderboard" && (
+          <>
+            {filteredVisited.length > 0 && (() => {
+              const champ = filteredVisited[0];
+              const score = foodMode === "with" ? avgWithFood(champ) : avgWithoutFood(champ);
+              return (
+                <div className="tda-champion">
+                  <div>
+                    <div className="tda-champion-eyebrow">🏆 Reigning Champion</div>
+                    <div className="tda-champion-name">{champ.name}</div>
+                  </div>
+                  <div className="tda-champion-score">{fmt(score)}</div>
+                </div>
+              );
+            })()}
+
+            <div className="tda-controls">
+              <input className="tda-input" placeholder="Search name or notes…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ flex: "1 1 200px" }} />
+              <div className="tda-toggle">
+                <button className={foodMode === "with" ? "active" : ""} onClick={() => setFoodMode("with")}>With food</button>
+                <button className={foodMode === "without" ? "active" : ""} onClick={() => setFoodMode("without")}>Without food</button>
+              </div>
+            </div>
+
+            <div className="tda-list">
+              {filteredVisited.length === 0 && <div className="tda-empty">No stages match that search yet.</div>}
+              {filteredVisited.map((b, i) => (
+                <BarCard key={b.id} b={b} rank={i + 1} score={foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b)}
+                  scoreLabel={foodMode === "with" ? "with food" : "no food"} isFetching={fetchingIds.has(b.id)}
+                  onNameClick={() => openDetails(b)} onEdit={() => editVisited(b)} onDelete={() => removeBar(b.id)} />
+              ))}
+            </div>
+            <button className="tda-add-btn" onClick={() => { setVisitedForm(emptyVisitedForm); setShowVisitedForm(true); }}>+ Log a stage we rode (rank a bar we visited)</button>
+          </>
+        )}
+
+        {tab === "find" && (
+          <>
+            <div className="tda-search-panel">
+              <div className="tda-search-row">
+                <input className="tda-input" placeholder='Describe the vibe — "games", "raunchy", "classy", "rooftop"…' value={vibeQuery} onChange={(e) => setVibeQuery(e.target.value)} style={{ flex: "1 1 220px" }} />
+                <div className="tda-group-stepper">
+                  <span style={{ color: "#857C8E" }}>Group of</span>
+                  <button className="tda-group-btn" onClick={() => persistGroup(Math.max(1, groupSize - 1))}>−</button>
+                  <b style={{ color: "#EDE6D9" }}>{groupSize}</b>
+                  <button className="tda-group-btn" onClick={() => persistGroup(groupSize + 1)}>+</button>
+                </div>
+                <button className={`tda-chip ${fitsGroupOnly ? "active" : ""}`} onClick={() => setFitsGroupOnly(!fitsGroupOnly)}>Fits our group</button>
+                <button className="tda-find-btn" onClick={runSearch} disabled={searching}>{searching ? "Searching…" : "Find bars"}</button>
+              </div>
+
+              {searching && <div className="tda-spinner">scouting the city…</div>}
+              {searchDone && !searching && searchResults.length === 0 && (
+                <div className="tda-empty">No fresh matches came back — try a different vibe.</div>
+              )}
+              {searchResults.length > 0 && (
+                <div className="tda-suggestion-grid">
+                  {searchResults.map((s) => (
+                    <div key={s.name} className="tda-suggestion-card">
+                      <div className="tda-suggestion-name">{s.name}</div>
+                      {s.neighborhood && <div className="tda-suggestion-hood">{s.neighborhood}</div>}
+                      {s.tags && s.tags.length > 0 && <div className="tda-tags" style={{ marginTop: "0.5rem" }}>{s.tags.map((t) => <span key={t} className="tda-tag">{t}</span>)}</div>}
+                      <div className="tda-suggestion-desc">{s.description}</div>
+                      {s.happyHour && <div className="tda-suggestion-desc" style={{ color: "#C9A876" }}>🕔 {s.happyHour}</div>}
+                      <button className="tda-suggestion-add" onClick={() => addSuggestionToWishlist(s)}>+ Add to our list</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="tda-section-heading">
+              <h2>Our Wishlist</h2>
+              <div className="tda-rule" />
+              <span className="tda-section-count">{filteredToTry.length} bar{filteredToTry.length === 1 ? "" : "s"}</span>
+            </div>
+            <div className="tda-list">
+              {filteredToTry.length === 0 && <div className="tda-empty">Nothing on the list yet — search above or add one below.</div>}
+              {filteredToTry.map((b) => (
+                <BarCard key={b.id} b={b} isFetching={fetchingIds.has(b.id)} onNameClick={() => openDetails(b)}
+                  onEdit={() => markVisited(b)} editLabel="Mark visited" onDelete={() => removeBar(b.id)} />
+              ))}
+            </div>
+            <button className="tda-add-btn" onClick={() => { setWishForm(emptyWishForm); setShowWishForm(true); }}>+ Add a bar by name (we'll fill in the rest)</button>
+          </>
+        )}
+
+        {saveError && <div className="tda-footnote" style={{ color: "#C77676" }}>Couldn't save that change — check your connection and try again.</div>}
+        <div className="tda-footnote">Shared list — anyone with this page can add stages, rank bars, and edit entries.</div>
+      </div>
+
+      {showVisitedForm && (
+        <div className="tda-modal-backdrop" onClick={() => setShowVisitedForm(false)}>
+          <div className="tda-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{visitedForm.id ? "Rank this bar" : "Log a stage"}</h3>
+            <form onSubmit={saveVisitedForm}>
+              <div className="tda-field"><label>Name</label><input className="tda-input" required value={visitedForm.name} onChange={(e) => setVisitedForm({ ...visitedForm, name: e.target.value })} /></div>
+              <div className="tda-field-row">
+                <div className="tda-field"><label>Vibe (0-10)</label><input className="tda-input" type="number" step="0.5" min="0" max="10" value={visitedForm.vibe} onChange={(e) => setVisitedForm({ ...visitedForm, vibe: e.target.value })} /></div>
+                <div className="tda-field"><label>Value (0-10)</label><input className="tda-input" type="number" step="0.5" min="0" max="10" value={visitedForm.value} onChange={(e) => setVisitedForm({ ...visitedForm, value: e.target.value })} /></div>
+              </div>
+              <div className="tda-field-row">
+                <div className="tda-field"><label>Service (0-10)</label><input className="tda-input" type="number" step="0.5" min="0" max="10" value={visitedForm.service} onChange={(e) => setVisitedForm({ ...visitedForm, service: e.target.value })} /></div>
+                <div className="tda-field"><label>Food (0-10)</label><input className="tda-input" type="number" step="0.5" min="0" max="10" value={visitedForm.food} onChange={(e) => setVisitedForm({ ...visitedForm, food: e.target.value })} /></div>
+              </div>
+              <div className="tda-field-row">
+                <div className="tda-field"><label>Drinks (0-10)</label><input className="tda-input" type="number" step="0.5" min="0" max="10" value={visitedForm.drinks} onChange={(e) => setVisitedForm({ ...visitedForm, drinks: e.target.value })} /></div>
+                <div className="tda-field"><label>Bathroom bonus</label><input className="tda-input" type="number" step="0.5" min="0" max="10" value={visitedForm.bathroomBonus} onChange={(e) => setVisitedForm({ ...visitedForm, bathroomBonus: e.target.value })} /></div>
+              </div>
+              <div className="tda-field"><label>Notes</label><input className="tda-input" value={visitedForm.notes} onChange={(e) => setVisitedForm({ ...visitedForm, notes: e.target.value })} /></div>
+              <div className="tda-modal-actions">
+                <button type="button" className="tda-secondary-btn" onClick={() => setShowVisitedForm(false)}>Cancel</button>
+                <button type="submit" className="tda-primary-btn">{visitedForm.id ? "Save ranking" : "Add to leaderboard"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showWishForm && (
+        <div className="tda-modal-backdrop" onClick={() => setShowWishForm(false)}>
+          <div className="tda-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Add a bar</h3>
+            <form onSubmit={saveWishForm}>
+              <div className="tda-field"><label>Name</label><input className="tda-input" required value={wishForm.name} onChange={(e) => setWishForm({ ...wishForm, name: e.target.value })} /></div>
+              <div className="tda-field"><label>Neighborhood (optional, helps us find the right one)</label><input className="tda-input" value={wishForm.neighborhood} onChange={(e) => setWishForm({ ...wishForm, neighborhood: e.target.value })} /></div>
+              <div className="tda-field"><label>Notes</label><input className="tda-input" value={wishForm.notes} onChange={(e) => setWishForm({ ...wishForm, notes: e.target.value })} /></div>
+              <div className="tda-modal-actions">
+                <button type="button" className="tda-secondary-btn" onClick={() => setShowWishForm(false)}>Cancel</button>
+                <button type="submit" className="tda-primary-btn">Add to the list</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {detailsModal && (
+        <div className="tda-modal-backdrop" onClick={() => setDetailsModal(null)}>
+          <div className="tda-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{detailsModal.bar.name}</h3>
+            {detailsModal.loading ? (
+              <div className="tda-spinner">looking it up…</div>
+            ) : (
+              <>
+                {detailsModal.bar.neighborhood && <div className="tda-details-hood">{detailsModal.bar.neighborhood}</div>}
+                <div className="tda-details-desc">{detailsModal.bar.description || "No description found yet."}</div>
+                <div className="tda-details-row">
+                  {detailsModal.bar.happyHour && <span>🕔 {detailsModal.bar.happyHour}</span>}
+                  {detailsModal.bar.capacity && <span>Comfortably fits about {detailsModal.bar.capacity} people</span>}
+                </div>
+                {detailsModal.bar.tags && detailsModal.bar.tags.length > 0 && <div className="tda-tags" style={{ marginTop: "0.7rem" }}>{detailsModal.bar.tags.map((t) => <span key={t} className="tda-tag">{t}</span>)}</div>}
+                <div className="tda-modal-actions">
+                  {detailsModal.bar.mapsLink && <a className="tda-secondary-btn" style={{ textAlign: "center", textDecoration: "none" }} href={detailsModal.bar.mapsLink} target="_blank" rel="noreferrer">Open map ↗</a>}
+                  <button className="tda-secondary-btn" onClick={() => refreshDetails(detailsModal.bar)}>Refresh</button>
+                  <button className="tda-primary-btn" onClick={() => setDetailsModal(null)}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, editLabel, onDelete }) {
+  const rankClass = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
+  return (
+    <div className="tda-card">
+      <div className="tda-card-top">
+        <div className="tda-name-row">
+          {rank && <span className={`tda-rank ${rankClass}`}>{rank}</span>}
+          <div className="tda-card-name" onClick={onNameClick}>{b.name}</div>
+        </div>
+        {score !== undefined && score !== null && (
+          <div>
+            <div className="tda-avg">{fmt(score)}</div>
+            <div className="tda-avg-label">{scoreLabel}</div>
+          </div>
+        )}
+      </div>
+      {b.tags && b.tags.length > 0 && <div className="tda-card-badges"><div className="tda-tags">{b.tags.map((t) => <span key={t} className="tda-tag">{t}</span>)}</div></div>}
+      {b.status === "visited" && (
+        <div className="tda-stats">
+          <span>Vibe <b>{fmt(b.vibe)}</b></span>
+          <span>Value <b>{fmt(b.value)}</b></span>
+          <span>Service <b>{fmt(b.service)}</b></span>
+          <span>Food <b>{fmt(b.food)}</b></span>
+          <span>Drinks <b>{fmt(b.drinks)}</b></span>
+          {b.bathroomBonus > 0 && <span>🚻 bonus <b>{fmt(b.bathroomBonus)}</b></span>}
+        </div>
+      )}
+      {b.happyHour && <div className="tda-comment">🕔 {b.happyHour}</div>}
+      {b.notes && <div className="tda-comment">"{b.notes}"</div>}
+      {isFetching && <div className="tda-fetching">finding details…</div>}
+      <div className="tda-card-actions">
+        {b.mapsLink && <a className="tda-link-btn" href={b.mapsLink} target="_blank" rel="noreferrer">Map ↗</a>}
+        <button className="tda-edit-btn" onClick={onNameClick}>Details</button>
+        <button className="tda-visit-btn" onClick={onEdit}>{editLabel || "Edit"}</button>
+        <button className="tda-del-btn" onClick={onDelete}>Remove</button>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
