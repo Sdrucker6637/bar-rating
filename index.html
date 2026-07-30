@@ -40,7 +40,6 @@
   // ======================================================================
   // 2. PASTE YOUR GEMINI API KEY HERE (see README.md — free, from Google AI Studio)
   // ======================================================================
-  const GEMINI_API_KEY = "AQ.Ab8RN6Kebxpb8DrB6R4xyqC9bBcZeUiC4KIozpZlXUTXjevZyw";
   const GEMINI_MODEL = "gemini-2.5-flash";
 
   firebase.initializeApp(FIREBASE_CONFIG);
@@ -112,18 +111,20 @@ function safeParse(text, isArray) {
     return null;
 }
 async function callGemini(prompt) {
-    var _a, _b, _c;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-    const response = await fetch(url, {
+    const response = await fetch("/api/gemini", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            tools: [{ google_search: {} }],
+            prompt,
         }),
     });
+
     const data = await response.json();
-    const parts = ((_c = (_b = (_a = data === null || data === void 0 ? void 0 : data.candidates) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c.parts) || [];
+
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+
     return parts.map((p) => p.text || "").join("\n");
 }
 async function fetchBarDetails(name, hint) {
