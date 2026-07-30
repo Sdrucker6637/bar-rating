@@ -13,6 +13,35 @@ if (getApps().length === 0) {
 
 const db = getFirestore();
 
+// Parses whatever the model sent back into real JSON (object or array).
+// Tries a direct parse first, then falls back to pulling out the first
+// {...} or [...] block in case the model added stray text around it.
+function safeParse(text) {
+  const cleaned = (text || "").replace(/```json/gi, "").replace(/```/g, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    // fall through
+  }
+  const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+  if (arrMatch) {
+    try {
+      return JSON.parse(arrMatch[0]);
+    } catch (e) {
+      // fall through
+    }
+  }
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (objMatch) {
+    try {
+      return JSON.parse(objMatch[0]);
+    } catch (e) {
+      // fall through
+    }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -30,18 +59,14 @@ export default async function handler(req, res) {
     // Only use Firebase caching when we are fetching details
     // for an existing bar
     if (barId) {
-      docRef = db
-        .collection("tourDeAlcoholism")
-        .doc("sharedList");
+      docRef = db.collection("tourDeAlcoholism").doc("sharedList");
 
       const snapshot = await docRef.get();
       const data = snapshot.data();
 
       bars = data?.bars || [];
 
-      existingBar = bars.find(
-        (bar) => bar.id === barId
-      );
+      existingBar = bars.find((bar) => bar.id === barId);
 
       if (!existingBar) {
         return res.status(404).json({
@@ -49,9 +74,9 @@ export default async function handler(req, res) {
         });
       }
 
-      // Return cached result
+      // Return cached result — already structured, no parsing needed
       if (existingBar.detailsFetched) {
-        return res.status(200).json(existingBar);
+        return res.status(200).json({ result: existingBar });
       }
     }
 
@@ -89,42 +114,50 @@ export default async function handler(req, res) {
       });
     }
 
-    const description =
+    const rawText =
       geminiData?.candidates?.[0]?.content?.parts
         ?.map((p) => p.text || "")
         .join("\n") || "";
 
-    // If this was only a suggestion/random search,
-    // return Gemini directly and do not touch Firebase
+    const parsed = safeParse(rawText);
+
+    // Search / random-pick calls (no barId): hand back whatever shape the
+    // prompt asked for — an array for search suggestions, an object for a
+    // single random pick. Never touches Firebase.
     if (!barId) {
-      return res.status(200).json({
-        description,
-      });
+      return res.status(200).json({ result: parsed });
     }
 
-    // Update Firestore cache for existing bar
-    const updatedBars = bars.map((bar) => {
-      if (bar.id !== barId) {
-        return bar;
-      }
+    // Bar-details call for a specific bar. If parsing failed, still mark it
+    // fetched (so we don't hammer Gemini again every time it's opened) but
+    // don't overwrite real fields with junk.
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      const fallbackBars = bars.map((bar) =>
+        bar.id === barId ? { ...bar, detailsFetched: true } : bar
+      );
+      await docRef.update({ bars: fallbackBars });
+      return res.status(200).json({ result: { ...existingBar, detailsFetched: true } });
+    }
 
-      return {
-        ...bar,
-        description,
-        detailsFetched: true,
-        lastUpdated: new Date().toISOString(),
-      };
-    });
+    const mergedBar = {
+      ...existingBar,
+      mapsLink: parsed.mapsLink || existingBar.mapsLink,
+      neighborhood: parsed.neighborhood || existingBar.neighborhood,
+      description: parsed.description || existingBar.description,
+      tags: Array.isArray(parsed.tags) && parsed.tags.length ? parsed.tags : existingBar.tags,
+      happyHour: parsed.happyHour !== undefined ? parsed.happyHour : existingBar.happyHour,
+      capacity: parsed.capacityHint || existingBar.capacity,
+      detailsFetched: true,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    const updatedBars = bars.map((bar) => (bar.id === barId ? mergedBar : bar));
 
     await docRef.update({
       bars: updatedBars,
     });
 
-    return res.status(200).json({
-      ...existingBar,
-      description,
-      detailsFetched: true,
-    });
+    return res.status(200).json({ result: mergedBar });
 
   } catch (error) {
     console.error("Server error:", error);

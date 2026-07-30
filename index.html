@@ -49,7 +49,7 @@
 "use strict";
 const { useState, useEffect, useMemo, useCallback } = React;
 // ---------- Seed data (from the original spreadsheet) ----------
-const base = { neighborhood: "", description: "", tags: [], happyHour: "", capacity: null, mapsLink: "", detailsFetched: false, notes: "" };
+const base = { neighborhood: "", description: "", tags: [], happyHour: "", capacity: null, mapsLink: "", detailsFetched: false, notes: "", disqualified: false, disqualifyReason: "" };
 const seedBars = [
     { id: "b1", name: "ShyShy", status: "visited", vibe: 8, value: 7, service: 9, food: 6, drinks: 7, bathroomBonus: 0, notes: "", ...base },
     { id: "b2", name: "Jungle Bird", status: "visited", vibe: 6, value: 6, service: 7, food: 9, drinks: 7, bathroomBonus: 0, notes: "Spacious but really loud, nice food, options bad", ...base },
@@ -78,12 +78,14 @@ const seedBars = [
 ];
 const DOC_PATH = { collection: "tourDeAlcoholism", doc: "sharedList" };
 function avgWithFood(b) {
+    if (b.disqualified) return null;
     const vals = [b.vibe, b.value, b.service, b.food, b.drinks].filter((v) => v !== null && v !== "" && !isNaN(v));
     if (vals.length < 5)
         return null;
     return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
 }
 function avgWithoutFood(b) {
+    if (b.disqualified) return null;
     const vals = [b.vibe, b.value, b.service, b.drinks].filter((v) => v !== null && v !== "" && !isNaN(v));
     if (vals.length < 4)
         return null;
@@ -122,17 +124,26 @@ async function callGemini(prompt, barId) {
     });
 
     const data = await response.json();
-
-    return data.description 
-        ? JSON.stringify(data)
-        : data?.candidates?.[0]?.content?.parts
-            ?.map((p) => p.text || "")
-            .join("\n") || "";
+    if (data.error) {
+        console.error("Gemini error:", data.error);
+        return null;
+    }
+    return data.result;
+}
+// Builds the price/distance constraint text shared by search + random pick.
+function buildConstraints(ballerMode, exploreMode) {
+    const price = ballerMode
+        ? "Price range: anything goes, including upscale $$$-$$$$ spots — don't hold back."
+        : "Price range: keep it affordable — $ to $$ only, nothing pricier.";
+    const distance = exploreMode
+        ? "Distance: no limit — further out is fine, even if it's a bit of a trek."
+        : "Distance: keep it realistic — roughly within a 40-minute transit ride of Manhattan.";
+    return price + " " + distance;
 }
 async function fetchBarDetails(name, hint, barId) {
     const prompt = `You are a knowledgeable NYC bar concierge. Provide the best available information about the NYC bar called "${name}". 
     If you are unsure whether it exists or details are unavailable, say so.
-    Do not invent addresses, hours, or prices.}.
+    Do not invent addresses, hours, or prices.
 
     Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
     {"mapsLink": "a google maps search url for it", "neighborhood": "short neighborhood name", "description": "two sentences covering the vibe, typical price range ($, $$, $$$, or $$$$), and location", "tags": ["3 to 5 short lowercase vibe words like cozy, loud, speakeasy, dancing, classy, dive, games"], "happyHour": "short description of happy hour deal with days/times, or null if none found", "capacityHint": an integer estimate of how many people comfortably fit for a casual visit}
@@ -140,31 +151,31 @@ async function fetchBarDetails(name, hint, barId) {
     If uncertain, clearly indicate uncertainty instead of inventing specific details.`;
 
     try {
-        const text = await callGemini(prompt, barId);
-        return safeParse(text, false);
+        return await callGemini(prompt, barId);
     }
     catch (e) {
         return null;
     }
 }
-async function fetchBarSuggestions(vibeQuery, groupSize, excludeNames) {
-    const prompt = `You are a concierge with live web search. Suggest 4 real, currently open bars in New York City matching this vibe request: "${vibeQuery || "a great night out"}". They should comfortably work for a group of about ${groupSize} people. Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary: an array of up to 4 objects, each in exactly this shape:
+async function fetchBarSuggestions(vibeQuery, groupSize, excludeNames, ballerMode, exploreMode) {
+    const constraints = buildConstraints(ballerMode, exploreMode);
+    const prompt = `You are a concierge with live web search. Suggest 4 real, currently open bars in New York City matching this vibe request: "${vibeQuery || "a great night out"}". They should comfortably work for a group of about ${groupSize} people. ${constraints} Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary: an array of up to 4 objects, each in exactly this shape:
 {"name": "string", "neighborhood": "short neighborhood name", "description": "two sentences covering vibe, price range ($ $$ $$$ $$$$), and location", "tags": ["3 to 5 short lowercase vibe words"], "happyHour": "short string or null", "capacityHint": integer, "mapsLink": "a google maps search url for it"}`;
     try {
-        const text = await callGemini(prompt);
-        const parsed = safeParse(text, true);
-        return Array.isArray(parsed) ? parsed : [];
+        const result = await callGemini(prompt);
+        return Array.isArray(result) ? result : [];
     }
     catch (e) {
         return [];
     }
 }
-async function fetchRandomBar(groupSize, excludeNames) {
-    const prompt = `You are a concierge with live web search. Pick exactly one real, currently open bar in New York City as a fun surprise recommendation — any vibe, your choice. It should comfortably work for a group of about ${groupSize} people. Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
+async function fetchRandomBar(groupSize, excludeNames, ballerMode, exploreMode) {
+    const constraints = buildConstraints(ballerMode, exploreMode);
+    const prompt = `You are a concierge with live web search. Pick exactly one real, currently open bar in New York City as a fun surprise recommendation — any vibe, your choice. It should comfortably work for a group of about ${groupSize} people. ${constraints} Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
 {"name": "string", "neighborhood": "short neighborhood name", "description": "two sentences covering vibe, price range ($ $$ $$$ $$$$), and location", "tags": ["3 to 5 short lowercase vibe words"], "happyHour": "short string or null", "capacityHint": integer, "mapsLink": "a google maps search url for it"}`;
     try {
-        const text = await callGemini(prompt);
-        return safeParse(text, false);
+        const result = await callGemini(prompt);
+        return (result && !Array.isArray(result)) ? result : null;
     }
     catch (e) {
         return null;
@@ -187,6 +198,8 @@ function App() {
     const [saveError, setSaveError] = useState(false);
     const [vibeQuery, setVibeQuery] = useState("");
     const [fitsGroupOnly, setFitsGroupOnly] = useState(false);
+    const [ballerMode, setBallerMode] = useState(false);
+    const [exploreMode, setExploreMode] = useState(false);
     const [searchResults, setSearchResults] = useState([]);
     const [searching, setSearching] = useState(false);
     const [searchDone, setSearchDone] = useState(false);
@@ -213,7 +226,7 @@ function App() {
     }, []);
     const persist = useCallback((next) => {
         setBars(next);
-        docRef.set({ bars: next }, { merge: true }).then(() => setSaveError(false)).catch(() => setSaveError(true));
+        return docRef.set({ bars: next }, { merge: true }).then(() => setSaveError(false)).catch(() => setSaveError(true));
         // eslint-disable-next-line
     }, []);
     const persistGroup = useCallback((n) => {
@@ -232,22 +245,16 @@ function App() {
     const runDetailsFetch = useCallback((bar) => {
         setFetchingIds((s) => new Set(s).add(bar.id));
         fetchBarDetails(bar.name, bar.neighborhood, bar.id).then((data) => {
-            if (data) {
-                updateBar(bar.id, {
-                    mapsLink: data.mapsLink || bar.mapsLink,
-                    neighborhood: data.neighborhood || bar.neighborhood,
-                    description: data.description || bar.description,
-                    tags: data.tags && data.tags.length ? data.tags : bar.tags,
-                    happyHour: data.happyHour !== undefined ? data.happyHour : bar.happyHour,
-                    capacity: data.capacityHint || bar.capacity,
-                    detailsFetched: true,
-                });
-            }
-            else {
-                updateBar(bar.id, { detailsFetched: true });
-            }
+            // The server already returns the fully-merged bar object (or
+            // null on failure) — just apply it directly instead of picking
+            // fields back apart client-side.
+            const patch = data ? { ...data, detailsFetched: true } : { detailsFetched: true };
+            updateBar(bar.id, patch);
             setFetchingIds((s) => { const n = new Set(s); n.delete(bar.id); return n; });
-            setDetailsModal((dm) => (dm && dm.bar.id === bar.id ? { ...dm, loading: false } : dm));
+            // Also refresh the bar snapshot the details modal is holding —
+            // without this, the modal kept showing stale (empty) data until
+            // it was closed and reopened, even after the fetch completed.
+            setDetailsModal((dm) => (dm && dm.bar.id === bar.id ? { ...dm, loading: false, bar: { ...dm.bar, ...patch } } : dm));
         });
     }, [updateBar]);
     function openDetails(bar) {
@@ -269,6 +276,7 @@ function App() {
             return b.name.toLowerCase().includes(q) || (b.notes || "").toLowerCase().includes(q) || (b.tags || []).some((t) => t.toLowerCase().includes(q));
         });
         list.sort((a, b) => {
+            if (!!a.disqualified !== !!b.disqualified) return a.disqualified ? 1 : -1;
             const av = foodMode === "with" ? avgWithFood(a) : avgWithoutFood(a);
             const bv = foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
             return (bv || 0) - (av || 0);
@@ -289,7 +297,7 @@ function App() {
         setSearching(true);
         setSearchDone(false);
         const exclude = (bars || []).map((b) => b.name);
-        const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude);
+        const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude, ballerMode, exploreMode);
         const filtered = fitsGroupOnly ? results.filter((r) => !r.capacityHint || r.capacityHint >= groupSize) : results;
         setSearchResults(filtered);
         setSearching(false);
@@ -299,7 +307,7 @@ function App() {
         setSearching(true);
         setSearchDone(false);
         const exclude = (bars || []).map((b) => b.name);
-        const pick = await fetchRandomBar(groupSize, exclude);
+        const pick = await fetchRandomBar(groupSize, exclude, ballerMode, exploreMode);
         setSearchResults(pick ? [pick] : []);
         setSearching(false);
         setSearchDone(true);
@@ -314,7 +322,7 @@ function App() {
         persist([...(bars || []), record]);
         setSearchResults((prev) => prev.filter((r) => r.name !== s.name));
     }
-    function saveVisitedForm(e) {
+    async function saveVisitedForm(e) {
         e.preventDefault();
         if (!visitedForm.name.trim())
             return;
@@ -336,13 +344,13 @@ function App() {
             next = bars.map((b) => (b.id === id ? { ...b, ...patch } : b));
             record = next.find((b) => b.id === id);
         }
-        persist(next);
+        await persist(next);
         setShowVisitedForm(false);
         setVisitedForm(emptyVisitedForm);
         if (!record.detailsFetched)
             runDetailsFetch(record);
     }
-    function saveWishForm(e) {
+    async function saveWishForm(e) {
         e.preventDefault();
         if (!wishForm.name.trim())
             return;
@@ -358,7 +366,7 @@ function App() {
             next = bars.map((b) => (b.id === id ? { ...b, ...patch } : b));
             record = next.find((b) => b.id === id);
         }
-        persist(next);
+        await persist(next);
         setShowWishForm(false);
         setWishForm(emptyWishForm);
         if (!record.detailsFetched)
@@ -374,6 +382,16 @@ function App() {
         setShowVisitedForm(true);
     }
     function removeBar(id) { persist(bars.filter((b) => b.id !== id)); }
+    function toggleDisqualify(b) {
+        if (b.disqualified) {
+            updateBar(b.id, { disqualified: false, disqualifyReason: "" });
+        }
+        else {
+            const reason = window.prompt("Why disqualify this one? (optional — e.g. free drinks, dietary restrictions)", "");
+            if (reason === null) return; // cancelled
+            updateBar(b.id, { disqualified: true, disqualifyReason: reason });
+        }
+    }
     if (loading) {
         return (React.createElement("div", { style: { minHeight: "100vh", background: "#0E0D10", display: "flex", alignItems: "center", justifyContent: "center" } },
             React.createElement("div", { style: { color: "#B8965F", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.85rem", letterSpacing: "0.05em" } }, connError ? "couldn't connect — check your Firebase config in index.html" : "setting the table…")));
@@ -405,6 +423,8 @@ function App() {
         .tda-toggle button.active { background: #B8965F; color: #16130F; font-weight: 600; }
         .tda-chip { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 0.38rem 0.75rem; border-radius: 999px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; }
         .tda-chip.active { background: #3F5D4E; border-color: #3F5D4E; color: #EDE6D9; }
+        .tda-chip-baller.active { background: #8A6D2F; border-color: #8A6D2F; }
+        .tda-chip-explore.active { background: #3A4F66; border-color: #3A4F66; }
         .tda-group-stepper { display: flex; align-items: center; gap: 0.4rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
         .tda-group-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid #302938; background: #0E0D10; color: #B8965F; cursor: pointer; font-size: 1rem; line-height: 1; }
 
@@ -415,9 +435,15 @@ function App() {
         .tda-rank.gold { border-color: #C9A876; color: #C9A876; }
         .tda-rank.silver { border-color: #B9B6BC; color: #C9C6CE; }
         .tda-rank.bronze { border-color: #A9784F; color: #C08E5F; }
-        .tda-name-row { display: flex; align-items: center; }
+        .tda-rank-na { border-color: #5D5666; color: #857C8E; font-size: 0.62rem; }
+        .tda-name-row { display: flex; align-items: center; gap: 0.5rem; }
         .tda-card-name { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.1rem; cursor: pointer; }
         .tda-card-name:hover { color: #C9A876; }
+        .tda-wishlist-badge { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; letter-spacing: 0.04em; color: #7FA88E; text-transform: uppercase; }
+        .tda-wishlist-hood { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: #C9A876; margin: 0.3rem 0 0; }
+        .tda-wishlist-desc { font-size: 0.85rem; color: #A79EB2; line-height: 1.45; margin-top: 0.35rem; }
+        .tda-card.wishlist { border-left: 3px solid #3F5D4E; }
+        .tda-card.disqualified { opacity: 0.7; border-style: dashed; }
         .tda-card-badges { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.3rem; margin-left: 2.5rem; }
         .tda-avg { font-family: 'IBM Plex Mono', monospace; font-size: 1.3rem; font-weight: 600; color: #C9A876; text-align: right; }
         .tda-avg-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #857C8E; text-align: right; }
@@ -500,7 +526,11 @@ function App() {
                         React.createElement("button", { className: foodMode === "without" ? "active" : "", onClick: () => setFoodMode("without") }, "Without food"))),
                 React.createElement("div", { className: "tda-list" },
                     filteredVisited.length === 0 && React.createElement("div", { className: "tda-empty" }, "No stages match that search yet."),
-                    filteredVisited.map((b, i) => (React.createElement(BarCard, { key: b.id, b: b, rank: i + 1, score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b), scoreLabel: foodMode === "with" ? "with food" : "no food", isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => editVisited(b), onDelete: () => removeBar(b.id) })))),
+                    (() => { let rankCounter = 0; return filteredVisited.map((b) => {
+                        const ranked = !b.disqualified;
+                        if (ranked) rankCounter++;
+                        return React.createElement(BarCard, { key: b.id, b: b, rank: ranked ? rankCounter : null, score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b), scoreLabel: foodMode === "with" ? "with food" : "no food", isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => editVisited(b), onDelete: () => removeBar(b.id), onDisqualify: () => toggleDisqualify(b) });
+                    }); })()),
                 React.createElement("button", { className: "tda-add-btn", onClick: () => { setVisitedForm(emptyVisitedForm); setShowVisitedForm(true); } }, "+ Log a stage we rode (rank a bar we visited)"))),
             tab === "find" && (React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "tda-search-panel" },
@@ -512,6 +542,8 @@ function App() {
                             React.createElement("b", { style: { color: "#EDE6D9" } }, groupSize),
                             React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(groupSize + 1) }, "+")),
                         React.createElement("button", { className: `tda-chip ${fitsGroupOnly ? "active" : ""}`, onClick: () => setFitsGroupOnly(!fitsGroupOnly) }, "Fits our group"),
+                        React.createElement("button", { className: `tda-chip tda-chip-baller ${ballerMode ? "active" : ""}`, onClick: () => setBallerMode(!ballerMode) }, "\uD83D\uDCB0 Baller mode"),
+                        React.createElement("button", { className: `tda-chip tda-chip-explore ${exploreMode ? "active" : ""}`, onClick: () => setExploreMode(!exploreMode) }, "\uD83E\uDDED Explore mode"),
                         React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching }, searching ? "Searching…" : "Find bars"),
                         React.createElement("button", { className: "tda-find-btn tda-surprise-btn", onClick: runRandomSearch, disabled: searching }, searching ? "Searching…" : "🎲 Surprise us")),
                     searching && React.createElement("div", { className: "tda-spinner" }, "scouting the city\u2026"),
@@ -605,21 +637,30 @@ function App() {
                     detailsModal.bar.tags && detailsModal.bar.tags.length > 0 && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.7rem" } }, detailsModal.bar.tags.map((t) => React.createElement("span", { key: t, className: "tda-tag" }, t))),
                     React.createElement("div", { className: "tda-modal-actions" },
                         detailsModal.bar.mapsLink && React.createElement("a", { className: "tda-secondary-btn", style: { textAlign: "center", textDecoration: "none" }, href: detailsModal.bar.mapsLink, target: "_blank", rel: "noreferrer" }, "Open map \u2197"),
-                        React.createElement("button", { className: "tda-secondary-btn", onClick: () => refreshDetails(detailsModal.bar) }, "Refresh"),
+                        detailsModal.bar.status !== "visited" && React.createElement("button", { className: "tda-secondary-btn", onClick: () => refreshDetails(detailsModal.bar) }, "Refresh"),
                         React.createElement("button", { className: "tda-primary-btn", onClick: () => setDetailsModal(null) }, "Close")))))))));
 }
-function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, editLabel, onDelete }) {
+function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, editLabel, onDelete, onDisqualify }) {
     const rankClass = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
-    return (React.createElement("div", { className: "tda-card" },
+    const isWishlist = b.status === "to-try";
+    const cardClass = `tda-card ${isWishlist ? "wishlist" : ""} ${b.disqualified ? "disqualified" : ""}`;
+    const shortDesc = b.description && b.description.length > 140 ? b.description.slice(0, 140) + "…" : b.description;
+    return (React.createElement("div", { className: cardClass },
         React.createElement("div", { className: "tda-card-top" },
             React.createElement("div", { className: "tda-name-row" },
-                rank && React.createElement("span", { className: `tda-rank ${rankClass}` }, rank),
-                React.createElement("div", { className: "tda-card-name", onClick: onNameClick }, b.name)),
+                rank ? React.createElement("span", { className: `tda-rank ${rankClass}` }, rank)
+                    : (b.disqualified && React.createElement("span", { className: "tda-rank tda-rank-na" }, "N/A")),
+                React.createElement("div", { className: "tda-card-name", onClick: onNameClick }, b.name),
+                isWishlist && React.createElement("span", { className: "tda-wishlist-badge" }, "\u2606 wishlist")),
             score !== undefined && score !== null && (React.createElement("div", null,
-                React.createElement("div", { className: "tda-avg" }, fmt(score)),
-                React.createElement("div", { className: "tda-avg-label" }, scoreLabel)))),
+                React.createElement("div", { className: "tda-avg" }, b.disqualified ? "N/A" : fmt(score)),
+                React.createElement("div", { className: "tda-avg-label" }, b.disqualified ? "disqualified" : scoreLabel)))),
+        b.disqualified && b.disqualifyReason && React.createElement("div", { className: "tda-comment", style: { marginLeft: rank || b.disqualified ? "2.5rem" : 0 } },
+            "Disqualified \u2014 ", b.disqualifyReason),
         b.tags && b.tags.length > 0 && React.createElement("div", { className: "tda-card-badges" },
             React.createElement("div", { className: "tda-tags" }, b.tags.map((t) => React.createElement("span", { key: t, className: "tda-tag" }, t)))),
+        isWishlist && b.neighborhood && React.createElement("div", { className: "tda-wishlist-hood" }, b.neighborhood),
+        isWishlist && shortDesc && React.createElement("div", { className: "tda-wishlist-desc" }, shortDesc),
         b.status === "visited" && (React.createElement("div", { className: "tda-stats" },
             React.createElement("span", null,
                 "Vibe ",
@@ -651,6 +692,7 @@ function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, 
             b.mapsLink && React.createElement("a", { className: "tda-link-btn", href: b.mapsLink, target: "_blank", rel: "noreferrer" }, "Map \u2197"),
             React.createElement("button", { className: "tda-edit-btn", onClick: onNameClick }, "Details"),
             React.createElement("button", { className: "tda-visit-btn", onClick: onEdit }, editLabel || "Edit"),
+            b.status === "visited" && onDisqualify && React.createElement("button", { className: "tda-visit-btn", onClick: onDisqualify }, b.disqualified ? "Un-disqualify" : "Disqualify"),
             React.createElement("button", { className: "tda-del-btn", onClick: onDelete }, "Remove"))));
 }
 const root = ReactDOM.createRoot(document.getElementById("root"));
