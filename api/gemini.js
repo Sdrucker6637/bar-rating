@@ -1,4 +1,4 @@
-import admin from "firebase-admin";
+import * as admin from "firebase-admin";
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -22,31 +22,39 @@ export default async function handler(req, res) {
   try {
     const { barId, prompt } = req.body;
 
-    const docRef = db
-      .collection("tourDeAlcoholism")
-      .doc("sharedList");
+    let existingBar = null;
+    let bars = null;
+    let docRef = null;
 
-    const snapshot = await docRef.get();
-    const data = snapshot.data();
+    // Only use Firebase caching when we are fetching details
+    // for an existing bar
+    if (barId) {
+      docRef = db
+        .collection("tourDeAlcoholism")
+        .doc("sharedList");
 
-    const bars = data.bars || [];
+      const snapshot = await docRef.get();
+      const data = snapshot.data();
 
-    const existingBar = bars.find(
-      (bar) => bar.id === barId
-    );
+      bars = data?.bars || [];
 
-    if (!existingBar) {
-      return res.status(404).json({
-        error: "Bar not found",
-      });
+      existingBar = bars.find(
+        (bar) => bar.id === barId
+      );
+
+      if (!existingBar) {
+        return res.status(404).json({
+          error: "Bar not found",
+        });
+      }
+
+      // Return cached result
+      if (existingBar.detailsFetched) {
+        return res.status(200).json(existingBar);
+      }
     }
 
-    // Return cached result
-    if (existingBar.detailsFetched) {
-      return res.status(200).json(existingBar);
-    }
-
-    // Call Gemini only once
+    // Call Gemini
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent",
       {
@@ -71,11 +79,29 @@ export default async function handler(req, res) {
 
     const geminiData = await response.json();
 
+    // Surface Gemini errors (quota, invalid key, etc.)
+    if (!response.ok) {
+      console.error("Gemini error:", geminiData);
+
+      return res.status(response.status).json({
+        error: geminiData?.error?.message || "Gemini request failed",
+      });
+    }
+
     const description =
       geminiData?.candidates?.[0]?.content?.parts
         ?.map((p) => p.text || "")
         .join("\n") || "";
 
+    // If this was only a suggestion/random search,
+    // return Gemini directly and do not touch Firebase
+    if (!barId) {
+      return res.status(200).json({
+        description,
+      });
+    }
+
+    // Update Firestore cache for existing bar
     const updatedBars = bars.map((bar) => {
       if (bar.id !== barId) {
         return bar;
@@ -100,10 +126,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Server error:", error);
 
     return res.status(500).json({
-      error: "Failed to generate details",
+      error: error.message || "Failed to generate details",
     });
   }
 }
