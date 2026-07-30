@@ -109,7 +109,7 @@ function safeParse(text, isArray) {
     }
     return null;
 }
-async function callGemini(prompt) {
+async function callGemini(prompt, barId) {
     const response = await fetch("/api/gemini", {
         method: "POST",
         headers: {
@@ -117,21 +117,30 @@ async function callGemini(prompt) {
         },
         body: JSON.stringify({
             prompt,
+            barId
         }),
     });
 
     const data = await response.json();
 
-    const parts = data?.candidates?.[0]?.content?.parts || [];
-
-    return parts.map((p) => p.text || "").join("\n");
+    return data.description 
+        ? JSON.stringify(data)
+        : data?.candidates?.[0]?.content?.parts
+            ?.map((p) => p.text || "")
+            .join("\n") || "";
 }
-async function fetchBarDetails(name, hint) {
-    const prompt = `You are a concierge with live web search. Find the real bar called "${name}"${hint ? ` (near ${hint})` : ""} in New York City. Search the web to confirm it. Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
-{"mapsLink": "a google maps search url for it", "neighborhood": "short neighborhood name", "description": "two sentences covering the vibe, typical price range ($, $$, $$$, or $$$$), and location", "tags": ["3 to 5 short lowercase vibe words like cozy, loud, speakeasy, dancing, classy, dive, games"], "happyHour": "short description of happy hour deal with days/times, or null if none found", "capacityHint": an integer estimate of how many people comfortably fit for a casual visit}
-If you cannot find a confirmed real match, make a reasonable best-effort guess from the name and keep the description honest about the uncertainty.`;
+async function fetchBarDetails(name, hint, barId) {
+    const prompt = `You are a knowledgeable NYC bar concierge. Provide the best available information about the NYC bar called "${name}". 
+    If you are unsure whether it exists or details are unavailable, say so.
+    Do not invent addresses, hours, or prices.}.
+
+    Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
+    {"mapsLink": "a google maps search url for it", "neighborhood": "short neighborhood name", "description": "two sentences covering the vibe, typical price range ($, $$, $$$, or $$$$), and location", "tags": ["3 to 5 short lowercase vibe words like cozy, loud, speakeasy, dancing, classy, dive, games"], "happyHour": "short description of happy hour deal with days/times, or null if none found", "capacityHint": an integer estimate of how many people comfortably fit for a casual visit}
+
+    If uncertain, clearly indicate uncertainty instead of inventing specific details.`;
+
     try {
-        const text = await callGemini(prompt);
+        const text = await callGemini(prompt, barId);
         return safeParse(text, false);
     }
     catch (e) {
@@ -222,7 +231,7 @@ function App() {
     }, []);
     const runDetailsFetch = useCallback((bar) => {
         setFetchingIds((s) => new Set(s).add(bar.id));
-        fetchBarDetails(bar.name, bar.neighborhood).then((data) => {
+        fetchBarDetails(bar.name, bar.neighborhood, bar.id).then((data) => {
             if (data) {
                 updateBar(bar.id, {
                     mapsLink: data.mapsLink || bar.mapsLink,
