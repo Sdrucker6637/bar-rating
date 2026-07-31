@@ -321,15 +321,13 @@ function App() {
 
   function confirmOsmSelection(osmResult) {
     const merged = { ...osmModal.suggestion, ...osmResult };
-    // Preserve Gemini-provided description/tags if OSM result overwrote them
-    if (osmResult._fromGemini || Object.keys(osmResult).length === 0) {
-      // These fields should already be in osmModal.suggestion — ensure they survive
-      merged.description = osmModal.suggestion.description || merged.description || "";
-      merged.tags = osmModal.suggestion.tags || merged.tags || [];
-      merged.neighborhood = osmModal.suggestion.neighborhood || merged.neighborhood || "";
-      merged.happyHour = osmModal.suggestion.happyHour || merged.happyHour || "";
-      merged.capacityHint = osmModal.suggestion.capacityHint || merged.capacityHint || null;
-    }
+    // Always preserve description/tags/neighborhood from the original suggestion
+    // (OSM results only have name/address/lat/lon/mapsLink, so these would be lost otherwise)
+    merged.description = osmModal.suggestion.description || "";
+    merged.tags = osmModal.suggestion.tags || [];
+    merged.neighborhood = osmModal.suggestion.neighborhood || "";
+    merged.happyHour = osmModal.suggestion.happyHour || "";
+    merged.capacityHint = osmModal.suggestion.capacityHint || null;
     if (osmModal.suggestion._osmIntent === "visited") {
       // Pre-fill the visited scoring form with verified location data
       setVisitedSuggestion(merged);
@@ -350,6 +348,7 @@ function App() {
     let list = visited.filter(b => {
       if (!q) return true;
       return b.name.toLowerCase().includes(q)
+        || (b.neighborhood || "").toLowerCase().includes(q)
         || (b.notes || "").toLowerCase().includes(q)
         || (b.tags || []).some(t => t.toLowerCase().includes(q));
     });
@@ -693,7 +692,7 @@ function App() {
             React.createElement("div", { className: "tda-champion-score" }, fmt(score)));
         })(),
         React.createElement("div", { className: "tda-controls" },
-          React.createElement("input", { className: "tda-input", placeholder: "Search name or notes\u2026", value: search, onChange: e => setSearch(e.target.value), style: { flex: "1 1 200px" } }),
+          React.createElement("input", { className: "tda-input", placeholder: "Search name, hood, notes\u2026", value: search, onChange: e => setSearch(e.target.value), style: { flex: "1 1 200px" } }),
           React.createElement("div", { className: "tda-toggle" },
             React.createElement("button", { className: foodMode === "with" ? "active" : "", onClick: () => setFoodMode("with") }, "With food"),
             React.createElement("button", { className: foodMode === "without" ? "active" : "", onClick: () => setFoodMode("without") }, "Without food"))),
@@ -863,7 +862,7 @@ function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, 
     b.disqualified && b.disqualifyReason && React.createElement("div", { className: "tda-comment" }, "Disqualified \u2014 ", b.disqualifyReason),
     b.tags && b.tags.length > 0 && React.createElement("div", { className: "tda-card-badges" },
       React.createElement("div", { className: "tda-tags" }, b.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t)))),
-    isWishlist && b.neighborhood && React.createElement("div", { className: "tda-wishlist-hood" }, b.neighborhood),
+    b.neighborhood && React.createElement("div", { className: "tda-wishlist-hood" }, b.neighborhood),
     shortDesc && React.createElement("div", { className: "tda-wishlist-desc" }, shortDesc),
     b.status === "visited" && React.createElement("div", { className: "tda-stats" },
       React.createElement("span", null, "\uD83C\uDFAD Vibe ",    React.createElement("b", null, fmt(b.vibe))),
