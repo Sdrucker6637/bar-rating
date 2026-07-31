@@ -308,8 +308,9 @@ function App() {
     const address = result.address || suggestion.address || "";
     const lat = result.latitude || null;
     const lng = result.longitude || null;
-    // Build mapsLink using bar name + NYC so Google Maps finds the actual business listing
-    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((result.name || suggestion.name) + ", New York City")}`;
+    // Use specific address when available for disambiguation; fall back to name + NYC
+    const mapsQuery = address || (result.name || suggestion.name) + ", New York City";
+    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
     return {
       name: result.name || suggestion.name,
       address,
@@ -385,8 +386,9 @@ function App() {
   }
 
   function addSuggestionToWishlist(s) {
-    // Use bar name + NYC so Google Maps finds the business listing, not just a street address
-    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ", New York City")}`;
+    // Use specific address when available for disambiguation; fall back to name + NYC
+    const mapsQuery = s.address || s.name + ", New York City";
+    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
     const isEdit = s._wishFormId;
     const id = isEdit ? s._wishFormId : `b${Date.now()}`;
     // If Gemini already gave us a real description, don't re-fetch and overwrite it
@@ -670,20 +672,21 @@ function App() {
 
       tab === "find" && React.createElement(React.Fragment, null,
         searchPanel,
+        React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("wishlist") }, "+ Add to wishlist by name"),
         React.createElement("div", { className: "tda-section-heading" },
           React.createElement("h2", null, "Our Wishlist"),
           React.createElement("div", { className: "tda-rule" }),
           React.createElement("span", { className: "tda-section-count" }, filteredToTry.length, " bar", filteredToTry.length === 1 ? "" : "s")),
         React.createElement("div", { className: "tda-list" },
-          filteredToTry.length === 0 && React.createElement("div", { className: "tda-empty" }, "Nothing on the list yet \u2014 search above or add one below."),
+          filteredToTry.length === 0 && React.createElement("div", { className: "tda-empty" }, "Nothing on the list yet \u2014 use the button above to add one."),
           filteredToTry.map(b => React.createElement(BarCard, {
             key: b.id, b: b, isFetching: fetchingIds.has(b.id),
             onNameClick: () => { if (b.mapsLink) window.open(b.mapsLink, "_blank"); },
             onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id),
-          }))),
-        React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("wishlist") }, "+ Add to wishlist by name")),
+          })))),
 
       tab === "leaderboard" && React.createElement(React.Fragment, null,
+        React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("visited") }, "+ Add a bar you visited & rank it"),
         filteredVisited.length > 0 && (() => {
           const champ = filteredVisited[0];
           const score = foodMode === "with" ? avgWithFood(champ) : avgWithoutFood(champ);
@@ -716,8 +719,6 @@ function App() {
               });
             });
           })()),
-        React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("visited") }, "+ Add a bar you visited & rank it")),
-
       saveError && React.createElement("div", { className: "tda-footnote", style: { color: "#C77676" } }, "Couldn't save that change \u2014 check your connection and try again."),
       React.createElement("div", { className: "tda-footnote" }, "Shared list \u2014 anyone with this page can add stages, rank bars, and edit entries.")),
 
