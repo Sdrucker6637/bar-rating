@@ -445,11 +445,8 @@ function App() {
     };
     let next, record;
     if (isNew) {
-      const mapsQuery = visitedSuggestion
-        ? (visitedSuggestion.address || visitedSuggestion.name + ", New York City")
-        : "";
-      const mapsLink = mapsQuery
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
+      const mapsLink = visitedSuggestion
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visitedSuggestion.name + (visitedSuggestion.address ? ", " + visitedSuggestion.address : ", New York City"))}`
         : "";
       record = visitedSuggestion
         ? { ...base, ...patch, id,
