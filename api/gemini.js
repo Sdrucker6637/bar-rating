@@ -117,7 +117,7 @@ export default async function handler(req, res) {
     try {
       geminiResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${
-          process.env.GEMINI_MODEL || "gemini-2.0-flash-lite"
+          process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
         }:generateContent`,
         {
           method: "POST",
