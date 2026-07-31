@@ -718,7 +718,7 @@ function App() {
                 onEdit: () => editVisited(b), onDelete: () => removeBar(b.id), onDisqualify: () => toggleDisqualify(b),
               });
             });
-          })()),
+          })())),
       saveError && React.createElement("div", { className: "tda-footnote", style: { color: "#C77676" } }, "Couldn't save that change \u2014 check your connection and try again."),
       React.createElement("div", { className: "tda-footnote" }, "Shared list \u2014 anyone with this page can add stages, rank bars, and edit entries.")),
 
