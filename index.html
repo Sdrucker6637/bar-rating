@@ -307,13 +307,8 @@ function App() {
     const address = result.address || suggestion.address || "";
     const lat = result.latitude || null;
     const lng = result.longitude || null;
-    // Build mapsLink from address if available, otherwise fall back to coordinates
-    let mapsLink = "";
-    if (address) {
-      mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-    } else if (lat && lng) {
-      mapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-    }
+    // Build mapsLink using bar name + NYC so Google Maps finds the actual business listing
+    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((result.name || suggestion.name) + ", New York City")}`;
     return {
       name: result.name || suggestion.name,
       address,
@@ -390,9 +385,8 @@ function App() {
   }
 
   function addSuggestionToWishlist(s) {
-    const mapsLink = s.address
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address)}`
-      : "";
+    // Use bar name + NYC so Google Maps finds the business listing, not just a street address
+    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ", New York City")}`;
     const isEdit = s._wishFormId;
     const id = isEdit ? s._wishFormId : `b${Date.now()}`;
     // If Gemini already gave us a real description, don't re-fetch and overwrite it
@@ -449,9 +443,7 @@ function App() {
     let next, record;
     if (isNew) {
       const mapsLink = visitedSuggestion
-        ? (visitedSuggestion.address
-            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visitedSuggestion.address)}`
-            : visitedSuggestion.mapsLink || "")
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visitedSuggestion.name + ", New York City")}`
         : "";
       record = visitedSuggestion
         ? { ...base, ...patch, id,

@@ -32,13 +32,17 @@ export default async function handler(req, res) {
       nyPlaces = await nominatimSearch(barTerms);
     }
 
-    const results = nyPlaces.map((p) => ({
-      name: p.name || p.display_name.split(",")[0],
-      address: p.display_name,
-      latitude: p.lat,
-      longitude: p.lon,
-      mapsLink: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.display_name)}`,
-    }));
+    const results = nyPlaces.map((p) => {
+      const barName = p.name || p.display_name.split(",")[0];
+      return {
+        name: barName,
+        address: p.display_name,
+        latitude: p.lat,
+        longitude: p.lon,
+        // Use bar name + NYC so Google Maps finds the business listing, not just a street address
+        mapsLink: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(barName + ", New York City")}`,
+      };
+    });
 
     return res.status(200).json(results);
   } catch (error) {
