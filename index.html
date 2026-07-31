@@ -304,12 +304,22 @@ function App() {
     const prompt = `You are a geocoding assistant. Find the exact street address and coordinates for "${suggestion.name}" ${suggestion.neighborhood ? "in " + suggestion.neighborhood + ", " : "in "}New York City, NY. Respond with ONLY raw JSON, no markdown fences: {"address":"full street address, city, state, zip","latitude":40.7,"longitude":-74.0,"name":"verified business name"}`;
     const result = await callGemini(prompt, null, true);
     if (!result) return null;
+    const address = result.address || suggestion.address || "";
+    const lat = result.latitude || null;
+    const lng = result.longitude || null;
+    // Build mapsLink from address if available, otherwise fall back to coordinates
+    let mapsLink = "";
+    if (address) {
+      mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    } else if (lat && lng) {
+      mapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    }
     return {
       name: result.name || suggestion.name,
-      address: result.address || suggestion.address || "",
-      latitude: result.latitude || null,
-      longitude: result.longitude || null,
-      mapsLink: result.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(result.address)}` : "",
+      address,
+      latitude: lat,
+      longitude: lng,
+      mapsLink,
       _fromGemini: true,
     };
   }
@@ -636,7 +646,7 @@ function App() {
       .tda-section-count { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; }
       .tda-modal-backdrop { position:fixed; inset:0; background:rgba(6,5,7,0.8); display:flex; align-items:center; justify-content:center; padding:1rem; z-index:50; }
       .tda-modal { background:#17141B; border:1px solid #302938; border-radius:10px; padding:1.5rem; max-width:460px; width:100%; max-height:85vh; overflow-y:auto; }
-      .tda-modal h3 { font-family:'Fraunces',serif; font-weight:500; margin-top:0; }
+      .tda-modal h3 { font-family:'Fraunces',serif; font-weight:500; margin-top:0; color:#EDE6D9; }
       .tda-field { display:flex; flex-direction:column; gap:0.3rem; margin-bottom:0.7rem; }
       .tda-field label { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:#857C8E; }
       .tda-field-row { display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; }
@@ -651,8 +661,8 @@ function App() {
       .tda-osm-result { border:1px solid #302938; border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.5rem; cursor:pointer; background:#0E0D10; transition:border-color 0.15s, background 0.15s; }
       .tda-osm-result:hover { border-color:#B8965F; background:#141118; }
       .tda-osm-result-name { font-family:'Fraunces',serif; font-weight:500; font-size:1rem; color:#EDE6D9; }
-      .tda-osm-result-addr { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:0.25rem; line-height:1.4; }
-      .tda-osm-none { font-size:0.85rem; color:#A79EB2; line-height:1.5; margin-bottom:0.25rem; }
+      .tda-osm-result-addr { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#A79EB2; margin-top:0.25rem; line-height:1.4; }
+      .tda-osm-none { font-size:0.85rem; color:#EDE6D9; line-height:1.5; margin-bottom:0.25rem; }
     `),
 
     React.createElement("div", { className: "tda-container" },

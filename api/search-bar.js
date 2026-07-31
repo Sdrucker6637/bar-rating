@@ -1,3 +1,17 @@
+async function nominatimSearch(queryTerms) {
+  const search = encodeURIComponent(queryTerms);
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${search}&limit=8&addressdetails=1&countrycodes=us`,
+    { headers: { "User-Agent": "TourDeAlcoholism" } }
+  );
+  const places = await response.json();
+  return places.filter(p => {
+    const addr = p.address || {};
+    const state = (addr.state || "").toLowerCase();
+    return state === "new york" || state === "ny";
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -6,27 +20,17 @@ export default async function handler(req, res) {
   try {
     const { query, neighborhood } = req.body;
 
-    // Scope every search to New York City so results are always local.
-    // Include neighborhood when provided for better accuracy.
-    const terms = [query, "New York City", neighborhood || ""].filter(Boolean).join(", ");
-    const search = encodeURIComponent(terms);
+    // Base terms: always scope to NYC
+    const baseTerms = [query, "New York City", neighborhood || ""].filter(Boolean).join(", ");
 
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${search}&limit=8&addressdetails=1&countrycodes=us`,
-      {
-        headers: { "User-Agent": "TourDeAlcoholism" },
-      }
-    );
+    // First pass: standard search
+    let nyPlaces = await nominatimSearch(baseTerms);
 
-    const places = await response.json();
-
-    // Strict filter: only return results confirmed to be in New York state
-    const nyPlaces = places.filter(p => {
-      const addr = p.address || {};
-      const state = (addr.state || "").toLowerCase();
-      // Check for "new york" in state field or "ny" as state code
-      return state === "new york" || state === "ny";
-    });
+    // Second pass: if nothing found, try appending "bar" for POI matching
+    if (nyPlaces.length === 0) {
+      const barTerms = [query + " bar", "New York City", neighborhood || ""].filter(Boolean).join(", ");
+      nyPlaces = await nominatimSearch(barTerms);
+    }
 
     const results = nyPlaces.map((p) => ({
       name: p.name || p.display_name.split(",")[0],
