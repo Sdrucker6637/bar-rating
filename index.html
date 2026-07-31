@@ -111,7 +111,18 @@ function safeParse(text, isArray) {
     }
     return null;
 }
-async function callGemini(prompt, barId) {
+function displayDescription(value) {
+    if (typeof value !== "string") return "";
+    const parsed = safeParse(value, false);
+    return parsed && !Array.isArray(parsed) && typeof parsed.description === "string"
+        ? parsed.description.trim()
+        : value.trim();
+}
+function needsDetails(bar) {
+    const desc = displayDescription(bar.description);
+    return !bar.detailsFetched || desc.length < 36 || /^\s*[\[{]/.test(desc);
+}
+async function callGemini(prompt, barId, forceRefresh) {
     const response = await fetch("/api/gemini", {
         method: "POST",
         headers: {
@@ -119,7 +130,8 @@ async function callGemini(prompt, barId) {
         },
         body: JSON.stringify({
             prompt,
-            barId
+            barId,
+            forceRefresh: !!forceRefresh
         }),
     });
 
@@ -140,8 +152,8 @@ function buildConstraints(ballerMode, exploreMode) {
         : "Distance: keep it realistic — roughly within a 40-minute transit ride of Manhattan.";
     return price + " " + distance;
 }
-async function fetchBarDetails(name, hint, barId) {
-    const prompt = `You are a knowledgeable NYC bar concierge. Provide the best available information about the NYC bar called "${name}". 
+async function fetchBarDetails(name, hint, barId, forceRefresh) {
+    const prompt = `You are a knowledgeable NYC bar concierge. Use Google Search to verify the currently open NYC bar called "${name}"${hint ? ` near/in ${hint}` : ""}. 
     If you are unsure whether it exists or details are unavailable, say so.
     Do not invent addresses, hours, or prices.
 
@@ -151,7 +163,7 @@ async function fetchBarDetails(name, hint, barId) {
     If uncertain, clearly indicate uncertainty instead of inventing specific details.`;
 
     try {
-        return await callGemini(prompt, barId);
+        return await callGemini(prompt, barId, forceRefresh);
     }
     catch (e) {
         return null;
@@ -205,6 +217,8 @@ function App() {
     const [searchDone, setSearchDone] = useState(false);
     const [detailsModal, setDetailsModal] = useState(null);
     const [fetchingIds, setFetchingIds] = useState(new Set());
+    const [showInfo, setShowInfo] = useState(false);
+    const [visitedSuggestion, setVisitedSuggestion] = useState(null);
     const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
     // live sync from Firestore — updates instantly for everyone with this page open
     useEffect(() => {
@@ -242,29 +256,30 @@ function App() {
         });
         // eslint-disable-next-line
     }, []);
-    const runDetailsFetch = useCallback((bar) => {
+    const runDetailsFetch = useCallback((bar, forceRefresh) => {
         setFetchingIds((s) => new Set(s).add(bar.id));
-        fetchBarDetails(bar.name, bar.neighborhood, bar.id).then((data) => {
+        fetchBarDetails(bar.name, bar.neighborhood, bar.id, forceRefresh).then((data) => {
             // The server already returns the fully-merged bar object (or
             // null on failure) — just apply it directly instead of picking
             // fields back apart client-side.
-            const patch = data ? { ...data, detailsFetched: true } : { detailsFetched: true };
-            updateBar(bar.id, patch);
+            const patch = data ? { ...data, detailsFetched: true } : null;
+            if (patch) updateBar(bar.id, patch);
             setFetchingIds((s) => { const n = new Set(s); n.delete(bar.id); return n; });
             // Also refresh the bar snapshot the details modal is holding —
             // without this, the modal kept showing stale (empty) data until
             // it was closed and reopened, even after the fetch completed.
-            setDetailsModal((dm) => (dm && dm.bar.id === bar.id ? { ...dm, loading: false, bar: { ...dm.bar, ...patch } } : dm));
+            setDetailsModal((dm) => (dm && dm.bar.id === bar.id ? { ...dm, loading: false, bar: patch ? { ...dm.bar, ...patch } : dm.bar, error: patch ? "" : "We couldn't find a reliable description yet. Try Refresh." } : dm));
         });
     }, [updateBar]);
     function openDetails(bar) {
-        setDetailsModal({ bar, loading: !bar.detailsFetched });
-        if (!bar.detailsFetched && !fetchingIds.has(bar.id))
+        const shouldFetch = needsDetails(bar);
+        setDetailsModal({ bar, loading: shouldFetch, error: "" });
+        if (shouldFetch && !fetchingIds.has(bar.id))
             runDetailsFetch(bar);
     }
     function refreshDetails(bar) {
-        setDetailsModal({ bar, loading: true });
-        runDetailsFetch({ ...bar, detailsFetched: false });
+        setDetailsModal({ bar, loading: true, error: "" });
+        runDetailsFetch(bar, true);
     }
     const visited = useMemo(() => (bars || []).filter((b) => b.status === "visited"), [bars]);
     const toTry = useMemo(() => (bars || []).filter((b) => b.status === "to-try"), [bars]);
@@ -322,6 +337,11 @@ function App() {
         persist([...(bars || []), record]);
         setSearchResults((prev) => prev.filter((r) => r.name !== s.name));
     }
+    function rankSuggestion(s) {
+        setVisitedSuggestion(s);
+        setVisitedForm({ ...emptyVisitedForm, name: s.name });
+        setShowVisitedForm(true);
+    }
     async function saveVisitedForm(e) {
         e.preventDefault();
         if (!visitedForm.name.trim())
@@ -337,7 +357,9 @@ function App() {
         };
         let next, record;
         if (isNew) {
-            record = { ...base, ...patch, id, tags: [] };
+            record = visitedSuggestion
+                ? { ...base, ...patch, id, neighborhood: visitedSuggestion.neighborhood || "", description: displayDescription(visitedSuggestion.description), tags: visitedSuggestion.tags || [], happyHour: visitedSuggestion.happyHour || "", capacity: visitedSuggestion.capacityHint || null, mapsLink: visitedSuggestion.mapsLink || "", detailsFetched: !!displayDescription(visitedSuggestion.description) }
+                : { ...base, ...patch, id, tags: [] };
             next = [...bars, record];
         }
         else {
@@ -347,6 +369,7 @@ function App() {
         await persist(next);
         setShowVisitedForm(false);
         setVisitedForm(emptyVisitedForm);
+        setVisitedSuggestion(null);
         if (!record.detailsFetched)
             runDetailsFetch(record);
     }
@@ -356,7 +379,7 @@ function App() {
             return;
         const isNew = !wishForm.id;
         const id = wishForm.id || `b${Date.now()}`;
-        const patch = { name: wishForm.name.trim(), status: "to-try", notes: wishForm.notes.trim() };
+        const patch = { name: wishForm.name.trim(), neighborhood: wishForm.neighborhood.trim(), status: "to-try", notes: wishForm.notes.trim() };
         let next, record;
         if (isNew) {
             record = { ...base, ...patch, id, tags: [], vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0 };
@@ -373,10 +396,12 @@ function App() {
             runDetailsFetch(record);
     }
     function markVisited(b) {
+        setVisitedSuggestion(null);
         setVisitedForm({ id: b.id, name: b.name, vibe: "", value: "", service: "", food: "", drinks: "", bathroomBonus: "", notes: b.notes || "" });
         setShowVisitedForm(true);
     }
     function editVisited(b) {
+        setVisitedSuggestion(null);
         var _a, _b, _c, _d, _e, _f;
         setVisitedForm({ id: b.id, name: b.name, vibe: (_a = b.vibe) !== null && _a !== void 0 ? _a : "", value: (_b = b.value) !== null && _b !== void 0 ? _b : "", service: (_c = b.service) !== null && _c !== void 0 ? _c : "", food: (_d = b.food) !== null && _d !== void 0 ? _d : "", drinks: (_e = b.drinks) !== null && _e !== void 0 ? _e : "", bathroomBonus: (_f = b.bathroomBonus) !== null && _f !== void 0 ? _f : "", notes: b.notes || "" });
         setShowVisitedForm(true);
@@ -403,6 +428,7 @@ function App() {
         .tda-header { padding: 3rem 0 1.75rem; text-align: center; border-bottom: 1px solid #262029; }
         .tda-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: clamp(1.9rem, 5.5vw, 2.9rem); letter-spacing: -0.01em; color: #EDE6D9; margin: 0; }
         .tda-title .accent { color: #C9A876; font-style: italic; font-weight: 500; }
+        .tda-info-btn { margin-left: 0.4rem; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #857C8E; background: transparent; color: #C9A876; font: 600 0.72rem 'IBM Plex Mono', monospace; cursor: pointer; vertical-align: middle; }
         .tda-sub { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #857C8E; margin-top: 0.7rem; }
 
         .tda-tabs { display: flex; gap: 0.5rem; justify-content: center; margin: 1.75rem 0; flex-wrap: wrap; }
@@ -476,6 +502,8 @@ function App() {
         .tda-suggestion-desc { font-size: 0.82rem; color: #A79EB2; margin-top: 0.5rem; line-height: 1.4; }
         .tda-suggestion-add { margin-top: 0.7rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 0.4rem 0.8rem; border-radius: 5px; border: 1px solid #3F5D4E; background: transparent; color: #7FA88E; cursor: pointer; width: 100%; }
         .tda-suggestion-add:hover { background: #3F5D4E; color: #EDE6D9; }
+        .tda-suggestion-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+        .tda-suggestion-actions .tda-suggestion-add { margin-top: 0; flex: 1; }
 
         .tda-empty { text-align: center; padding: 2.5rem 1rem; color: #857C8E; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
         .tda-section-heading { display: flex; align-items: center; gap: 0.8rem; margin: 2.25rem 0 0.25rem; }
@@ -504,7 +532,8 @@ function App() {
             React.createElement("div", { className: "tda-header" },
                 React.createElement("h1", { className: "tda-title" },
                     "Tour de ",
-                    React.createElement("span", { className: "accent" }, "Alcoholism")),
+                    React.createElement("span", { className: "accent" }, "Alcoholism"),
+                    React.createElement("button", { className: "tda-info-btn", type: "button", title: "How Tour de Alcoholism works", "aria-label": "How Tour de Alcoholism works", onClick: () => setShowInfo(true) }, "i")),
                 React.createElement("div", { className: "tda-sub" }, "a running record of the bars we've survived")),
             React.createElement("div", { className: "tda-tabs" },
                 React.createElement("button", { className: `tda-tab ${tab === "leaderboard" ? "active" : ""}`, onClick: () => setTab("leaderboard") }, "Current Leaderboard"),
@@ -531,7 +560,7 @@ function App() {
                         if (ranked) rankCounter++;
                         return React.createElement(BarCard, { key: b.id, b: b, rank: ranked ? rankCounter : null, score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b), scoreLabel: foodMode === "with" ? "with food" : "no food", isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => editVisited(b), onDelete: () => removeBar(b.id), onDisqualify: () => toggleDisqualify(b) });
                     }); })()),
-                React.createElement("button", { className: "tda-add-btn", onClick: () => { setVisitedForm(emptyVisitedForm); setShowVisitedForm(true); } }, "+ Log a stage we rode (rank a bar we visited)"))),
+                React.createElement("button", { className: "tda-add-btn", onClick: () => { setVisitedSuggestion(null); setVisitedForm(emptyVisitedForm); setShowVisitedForm(true); } }, "+ Add a bar you visited & rank it"))),
             tab === "find" && (React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "tda-search-panel" },
                     React.createElement("div", { className: "tda-search-row" },
@@ -556,7 +585,10 @@ function App() {
                         s.happyHour && React.createElement("div", { className: "tda-suggestion-desc", style: { color: "#C9A876" } },
                             "\uD83D\uDD54 ",
                             s.happyHour),
-                        React.createElement("button", { className: "tda-suggestion-add", onClick: () => addSuggestionToWishlist(s) }, "+ Add to our list"))))))),
+                        s.mapsLink && React.createElement("a", { className: "tda-link-btn", style: { display: "inline-block", marginTop: "0.7rem" }, href: s.mapsLink, target: "_blank", rel: "noreferrer" }, "Map ↗"),
+                        React.createElement("div", { className: "tda-suggestion-actions" },
+                            React.createElement("button", { className: "tda-suggestion-add", onClick: () => addSuggestionToWishlist(s) }, "+ Wishlist"),
+                            React.createElement("button", { className: "tda-visit-btn", onClick: () => rankSuggestion(s) }, "I visited"))))))),
                 React.createElement("div", { className: "tda-section-heading" },
                     React.createElement("h2", null, "Our Wishlist"),
                     React.createElement("div", { className: "tda-rule" }),
@@ -566,13 +598,13 @@ function App() {
                         filteredToTry.length === 1 ? "" : "s")),
                 React.createElement("div", { className: "tda-list" },
                     filteredToTry.length === 0 && React.createElement("div", { className: "tda-empty" }, "Nothing on the list yet \u2014 search above or add one below."),
-                    filteredToTry.map((b) => (React.createElement(BarCard, { key: b.id, b: b, isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => markVisited(b), editLabel: "Mark visited", onDelete: () => removeBar(b.id) })))),
-                React.createElement("button", { className: "tda-add-btn", onClick: () => { setWishForm(emptyWishForm); setShowWishForm(true); } }, "+ Add a bar by name (we'll fill in the rest)"))),
+                    filteredToTry.map((b) => (React.createElement(BarCard, { key: b.id, b: b, isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id) })))),
+                React.createElement("button", { className: "tda-add-btn", onClick: () => { setWishForm(emptyWishForm); setShowWishForm(true); } }, "+ Add to wishlist by name"))),
             saveError && React.createElement("div", { className: "tda-footnote", style: { color: "#C77676" } }, "Couldn't save that change \u2014 check your connection and try again."),
             React.createElement("div", { className: "tda-footnote" }, "Shared list \u2014 anyone with this page can add stages, rank bars, and edit entries.")),
         showVisitedForm && (React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowVisitedForm(false) },
             React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },
-                React.createElement("h3", null, visitedForm.id ? "Rank this bar" : "Log a stage"),
+                React.createElement("h3", null, visitedForm.id ? "Rank this bar" : "Rank a bar you visited"),
                 React.createElement("form", { onSubmit: saveVisitedForm },
                     React.createElement("div", { className: "tda-field" },
                         React.createElement("label", null, "Name"),
@@ -606,7 +638,7 @@ function App() {
                         React.createElement("button", { type: "submit", className: "tda-primary-btn" }, visitedForm.id ? "Save ranking" : "Add to leaderboard")))))),
         showWishForm && (React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowWishForm(false) },
             React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },
-                React.createElement("h3", null, "Add a bar"),
+                React.createElement("h3", null, "Add to wishlist"),
                 React.createElement("form", { onSubmit: saveWishForm },
                     React.createElement("div", { className: "tda-field" },
                         React.createElement("label", null, "Name"),
@@ -619,32 +651,37 @@ function App() {
                         React.createElement("input", { className: "tda-input", value: wishForm.notes, onChange: (e) => setWishForm({ ...wishForm, notes: e.target.value }) })),
                     React.createElement("div", { className: "tda-modal-actions" },
                         React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowWishForm(false) }, "Cancel"),
-                        React.createElement("button", { type: "submit", className: "tda-primary-btn" }, "Add to the list")))))),
-        detailsModal && (React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setDetailsModal(null) },
+                        React.createElement("button", { type: "submit", className: "tda-primary-btn" }, "Add to wishlist")))))),
+        showInfo && (React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowInfo(false) },
+            React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },
+                React.createElement("h3", null, "How it works"),
+                React.createElement("div", { className: "tda-details-desc" }, "Find bars by vibe, then add promising ones to the wishlist. When you visit a bar, tap I visited and score the experience — it moves to the leaderboard automatically. Open Details for a grounded description and map; Refresh retries any stale or missing details."),
+                React.createElement("div", { className: "tda-modal-actions" },
+                    React.createElement("button", { className: "tda-primary-btn", onClick: () => setShowInfo(false) }, "Got it"))))),
+        detailsModal && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setDetailsModal(null) },
             React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },
                 React.createElement("h3", null, detailsModal.bar.name),
-                detailsModal.loading ? (React.createElement("div", { className: "tda-spinner" }, "looking it up\u2026")) : (React.createElement(React.Fragment, null,
-                    detailsModal.bar.neighborhood && React.createElement("div", { className: "tda-details-hood" }, detailsModal.bar.neighborhood),
-                    React.createElement("div", { className: "tda-details-desc" }, detailsModal.bar.description || "No description found yet."),
-                    React.createElement("div", { className: "tda-details-row" },
-                        detailsModal.bar.happyHour && React.createElement("span", null,
-                            "\uD83D\uDD54 ",
-                            detailsModal.bar.happyHour),
-                        detailsModal.bar.capacity && React.createElement("span", null,
-                            "Comfortably fits about ",
-                            detailsModal.bar.capacity,
-                            " people")),
-                    detailsModal.bar.tags && detailsModal.bar.tags.length > 0 && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.7rem" } }, detailsModal.bar.tags.map((t) => React.createElement("span", { key: t, className: "tda-tag" }, t))),
-                    React.createElement("div", { className: "tda-modal-actions" },
-                        detailsModal.bar.mapsLink && React.createElement("a", { className: "tda-secondary-btn", style: { textAlign: "center", textDecoration: "none" }, href: detailsModal.bar.mapsLink, target: "_blank", rel: "noreferrer" }, "Open map \u2197"),
-                        detailsModal.bar.status !== "visited" && React.createElement("button", { className: "tda-secondary-btn", onClick: () => refreshDetails(detailsModal.bar) }, "Refresh"),
-                        React.createElement("button", { className: "tda-primary-btn", onClick: () => setDetailsModal(null) }, "Close")))))))));
+                detailsModal.loading
+                    ? React.createElement("div", { className: "tda-spinner" }, "looking it up\u2026")
+                    : React.createElement(React.Fragment, null,
+                        detailsModal.bar.neighborhood && React.createElement("div", { className: "tda-details-hood" }, detailsModal.bar.neighborhood),
+                        React.createElement("div", { className: "tda-details-desc" }, displayDescription(detailsModal.bar.description) || "No description found yet."),
+                        detailsModal.error && React.createElement("div", { className: "tda-comment", style: { marginLeft: 0 } }, detailsModal.error),
+                        React.createElement("div", { className: "tda-details-row" },
+                            detailsModal.bar.happyHour && React.createElement("span", null, "\uD83D\uDD54 ", detailsModal.bar.happyHour),
+                            detailsModal.bar.capacity && React.createElement("span", null, "Comfortably fits about ", detailsModal.bar.capacity, " people")),
+                        detailsModal.bar.tags && detailsModal.bar.tags.length > 0 && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.7rem" } }, detailsModal.bar.tags.map((t) => React.createElement("span", { key: t, className: "tda-tag" }, t))),
+                        React.createElement("div", { className: "tda-modal-actions" },
+                            detailsModal.bar.mapsLink && React.createElement("a", { className: "tda-secondary-btn", style: { textAlign: "center", textDecoration: "none" }, href: detailsModal.bar.mapsLink, target: "_blank", rel: "noreferrer" }, "Open map \u2197"),
+                            React.createElement("button", { className: "tda-secondary-btn", onClick: () => refreshDetails(detailsModal.bar) }, "Refresh"),
+                            React.createElement("button", { className: "tda-primary-btn", onClick: () => setDetailsModal(null) }, "Close"))))))));
 }
 function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, editLabel, onDelete, onDisqualify }) {
     const rankClass = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
     const isWishlist = b.status === "to-try";
     const cardClass = `tda-card ${isWishlist ? "wishlist" : ""} ${b.disqualified ? "disqualified" : ""}`;
-    const shortDesc = b.description && b.description.length > 140 ? b.description.slice(0, 140) + "…" : b.description;
+    const cleanDescription = displayDescription(b.description);
+    const shortDesc = cleanDescription && cleanDescription.length > 140 ? cleanDescription.slice(0, 140) + "…" : cleanDescription;
     return (React.createElement("div", { className: cardClass },
         React.createElement("div", { className: "tda-card-top" },
             React.createElement("div", { className: "tda-name-row" },

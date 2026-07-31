@@ -42,6 +42,26 @@ function safeParse(text) {
   return null;
 }
 
+function isUsefulDescription(value) {
+  return typeof value === "string" && value.trim().length > 35 && !/^\s*[\[{]/.test(value);
+}
+
+function normalizeDetails(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const nested = typeof parsed.description === "string" ? safeParse(parsed.description) : null;
+  const source = nested && typeof nested === "object" && !Array.isArray(nested) ? { ...parsed, ...nested } : parsed;
+  const description = typeof source.description === "string" ? source.description.trim() : "";
+  return {
+    name: typeof source.name === "string" ? source.name.trim() : "",
+    mapsLink: typeof source.mapsLink === "string" ? source.mapsLink.trim() : "",
+    neighborhood: typeof source.neighborhood === "string" ? source.neighborhood.trim() : "",
+    description,
+    tags: Array.isArray(source.tags) ? source.tags.filter((tag) => typeof tag === "string" && tag.trim()).slice(0, 5) : [],
+    happyHour: typeof source.happyHour === "string" ? source.happyHour.trim() : "",
+    capacityHint: Number.isFinite(Number(source.capacityHint)) ? Number(source.capacityHint) : null,
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -50,7 +70,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { barId, prompt } = req.body;
+    const { barId, prompt, forceRefresh = false } = req.body || {};
 
     let existingBar = null;
     let bars = null;
@@ -75,14 +95,14 @@ export default async function handler(req, res) {
       }
 
       // Return cached result — already structured, no parsing needed
-      if (existingBar.detailsFetched) {
+      if (existingBar.detailsFetched && isUsefulDescription(existingBar.description) && !forceRefresh) {
         return res.status(200).json({ result: existingBar });
       }
     }
 
     // Call Gemini
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+      `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || "gemini-3.5-flash"}:generateContent`,
       {
         method: "POST",
         headers: {
@@ -99,6 +119,8 @@ export default async function handler(req, res) {
               ],
             },
           ],
+          tools: [{ google_search: {} }],
+          generationConfig: { responseMimeType: "application/json" },
         }),
       }
     );
@@ -125,28 +147,29 @@ export default async function handler(req, res) {
     // prompt asked for — an array for search suggestions, an object for a
     // single random pick. Never touches Firebase.
     if (!barId) {
-      return res.status(200).json({ result: parsed });
+      const result = Array.isArray(parsed)
+        ? parsed.map(normalizeDetails).filter((bar) => bar && bar.name)
+        : normalizeDetails(parsed);
+      return res.status(200).json({ result });
     }
 
     // Bar-details call for a specific bar. If parsing failed, still mark it
     // fetched (so we don't hammer Gemini again every time it's opened) but
     // don't overwrite real fields with junk.
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      const fallbackBars = bars.map((bar) =>
-        bar.id === barId ? { ...bar, detailsFetched: true } : bar
-      );
-      await docRef.update({ bars: fallbackBars });
-      return res.status(200).json({ result: { ...existingBar, detailsFetched: true } });
+    const details = normalizeDetails(parsed);
+    if (!details || !isUsefulDescription(details.description)) {
+      // Never cache a failed lookup: Details/Refresh can safely retry it.
+      return res.status(422).json({ error: "No usable bar description returned. Please try again." });
     }
 
     const mergedBar = {
       ...existingBar,
-      mapsLink: parsed.mapsLink || existingBar.mapsLink,
-      neighborhood: parsed.neighborhood || existingBar.neighborhood,
-      description: parsed.description || existingBar.description,
-      tags: Array.isArray(parsed.tags) && parsed.tags.length ? parsed.tags : existingBar.tags,
-      happyHour: parsed.happyHour !== undefined ? parsed.happyHour : existingBar.happyHour,
-      capacity: parsed.capacityHint || existingBar.capacity,
+      mapsLink: details.mapsLink || existingBar.mapsLink,
+      neighborhood: details.neighborhood || existingBar.neighborhood,
+      description: details.description,
+      tags: details.tags.length ? details.tags : existingBar.tags,
+      happyHour: details.happyHour || existingBar.happyHour,
+      capacity: details.capacityHint || existingBar.capacity,
       detailsFetched: true,
       lastUpdated: new Date().toISOString(),
     };
