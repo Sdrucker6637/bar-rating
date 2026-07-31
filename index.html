@@ -153,8 +153,8 @@ function buildConstraints(ballerMode, exploreMode) {
     return price + " " + distance;
 }
 async function fetchBarDetails(name, hint, barId, forceRefresh) {
-    const prompt = `You are a knowledgeable NYC bar concierge. Use Google Search to verify the currently open NYC bar called "${name}"${hint ? ` near/in ${hint}` : ""}. 
-    If you are unsure whether it exists or details are unavailable, say so.
+    const prompt = `You are a knowledgeable NYC bar concierge. Identify the currently open NYC venue by searching for the exact query "${name} bar NYC"${hint ? ` and using this location hint: ${hint}` : ""}. The word "bar" is part of the lookup query even if the venue's official name does not include it. Resolve likely spelling variants before deciding it is unavailable.
+    If you still cannot identify it, say so briefly rather than claiming it is absent from a database.
     Do not invent addresses, hours, or prices.
 
     Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
@@ -426,7 +426,9 @@ function App() {
                     React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(Math.max(1, groupSize - 1)) }, "−"),
                     React.createElement("b", { style: { color: "#EDE6D9" } }, groupSize),
                     React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(groupSize + 1) }, "+")),
-                React.createElement("button", { className: "tda-chip", onClick: () => setFitsGroupOnly(!fitsGroupOnly) }, "Fits our group"),
+                React.createElement("button", { className: `tda-chip ${fitsGroupOnly ? "active" : ""}`, onClick: () => setFitsGroupOnly(!fitsGroupOnly) }, "Fits our group"),
+                React.createElement("button", { className: `tda-chip tda-chip-baller ${ballerMode ? "active" : ""}`, onClick: () => setBallerMode(!ballerMode) }, "💰 Baller mode"),
+                React.createElement("button", { className: `tda-chip tda-chip-explore ${exploreMode ? "active" : ""}`, onClick: () => setExploreMode(!exploreMode) }, "🧭 Explore mode"),
                 React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching }, searching ? "Searching…" : "Find bars"),
                 React.createElement("button", { className: "tda-find-btn tda-surprise-btn", onClick: runRandomSearch, disabled: searching }, "Surprise us")),
             searching && React.createElement("div", { className: "tda-spinner" }, "scouting the city…"),
