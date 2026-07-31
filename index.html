@@ -141,6 +141,18 @@ function buildConstraints(ballerMode, exploreMode) {
   return price + " " + distance;
 }
 
+async function verifyBarExists(name, neighborhood) {
+  try {
+    const response = await fetch("/api/search-bar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: name + " bar", neighborhood: neighborhood || "" }),
+    });
+    const results = await response.json();
+    return Array.isArray(results) && results.length > 0;
+  } catch(e) { return false; }
+}
+
 async function fetchBarSuggestions(vibeQuery, groupSize, excludeNames, ballerMode, exploreMode) {
   const constraints = buildConstraints(ballerMode, exploreMode);
   const prompt = `You are a concierge with live web search. You MUST use web search to find REAL bars that actually exist. DO NOT invent, hallucinate, or guess bar names — every suggestion must be verifiable via search results. ONLY suggest establishments that are specifically bars (cocktail bars, dive bars, wine bars, speakeasies, pubs, beer bars, taprooms). Do NOT suggest restaurants, cafes, bistros, or any place where food is the primary focus — even if they have a bar inside. Suggest 4 real, currently open bars in New York City matching this vibe request: "${vibeQuery || "a great night out"}". They should comfortably work for a group of about ${groupSize} people. ${constraints} IMPORTANT: Do NOT suggest any bars that are permanently closed or have gone out of business — verify they are still open and operating. Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary: an array of up to 4 objects, each in exactly this shape:
@@ -374,15 +386,29 @@ function App() {
     setSearchResults([]); setSearching(true); setSearchDone(false);
     const exclude = (bars || []).map(b => b.name);
     const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude, ballerMode, exploreMode);
-    const filtered = fitsGroupOnly ? results.filter(r => !r.capacityHint || r.capacityHint >= groupSize) : results;
-    setSearchResults(filtered); setSearching(false); setSearchDone(true);
+    const fitFiltered = fitsGroupOnly ? results.filter(r => !r.capacityHint || r.capacityHint >= groupSize) : results;
+    // Verify each bar exists on OSM — staggered to respect Nominatim rate limits
+    const verifyResults = [];
+    for (const r of fitFiltered) {
+      const exists = await verifyBarExists(r.name, r.neighborhood);
+      verifyResults.push(exists ? r : null);
+    }
+    const verified = verifyResults.filter(r => r !== null);
+    setSearchResults(verified); setSearching(false); setSearchDone(true);
   }
 
   async function runRandomSearch() {
     setSearchResults([]); setSearching(true); setSearchDone(false);
     const exclude = (bars || []).map(b => b.name);
     const pick = await fetchRandomBar(groupSize, exclude, ballerMode, exploreMode);
-    setSearchResults(pick ? [pick] : []); setSearching(false); setSearchDone(true);
+    // Verify it exists on OSM before showing
+    if (pick) {
+      const exists = await verifyBarExists(pick.name, pick.neighborhood);
+      setSearchResults(exists ? [pick] : []);
+    } else {
+      setSearchResults([]);
+    }
+    setSearching(false); setSearchDone(true);
   }
 
   function addSuggestionToWishlist(s) {
