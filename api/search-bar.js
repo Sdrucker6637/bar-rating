@@ -12,6 +12,21 @@ async function nominatimSearch(queryTerms) {
   });
 }
 
+// Only keep bar/restaurant/pub/amenity-type results — exclude schools, streets, sanitation, etc.
+function filterToBars(places) {
+  const barTypes = ["bar", "restaurant", "pub", "nightclub", "cafe", "biergarten", "food_court", "fast_food", "lounge"];
+  return places.filter(p => {
+    const category = (p.category || "").toLowerCase();
+    const type = (p.type || "").toLowerCase();
+    // If category/type is missing, keep the result (can't classify it)
+    if (!category || !type) return true;
+    // Must be an amenity, tourism, or leisure POI
+    if (!["amenity", "tourism", "leisure"].includes(category)) return false;
+    // Must match a bar/restaurant-type
+    return barTypes.some(bt => type.includes(bt));
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -20,19 +35,16 @@ export default async function handler(req, res) {
   try {
     const { query, neighborhood } = req.body;
 
-    // Base terms: always scope to NYC
-    const baseTerms = [query, "New York City", neighborhood || ""].filter(Boolean).join(", ");
+    // Always include "bar" to bias Nominatim toward bar/restaurant POIs
+    const baseTerms = [query + " bar", "New York City", neighborhood || ""].filter(Boolean).join(", ");
 
-    // First pass: standard search
-    let nyPlaces = await nominatimSearch(baseTerms);
+    const nyPlaces = await nominatimSearch(baseTerms);
 
-    // Second pass: if nothing found, try appending "bar" for POI matching
-    if (nyPlaces.length === 0) {
-      const barTerms = [query + " bar", "New York City", neighborhood || ""].filter(Boolean).join(", ");
-      nyPlaces = await nominatimSearch(barTerms);
-    }
+    // Filter to only bar-type results — return empty if nothing qualifies
+    // (the client-side Gemini geocoding fallback will handle the rest)
+    const barPlaces = filterToBars(nyPlaces);
 
-    const results = nyPlaces.map((p) => {
+    const results = barPlaces.map((p) => {
       const barName = p.name || p.display_name.split(",")[0];
       return {
         name: barName,

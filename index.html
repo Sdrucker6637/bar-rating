@@ -302,7 +302,7 @@ function App() {
   }
 
   async function geocodeWithGemini(suggestion) {
-    const prompt = `You are a geocoding assistant. Find the exact street address and coordinates for "${suggestion.name}" ${suggestion.neighborhood ? "in " + suggestion.neighborhood + ", " : "in "}New York City, NY. Respond with ONLY raw JSON, no markdown fences: {"address":"full street address, city, state, zip","latitude":40.7,"longitude":-74.0,"name":"verified business name"}`;
+    const prompt = `You are a geocoding assistant specializing in bars and nightlife venues. Find the exact street address, latitude, and longitude for the bar named "${suggestion.name}" ${suggestion.neighborhood ? "in " + suggestion.neighborhood + ", " : "in "}New York City, NY. This is a real bar — search your knowledge for it specifically. Respond with ONLY raw JSON, no markdown fences: {"address":"full street address, city, state, zip","latitude":40.7,"longitude":-74.0,"name":"exact verified business name"}`;
     const result = await callGemini(prompt, null, true);
     if (!result) return null;
     const address = result.address || suggestion.address || "";
