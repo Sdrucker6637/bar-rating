@@ -417,6 +417,31 @@ function App() {
             updateBar(b.id, { disqualified: true, disqualifyReason: reason });
         }
     }
+    const findPanel = tab === "find" && React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "tda-search-panel" },
+            React.createElement("div", { className: "tda-search-row" },
+                React.createElement("input", { className: "tda-input", placeholder: "Describe a vibe (optional)", value: vibeQuery, onChange: (e) => setVibeQuery(e.target.value), style: { flex: "1 1 220px" } }),
+                React.createElement("div", { className: "tda-group-stepper" },
+                    React.createElement("span", { style: { color: "#857C8E" } }, "Group of"),
+                    React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(Math.max(1, groupSize - 1)) }, "−"),
+                    React.createElement("b", { style: { color: "#EDE6D9" } }, groupSize),
+                    React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(groupSize + 1) }, "+")),
+                React.createElement("button", { className: "tda-chip", onClick: () => setFitsGroupOnly(!fitsGroupOnly) }, "Fits our group"),
+                React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching }, searching ? "Searching…" : "Find bars"),
+                React.createElement("button", { className: "tda-find-btn tda-surprise-btn", onClick: runRandomSearch, disabled: searching }, "Surprise us")),
+            searching && React.createElement("div", { className: "tda-spinner" }, "scouting the city…"),
+            searchDone && !searching && searchResults.length === 0 && React.createElement("div", { className: "tda-empty" }, "No fresh matches came back — try a different vibe."),
+            searchResults.length > 0 && React.createElement("div", { className: "tda-suggestion-grid" }, searchResults.map((s) => React.createElement("div", { key: s.name, className: "tda-suggestion-card" },
+                React.createElement("div", { className: "tda-suggestion-name" }, s.name),
+                s.neighborhood && React.createElement("div", { className: "tda-suggestion-hood" }, s.neighborhood),
+                React.createElement("div", { className: "tda-suggestion-desc" }, displayDescription(s.description)),
+                s.mapsLink && React.createElement("a", { className: "tda-link-btn", href: s.mapsLink, target: "_blank", rel: "noreferrer" }, "Map ↗"),
+                React.createElement("div", { className: "tda-suggestion-actions" },
+                    React.createElement("button", { className: "tda-suggestion-add", onClick: () => addSuggestionToWishlist(s) }, "+ Wishlist"),
+                    React.createElement("button", { className: "tda-visit-btn", onClick: () => rankSuggestion(s) }, "I visited"))))),
+        React.createElement("div", { className: "tda-section-heading" }, React.createElement("h2", null, "Our Wishlist"), React.createElement("div", { className: "tda-rule" }), React.createElement("span", { className: "tda-section-count" }, filteredToTry.length, " bars")),
+        React.createElement("div", { className: "tda-list" }, filteredToTry.map((b) => React.createElement(BarCard, { key: b.id, b: b, isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id) }))),
+        React.createElement("button", { className: "tda-add-btn", onClick: () => { setWishForm(emptyWishForm); setShowWishForm(true); } }, "+ Add to wishlist by name")));
     if (loading) {
         return (React.createElement("div", { style: { minHeight: "100vh", background: "#0E0D10", display: "flex", alignItems: "center", justifyContent: "center" } },
             React.createElement("div", { style: { color: "#B8965F", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.85rem", letterSpacing: "0.05em" } }, connError ? "couldn't connect — check your Firebase config in index.html" : "setting the table…")));
@@ -538,6 +563,7 @@ function App() {
             React.createElement("div", { className: "tda-tabs" },
                 React.createElement("button", { className: `tda-tab ${tab === "leaderboard" ? "active" : ""}`, onClick: () => setTab("leaderboard") }, "Current Leaderboard"),
                 React.createElement("button", { className: `tda-tab ${tab === "find" ? "active" : ""}`, onClick: () => setTab("find") }, "Find a New Bar")),
+            findPanel,
             tab === "leaderboard" && (React.createElement(React.Fragment, null,
                 filteredVisited.length > 0 && (() => {
                     const champ = filteredVisited[0];
@@ -601,6 +627,7 @@ function App() {
                     filteredToTry.map((b) => (React.createElement(BarCard, { key: b.id, b: b, isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id) })))),
                 React.createElement("button", { className: "tda-add-btn", onClick: () => { setWishForm(emptyWishForm); setShowWishForm(true); } }, "+ Add to wishlist by name"))),
             saveError && React.createElement("div", { className: "tda-footnote", style: { color: "#C77676" } }, "Couldn't save that change \u2014 check your connection and try again."),
+            findPanel,
             React.createElement("div", { className: "tda-footnote" }, "Shared list \u2014 anyone with this page can add stages, rank bars, and edit entries.")),
         showVisitedForm && (React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowVisitedForm(false) },
             React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },

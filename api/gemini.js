@@ -102,7 +102,7 @@ export default async function handler(req, res) {
 
     // Call Gemini
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || "gemini-3.5-flash"}:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"}:generateContent`,
       {
         method: "POST",
         headers: {
@@ -119,8 +119,6 @@ export default async function handler(req, res) {
               ],
             },
           ],
-          tools: [{ google_search: {} }],
-          generationConfig: { responseMimeType: "application/json" },
         }),
       }
     );
