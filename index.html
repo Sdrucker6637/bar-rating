@@ -358,15 +358,11 @@ function App() {
   }, [visited, search, foodMode]);
 
   const filteredToTry = useMemo(() => {
-    const q = vibeQuery.trim().toLowerCase();
     return toTry.filter(b => {
       if (fitsGroupOnly && b.capacity && Number(b.capacity) < groupSize) return false;
-      if (!q) return true;
-      return b.name.toLowerCase().includes(q)
-        || (b.description || "").toLowerCase().includes(q)
-        || (b.tags || []).some(t => t.toLowerCase().includes(q));
+      return true;
     });
-  }, [toTry, vibeQuery, fitsGroupOnly, groupSize]);
+  }, [toTry, fitsGroupOnly, groupSize]);
 
   async function runSearch() {
     setSearchResults([]); setSearching(true); setSearchDone(false);
@@ -526,7 +522,7 @@ function App() {
       React.createElement("button", { className: `tda-chip tda-chip-explore ${exploreMode ? "active" : ""}`, onClick: () => setExploreMode(!exploreMode) }, "\uD83E\uDDED Explore mode"),
       React.createElement("div", { className: "tda-search-btn-group" },
         React.createElement("div", { className: "tda-search-btn-wrap" },
-          React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching }, searching ? "Searching\u2026" : "Find Bars"),
+          React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching || !vibeQuery.trim() }, searching ? "Searching\u2026" : "Find Bars"),
           React.createElement("span", { className: "tda-search-btn-hint" }, "Search for a specific bar or location.")),
         React.createElement("div", { className: "tda-search-btn-wrap" },
           React.createElement("button", { className: "tda-find-btn tda-surprise-btn", onClick: runRandomSearch, disabled: searching }, "\uD83C\uDFB2 Surprise Us"),
@@ -599,19 +595,19 @@ function App() {
       .tda-wishlist-desc { font-size:0.85rem; color:#A79EB2; line-height:1.45; margin-top:0.35rem; }
       .tda-card.wishlist { border-left:3px solid #3F5D4E; }
       .tda-card.disqualified { opacity:0.7; border-style:dashed; }
-      .tda-card-badges { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.3rem; margin-left:2.5rem; }
+      .tda-card-badges { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.3rem; }
       .tda-avg { font-family:'IBM Plex Mono',monospace; font-size:1.3rem; font-weight:600; color:#C9A876; text-align:right; }
       .tda-avg-label { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.06em; color:#857C8E; text-align:right; }
-      .tda-stats { display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.7rem; margin-left:2.5rem; font-family:'IBM Plex Mono',monospace; font-size:0.76rem; color:#A79EB2; }
+      .tda-stats { display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.7rem; font-family:'IBM Plex Mono',monospace; font-size:0.76rem; color:#A79EB2; }
       .tda-stats span b { color:#EDE6D9; }
-      .tda-comment { margin-top:0.5rem; margin-left:2.5rem; font-size:0.85rem; color:#A79EB2; font-style:italic; }
+      .tda-comment { margin-top:0.5rem; font-size:0.85rem; color:#A79EB2; font-style:italic; }
       .tda-tags { display:flex; gap:0.35rem; flex-wrap:wrap; }
       .tda-tag { font-family:'IBM Plex Mono',monospace; font-size:0.66rem; padding:0.14rem 0.55rem; border-radius:999px; background:#262029; color:#A79EB2; }
-      .tda-card-actions { display:flex; gap:0.5rem; margin-top:0.75rem; margin-left:2.5rem; flex-wrap:wrap; }
+      .tda-card-actions { display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap; }
       .tda-link-btn,.tda-edit-btn,.tda-del-btn,.tda-visit-btn { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; padding:0.35rem 0.7rem; border-radius:5px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; text-decoration:none; }
       .tda-link-btn:hover,.tda-edit-btn:hover,.tda-visit-btn:hover { border-color:#B8965F; color:#EDE6D9; }
       .tda-del-btn:hover { border-color:#9A4B4B; color:#C77676; }
-      .tda-fetching { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-left:2.5rem; margin-top:0.4rem; }
+      .tda-fetching { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-top:0.4rem; }
       .tda-add-btn { font-family:'IBM Plex Mono',monospace; font-size:0.78rem; padding:0.6rem 1.1rem; border-radius:5px; border:1px dashed #302938; background:transparent; color:#B8965F; cursor:pointer; width:100%; margin-top:0.75rem; }
       .tda-add-btn:hover { border-color:#B8965F; background:rgba(184,150,95,0.05); }
       .tda-search-panel { background:#17141B; border:1px solid #262029; border-radius:8px; padding:1.1rem; margin:1rem 0; }
@@ -651,7 +647,7 @@ function App() {
       .tda-details-row { margin-top:0.9rem; font-family:'IBM Plex Mono',monospace; font-size:0.78rem; color:#A79EB2; display:flex; flex-direction:column; gap:0.35rem; }
       .tda-spinner { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; color:#857C8E; padding:1.5rem 0; text-align:center; }
       .tda-footnote { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#5D5666; margin-top:2.5rem; }
-      .tda-osm-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase; color:#857C8E; margin-bottom:0.9rem; }
+      .tda-osm-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase; color:#EDE6D9; margin-bottom:0.9rem; }
       .tda-osm-result { border:1px solid #302938; border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.5rem; cursor:pointer; background:#0E0D10; transition:border-color 0.15s, background 0.15s; }
       .tda-osm-result:hover { border-color:#B8965F; background:#141118; }
       .tda-osm-result-name { font-family:'Fraunces',serif; font-weight:500; font-size:1rem; color:#EDE6D9; }
@@ -862,17 +858,17 @@ function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, 
       score !== undefined && score !== null && React.createElement("div", null,
         React.createElement("div", { className: "tda-avg" }, b.disqualified ? "N/A" : fmt(score)),
         React.createElement("div", { className: "tda-avg-label" }, b.disqualified ? "disqualified" : scoreLabel))),
-    b.disqualified && b.disqualifyReason && React.createElement("div", { className: "tda-comment", style: { marginLeft: rank || b.disqualified ? "2.5rem" : 0 } }, "Disqualified \u2014 ", b.disqualifyReason),
+    b.disqualified && b.disqualifyReason && React.createElement("div", { className: "tda-comment" }, "Disqualified \u2014 ", b.disqualifyReason),
     b.tags && b.tags.length > 0 && React.createElement("div", { className: "tda-card-badges" },
       React.createElement("div", { className: "tda-tags" }, b.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t)))),
     isWishlist && b.neighborhood && React.createElement("div", { className: "tda-wishlist-hood" }, b.neighborhood),
     shortDesc && React.createElement("div", { className: "tda-wishlist-desc" }, shortDesc),
     b.status === "visited" && React.createElement("div", { className: "tda-stats" },
-      React.createElement("span", null, "Vibe ",    React.createElement("b", null, fmt(b.vibe))),
-      React.createElement("span", null, "Value ",   React.createElement("b", null, fmt(b.value))),
-      React.createElement("span", null, "Service ", React.createElement("b", null, fmt(b.service))),
-      React.createElement("span", null, "Food ",    React.createElement("b", null, fmt(b.food))),
-      React.createElement("span", null, "Drinks ",  React.createElement("b", null, fmt(b.drinks))),
+      React.createElement("span", null, "\uD83C\uDFAD Vibe ",    React.createElement("b", null, fmt(b.vibe))),
+      React.createElement("span", null, "\uD83D\uDCB0 Value ",   React.createElement("b", null, fmt(b.value))),
+      React.createElement("span", null, "\uD83E\uDD1D Service ", React.createElement("b", null, fmt(b.service))),
+      React.createElement("span", null, "\uD83C\uDF7D\uFE0F Food ",    React.createElement("b", null, fmt(b.food))),
+      React.createElement("span", null, "\uD83C\uDF78 Drinks ",  React.createElement("b", null, fmt(b.drinks))),
       b.bathroomBonus > 0 && React.createElement("span", null, "\uD83D\uDEBB bonus ", React.createElement("b", null, fmt(b.bathroomBonus)))),
     b.happyHour && React.createElement("div", { className: "tda-comment" }, "\uD83D\uDD54 ", b.happyHour),
     b.notes && React.createElement("div", { className: "tda-comment" }, "\"", b.notes, "\""),
