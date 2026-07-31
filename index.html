@@ -186,6 +186,8 @@ function App() {
   const [showInfo, setShowInfo]           = useState(false);
   const [visitedSuggestion, setVisitedSuggestion] = useState(null);
   const [osmModal, setOsmModal]           = useState(null);
+  const [showVisitedNamePrompt, setShowVisitedNamePrompt] = useState(false);
+  const [visitedNameInput, setVisitedNameInput] = useState("");
 
   const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
 
@@ -250,15 +252,45 @@ function App() {
 
   function startManualAdd(type) {
     if (type === "visited") {
+      // Show a quick name entry first, then go through OSM
       setVisitedSuggestion(null);
       setVisitedForm(emptyVisitedForm);
-      setShowVisitedForm(true);
+      setShowVisitedNamePrompt(true);
     } else {
       setWishForm(emptyWishForm);
       setShowWishForm(true);
     }
   }
 
+  async function startOsmLookup(suggestion) {
+    setOsmModal({ suggestion, results: [], searching: true });
+    try {
+      const response = await fetch("/api/search-bar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: suggestion.name, neighborhood: suggestion.neighborhood || "" }),
+      });
+      const results = await response.json();
+      setOsmModal({ suggestion, results: Array.isArray(results) ? results : [], searching: false });
+    } catch(e) {
+      setOsmModal({ suggestion, results: [], searching: false });
+    }
+  }
+
+  function confirmOsmSelection(osmResult) {
+    const merged = { ...osmModal.suggestion, ...osmResult };
+    if (osmModal.suggestion._osmIntent === "visited") {
+      // Pre-fill the visited scoring form with verified location data
+      setVisitedSuggestion(merged);
+      setVisitedForm({ ...emptyVisitedForm, name: merged.name });
+      setOsmModal(null);
+      setShowVisitedForm(true);
+    } else {
+      addSuggestionToWishlist(merged);
+      setWishForm(emptyWishForm);
+      setOsmModal(null);
+    }
+  }
   const visited = useMemo(() => (bars || []).filter(b => b.status === "visited"), [bars]);
   const toTry   = useMemo(() => (bars || []).filter(b => b.status === "to-try"),  [bars]);
 
@@ -291,7 +323,7 @@ function App() {
   }, [toTry, vibeQuery, fitsGroupOnly, groupSize]);
 
   async function runSearch() {
-    setSearching(true); setSearchDone(false);
+    setSearchResults([]); setSearching(true); setSearchDone(false);
     const exclude = (bars || []).map(b => b.name);
     const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude, ballerMode, exploreMode);
     const filtered = fitsGroupOnly ? results.filter(r => !r.capacityHint || r.capacityHint >= groupSize) : results;
@@ -338,24 +370,7 @@ function App() {
   }
 
   async function startVerifiedWishlistAdd(s) {
-    setOsmModal({ suggestion: s, results: [], searching: true });
-    try {
-      const response = await fetch("/api/search-bar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: s.name, neighborhood: s.neighborhood }),
-      });
-      const results = await response.json();
-      setOsmModal({ suggestion: s, results: Array.isArray(results) ? results : [], searching: false });
-    } catch(e) {
-      setOsmModal({ suggestion: s, results: [], searching: false });
-    }
-  }
-
-  function confirmOsmSelection(osmResult) {
-    addSuggestionToWishlist({ ...osmModal.suggestion, ...osmResult });
-    setWishForm(emptyWishForm);
-    setOsmModal(null);
+    await startOsmLookup({ ...s, _osmIntent: "wishlist" });
   }
 
   function rankSuggestion(s) {
@@ -410,27 +425,15 @@ function App() {
   async function saveWishForm(e) {
     e.preventDefault();
     if (!wishForm.name.trim()) return;
-    // Route through OSM lookup so every bar has a verified address
     const suggestion = {
       name: wishForm.name.trim(),
       neighborhood: wishForm.neighborhood.trim(),
       notes: wishForm.notes.trim(),
-      // carry the form id so we know if this is an edit
       _wishFormId: wishForm.id,
+      _osmIntent: "wishlist",
     };
     setShowWishForm(false);
-    setOsmModal({ suggestion, results: [], searching: true });
-    try {
-      const response = await fetch("/api/search-bar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: suggestion.name, neighborhood: suggestion.neighborhood }),
-      });
-      const results = await response.json();
-      setOsmModal({ suggestion, results: Array.isArray(results) ? results : [], searching: false });
-    } catch(e) {
-      setOsmModal({ suggestion, results: [], searching: false });
-    }
+    await startOsmLookup(suggestion);
   }
 
   function markVisited(b) {
@@ -601,6 +604,12 @@ function App() {
       .tda-details-row { margin-top:0.9rem; font-family:'IBM Plex Mono',monospace; font-size:0.78rem; color:#A79EB2; display:flex; flex-direction:column; gap:0.35rem; }
       .tda-spinner { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; color:#857C8E; padding:1.5rem 0; text-align:center; }
       .tda-footnote { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#5D5666; margin-top:2.5rem; }
+      .tda-osm-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase; color:#857C8E; margin-bottom:0.9rem; }
+      .tda-osm-result { border:1px solid #302938; border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.5rem; cursor:pointer; background:#0E0D10; transition:border-color 0.15s, background 0.15s; }
+      .tda-osm-result:hover { border-color:#B8965F; background:#141118; }
+      .tda-osm-result-name { font-family:'Fraunces',serif; font-weight:500; font-size:1rem; color:#EDE6D9; }
+      .tda-osm-result-addr { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:0.25rem; line-height:1.4; }
+      .tda-osm-none { font-size:0.85rem; color:#A79EB2; line-height:1.5; margin-bottom:0.25rem; }
     `),
 
     React.createElement("div", { className: "tda-container" },
@@ -703,8 +712,24 @@ function App() {
             React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowVisitedForm(false) }, "Cancel"),
             React.createElement("button", { type: "submit", className: "tda-primary-btn" }, visitedForm.id ? "Save ranking" : "Add to leaderboard"))))),
 
-    showWishForm && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowWishForm(false) },
+    showVisitedNamePrompt && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowVisitedNamePrompt(false) },
       React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
+        React.createElement("h3", null, "Which bar did you visit?"),
+        React.createElement("form", { onSubmit: e => {
+          e.preventDefault();
+          if (!visitedNameInput.trim()) return;
+          setShowVisitedNamePrompt(false);
+          startOsmLookup({ name: visitedNameInput.trim(), _osmIntent: "visited" });
+          setVisitedNameInput("");
+        }},
+          React.createElement("div", { className: "tda-field" },
+            React.createElement("label", null, "Bar name"),
+            React.createElement("input", { className: "tda-input", required: true, autoFocus: true, placeholder: "e.g. The Dead Rabbit", value: visitedNameInput, onChange: e => setVisitedNameInput(e.target.value) })),
+          React.createElement("div", { className: "tda-modal-actions" },
+            React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowVisitedNamePrompt(false) }, "Cancel"),
+            React.createElement("button", { type: "submit", className: "tda-primary-btn" }, "Look up"))))),
+
+    showWishForm && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowWishForm(false) },      React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
         React.createElement("h3", null, "Add to wishlist"),
         React.createElement("form", { onSubmit: saveWishForm },
           React.createElement("div", { className: "tda-field" },
@@ -738,27 +763,30 @@ function App() {
   // OSM selection modal
   const osmModalEl = osmModal && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setOsmModal(null) },
     React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
-      React.createElement("h3", null, "Pick the right \u201c", osmModal.suggestion.name, "\u201d"),
+      React.createElement("h3", null, "Confirm the location"),
+      React.createElement("p", { style: { fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.8rem", color: "#C9A876", margin: "0 0 1rem" } },
+        "\u201c", osmModal.suggestion.name, "\u201d"),
       osmModal.searching
-        ? React.createElement("div", { className: "tda-spinner" }, "Searching OpenStreetMap\u2026")
+        ? React.createElement("div", { className: "tda-spinner" }, "Looking up on OpenStreetMap\u2026")
         : osmModal.results.length === 0
           ? React.createElement(React.Fragment, null,
-              React.createElement("div", { className: "tda-details-desc" }, "No matches found on OpenStreetMap. Add it manually?"),
+              React.createElement("p", { className: "tda-osm-none" }, "No matches found on OpenStreetMap."),
+              React.createElement("p", { className: "tda-osm-none" }, "You can still add it \u2014 details will be filled in later."),
               React.createElement("div", { className: "tda-modal-actions" },
                 React.createElement("button", { className: "tda-secondary-btn", onClick: () => setOsmModal(null) }, "Cancel"),
-                React.createElement("button", { className: "tda-primary-btn", onClick: () => { addSuggestionToWishlist(osmModal.suggestion); setWishForm(emptyWishForm); setOsmModal(null); } }, "Add anyway")))
+                React.createElement("button", { className: "tda-primary-btn", onClick: () => { confirmOsmSelection({}); } }, "Add anyway")))
           : React.createElement(React.Fragment, null,
-              React.createElement("div", { style: { fontSize: "0.82rem", color: "#857C8E", marginBottom: "0.75rem", fontFamily: "'IBM Plex Mono', monospace" } }, "Select the correct location:"),
+              React.createElement("div", { className: "tda-osm-eyebrow" }, "Select the correct location"),
               osmModal.results.map((r, i) => React.createElement("div", {
                 key: i,
-                style: { border: "1px solid #302938", borderRadius: "6px", padding: "0.75rem", marginBottom: "0.5rem", cursor: "pointer", background: "#0E0D10" },
+                className: "tda-osm-result",
                 onClick: () => confirmOsmSelection(r),
               },
-                React.createElement("div", { style: { fontFamily: "'Fraunces', serif", fontSize: "1rem", fontWeight: 500 } }, r.name),
-                React.createElement("div", { style: { fontSize: "0.78rem", color: "#A79EB2", marginTop: "0.2rem" } }, r.address))),
-              React.createElement("div", { className: "tda-modal-actions" },
+                React.createElement("div", { className: "tda-osm-result-name" }, r.name),
+                React.createElement("div", { className: "tda-osm-result-addr" }, r.address))),
+              React.createElement("div", { className: "tda-modal-actions", style: { marginTop: "1.25rem" } },
                 React.createElement("button", { className: "tda-secondary-btn", onClick: () => setOsmModal(null) }, "Cancel"),
-                React.createElement("button", { className: "tda-secondary-btn", onClick: () => { addSuggestionToWishlist(osmModal.suggestion); setWishForm(emptyWishForm); setOsmModal(null); } }, "None of these \u2014 add anyway")))));
+                React.createElement("button", { className: "tda-secondary-btn", onClick: () => { confirmOsmSelection({}); } }, "None of these \u2014 add anyway")))));;
 
   return React.createElement(React.Fragment, null, appContent, osmModalEl);
 }
