@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { query, neighborhood, address } = req.body;
+    const { query, neighborhood, address, verify } = req.body;
 
     // Always include "bar" to bias Nominatim toward bar/restaurant POIs
     // Include neighborhood and address when available to disambiguate same-name bars
@@ -41,9 +41,9 @@ export default async function handler(req, res) {
 
     const nyPlaces = await nominatimSearch(baseTerms);
 
-    // Filter to only bar-type results — return empty if nothing qualifies
-    // (the client-side Gemini geocoding fallback will handle the rest)
-    const barPlaces = filterToBars(nyPlaces);
+    // For verification mode, keep all NY results — just checking if the bar exists.
+    // For normal mode, filter to only bar-type results.
+    const barPlaces = verify ? nyPlaces : filterToBars(nyPlaces);
 
     const results = barPlaces.map((p) => {
       const barName = p.name || p.display_name.split(",")[0];

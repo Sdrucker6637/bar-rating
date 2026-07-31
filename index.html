@@ -146,7 +146,7 @@ async function verifyBarExists(name, neighborhood) {
     const response = await fetch("/api/search-bar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: name + " bar", neighborhood: neighborhood || "" }),
+      body: JSON.stringify({ query: name, neighborhood: neighborhood || "", verify: true }),
     });
     const results = await response.json();
     return Array.isArray(results) && results.length > 0;
