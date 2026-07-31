@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -6,27 +6,16 @@
 <title>Tour de Alcoholism</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
-<!-- React (no build step needed) -->
 <script crossorigin="anonymous" src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-
-<!-- Firebase (free tier) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
-<style>
-  body { margin: 0; }
-  /* ====== PASTE YOUR CONFIG BELOW, THEN THE REST OF THE STYLES/APP HANDLE THEMSELVES ====== */
-</style>
+<style>body { margin: 0; }</style>
 </head>
 <body>
 <div id="root"></div>
 
 <script>
-  // ======================================================================
-  // 1. PASTE YOUR FIREBASE CONFIG HERE (see README.md for how to get this)
-  // ======================================================================
   const FIREBASE_CONFIG = {
     apiKey: "AIzaSyB10NK8lIz26T6NzObu421kg7wX6YQoFxg",
     authDomain: "bar-rating.firebaseapp.com",
@@ -35,12 +24,6 @@
     messagingSenderId: "372554240407",
     appId: "1:372554240407:web:103646f876f9c8416234d2"
   };
-
-
-  // ======================================================================
-  // 2. PASTE YOUR GEMINI API KEY HERE (see README.md — free, from Google AI Studio)
-  // ======================================================================
-
   firebase.initializeApp(FIREBASE_CONFIG);
   const db = firebase.firestore();
 </script>
@@ -48,722 +31,784 @@
 <script>
 "use strict";
 const { useState, useEffect, useMemo, useCallback } = React;
-// ---------- Seed data (from the original spreadsheet) ----------
-const base = { neighborhood: "", description: "", tags: [], happyHour: "", capacity: null, mapsLink: "", detailsFetched: false, notes: "", disqualified: false, disqualifyReason: "" };
+
+// ---------- Base bar shape ----------
+const base = {
+  neighborhood: "", description: "", tags: [], happyHour: "", capacity: null,
+  mapsLink: "", address: "", latitude: null, longitude: null,
+  detailsFetched: false, notes: "", disqualified: false, disqualifyReason: ""
+};
+
+// ---------- Seed data ----------
 const seedBars = [
-    { id: "b1", name: "ShyShy", status: "visited", vibe: 8, value: 7, service: 9, food: 6, drinks: 7, bathroomBonus: 0, notes: "", ...base },
-    { id: "b2", name: "Jungle Bird", status: "visited", vibe: 6, value: 6, service: 7, food: 9, drinks: 7, bathroomBonus: 0, notes: "Spacious but really loud, nice food, options bad", ...base },
-    { id: "b3", name: "P.S. Kitchen", status: "visited", vibe: 4, value: 5, service: 5, food: 7, drinks: 7, bathroomBonus: 0, notes: "Vegan restaurant, decent food, decent drinks, super loud", ...base },
-    { id: "b4", name: "Rose Vale", status: "visited", vibe: 10, value: 7, service: 6, food: 6.5, drinks: 7, bathroomBonus: 0, notes: "", ...base },
-    { id: "b5", name: "Fig 19", status: "visited", vibe: 9, value: 7, service: 8, food: 3, drinks: 9, bathroomBonus: 0, notes: "", ...base },
-    { id: "b6", name: "Sir Henrys", status: "visited", vibe: 5.5, value: 7, service: 7, food: 7, drinks: 7, bathroomBonus: 2, notes: "", ...base },
-    { id: "b7", name: "The WooWoo", status: "visited", vibe: 9, value: 7.5, service: 6, food: 6, drinks: 6, bathroomBonus: 0, notes: "", ...base },
-    { id: "b8", name: "Malachy Back Room", status: "visited", vibe: 4, value: 10, service: 10, food: 4.5, drinks: 8, bathroomBonus: 0, notes: "", ...base },
-    { id: "b9", name: "Pineapple Club", status: "visited", vibe: 7, value: 8, service: 8, food: 5, drinks: 6, bathroomBonus: 0, notes: "", ...base },
-    { id: "b10", name: "Mr. Paradise", status: "visited", vibe: 6.5, value: 5, service: 6, food: 8, drinks: 6.5, bathroomBonus: 0, notes: "", ...base },
-    { id: "b11", name: "Banshee", status: "visited", vibe: 8.5, value: 8.5, service: 6, food: 3.5, drinks: 7, bathroomBonus: 0, notes: "really nice atmosphere but the food was very mid", ...base },
-    { id: "b12", name: "Old Town Bar", status: "visited", vibe: 6.5, value: 3.5, service: 6, food: 6.5, drinks: 7, bathroomBonus: 0, notes: "", ...base },
-    { id: "b13", name: "Lillie's Victorian Establishment", status: "visited", vibe: 9, value: 6, service: 9, food: 6.5, drinks: 6, bathroomBonus: 0, notes: "", ...base },
-    { id: "b14", name: "929", status: "visited", vibe: 9, value: 5.5, service: 8, food: 8.5, drinks: 8, bathroomBonus: 0, notes: "20/10, hot guy there", ...base },
-    { id: "b15", name: "Célon (Bryant Park Hotel Basement)", status: "visited", vibe: 9, value: 4, service: 9, food: 8, drinks: 8, bathroomBonus: 0, notes: "", ...base },
-    { id: "b16", name: "Sid Golds Request Room", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/f6FM5FQSTSxA8L8F6" },
-    { id: "b17", name: "Please Don't Tell (Hotdog Speakeasy)", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/Y1ZcLk9hWY8mk5Vv9?g_st=ac" },
-    { id: "b18", name: "A10 Kitchen", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/L16byLwbc1kHYUYr5" },
-    { id: "b19", name: "Ten Degrees", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/mYhdYHCaMBDSKwm6A?g_st=ac" },
-    { id: "b20", name: "Angels Share", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/FPoVDSXT5j3a8qHw9?g_st=ac" },
-    { id: "b21", name: "Katana Kitten", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/8o7mvD7TGBkBHoHGA" },
-    { id: "b22", name: "Izakaya MEW", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/hc3V1X4nY4vrAoBz6?g_st=ac" },
-    { id: "b23", name: "Lucky Cat", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/dU2moYJoBgjvcQ966?g_st=ac" },
-    { id: "b24", name: "Ippudo NY", status: "to-try", vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "", ...base, mapsLink: "https://maps.app.goo.gl/j1p1VbJUSEbTvKZW6?g_st=ac" },
+  { id:"b1",  name:"ShyShy",                              status:"visited", vibe:8,   value:7,   service:9,  food:6,   drinks:7,   bathroomBonus:0, notes:"", ...base },
+  { id:"b2",  name:"Jungle Bird",                         status:"visited", vibe:6,   value:6,   service:7,  food:9,   drinks:7,   bathroomBonus:0, notes:"Spacious but really loud, nice food, options bad", ...base },
+  { id:"b3",  name:"P.S. Kitchen",                        status:"visited", vibe:4,   value:5,   service:5,  food:7,   drinks:7,   bathroomBonus:0, notes:"Vegan restaurant, decent food, decent drinks, super loud", ...base },
+  { id:"b4",  name:"Rose Vale",                           status:"visited", vibe:10,  value:7,   service:6,  food:6.5, drinks:7,   bathroomBonus:0, notes:"", ...base },
+  { id:"b5",  name:"Fig 19",                              status:"visited", vibe:9,   value:7,   service:8,  food:3,   drinks:9,   bathroomBonus:0, notes:"", ...base },
+  { id:"b6",  name:"Sir Henrys",                          status:"visited", vibe:5.5, value:7,   service:7,  food:7,   drinks:7,   bathroomBonus:2, notes:"", ...base },
+  { id:"b7",  name:"The WooWoo",                          status:"visited", vibe:9,   value:7.5, service:6,  food:6,   drinks:6,   bathroomBonus:0, notes:"", ...base },
+  { id:"b8",  name:"Malachy Back Room",                   status:"visited", vibe:4,   value:10,  service:10, food:4.5, drinks:8,   bathroomBonus:0, notes:"", ...base },
+  { id:"b9",  name:"Pineapple Club",                      status:"visited", vibe:7,   value:8,   service:8,  food:5,   drinks:6,   bathroomBonus:0, notes:"", ...base },
+  { id:"b10", name:"Mr. Paradise",                        status:"visited", vibe:6.5, value:5,   service:6,  food:8,   drinks:6.5, bathroomBonus:0, notes:"", ...base },
+  { id:"b11", name:"Banshee",                             status:"visited", vibe:8.5, value:8.5, service:6,  food:3.5, drinks:7,   bathroomBonus:0, notes:"really nice atmosphere but the food was very mid", ...base },
+  { id:"b12", name:"Old Town Bar",                        status:"visited", vibe:6.5, value:3.5, service:6,  food:6.5, drinks:7,   bathroomBonus:0, notes:"", ...base },
+  { id:"b13", name:"Lillie's Victorian Establishment",    status:"visited", vibe:9,   value:6,   service:9,  food:6.5, drinks:6,   bathroomBonus:0, notes:"", ...base },
+  { id:"b14", name:"929",                                 status:"visited", vibe:9,   value:5.5, service:8,  food:8.5, drinks:8,   bathroomBonus:0, notes:"20/10, hot guy there", ...base },
+  { id:"b15", name:"C\u00e9lon (Bryant Park Hotel Basement)", status:"visited", vibe:9, value:4, service:9,  food:8,   drinks:8,   bathroomBonus:0, notes:"", ...base },
+  { id:"b16", name:"Sid Golds Request Room",              status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/f6FM5FQSTSxA8L8F6" },
+  { id:"b17", name:"Please Don't Tell (Hotdog Speakeasy)",status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/Y1ZcLk9hWY8mk5Vv9?g_st=ac" },
+  { id:"b18", name:"A10 Kitchen",                         status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/L16byLwbc1kHYUYr5" },
+  { id:"b19", name:"Ten Degrees",                         status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/mYhdYHCaMBDSKwm6A?g_st=ac" },
+  { id:"b20", name:"Angels Share",                        status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/FPoVDSXT5j3a8qHw9?g_st=ac" },
+  { id:"b21", name:"Katana Kitten",                       status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/8o7mvD7TGBkBHoHGA" },
+  { id:"b22", name:"Izakaya MEW",                         status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/hc3V1X4nY4vrAoBz6?g_st=ac" },
+  { id:"b23", name:"Lucky Cat",                           status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/dU2moYJoBgjvcQ966?g_st=ac" },
+  { id:"b24", name:"Ippudo NY",                           status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/j1p1VbJUSEbTvKZW6?g_st=ac" },
 ];
+
 const DOC_PATH = { collection: "tourDeAlcoholism", doc: "sharedList" };
+
+// ---------- Scoring ----------
 function avgWithFood(b) {
-    if (b.disqualified) return null;
-    const vals = [b.vibe, b.value, b.service, b.food, b.drinks].filter((v) => v !== null && v !== "" && !isNaN(v));
-    if (vals.length < 5)
-        return null;
-    return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
+  if (b.disqualified) return null;
+  const vals = [b.vibe, b.value, b.service, b.food, b.drinks].filter(v => v !== null && v !== "" && !isNaN(v));
+  if (vals.length < 5) return null;
+  return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
 }
 function avgWithoutFood(b) {
-    if (b.disqualified) return null;
-    const vals = [b.vibe, b.value, b.service, b.drinks].filter((v) => v !== null && v !== "" && !isNaN(v));
-    if (vals.length < 4)
-        return null;
-    return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
+  if (b.disqualified) return null;
+  const vals = [b.vibe, b.value, b.service, b.drinks].filter(v => v !== null && v !== "" && !isNaN(v));
+  if (vals.length < 4) return null;
+  return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
 }
 function fmt(n) {
-    return n === null || n === undefined || isNaN(n) ? "—" : Number(n).toFixed(2);
+  return n === null || n === undefined || isNaN(n) ? "\u2014" : Number(n).toFixed(2);
 }
-// ---------- Gemini API helpers (live Google Search grounding) ----------
+
+// ---------- Helpers ----------
 function safeParse(text, isArray) {
-    const cleaned = (text || "").replace(/```json|```/g, "").trim();
-    try {
-        return JSON.parse(cleaned);
-    }
-    catch (e) { }
-    const re = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
-    const m = cleaned.match(re);
-    if (m) {
-        try {
-            return JSON.parse(m[0]);
-        }
-        catch (e) { }
-    }
-    return null;
+  const cleaned = (text || "").replace(/```json|```/g, "").trim();
+  try { return JSON.parse(cleaned); } catch(e) {}
+  const re = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+  const m = cleaned.match(re);
+  if (m) { try { return JSON.parse(m[0]); } catch(e) {} }
+  return null;
 }
 function displayDescription(value) {
-    if (typeof value !== "string") return "";
-    const parsed = safeParse(value, false);
-    return parsed && !Array.isArray(parsed) && typeof parsed.description === "string"
-        ? parsed.description.trim()
-        : value.trim();
+  if (typeof value !== "string") return "";
+  const parsed = safeParse(value, false);
+  return parsed && !Array.isArray(parsed) && typeof parsed.description === "string"
+    ? parsed.description.trim()
+    : value.trim();
 }
-function needsDetails(bar) {
-    const desc = displayDescription(bar.description);
-    return !bar.detailsFetched || desc.length < 36 || /^\s*[\[{]/.test(desc);
-}
+
+// ---------- Gemini ----------
+const geminiCache = {};
 async function callGemini(prompt, barId, forceRefresh) {
-    const response = await fetch("/api/gemini", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            prompt,
-            barId,
-            forceRefresh: !!forceRefresh
-        }),
+  const key = barId || prompt;
+  if (!forceRefresh && geminiCache[key]) return geminiCache[key];
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await fetch("/api/gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, barId, forceRefresh: false }),
+      signal: controller.signal,
     });
-
-    const data = await response.json();
-    if (data.error) {
-        console.error("Gemini error:", data.error);
-        return null;
-    }
-    return data.result;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  const data = await response.json();
+  if (data.result) geminiCache[key] = data.result;
+  return data.result || null;
 }
-// Builds the price/distance constraint text shared by search + random pick.
+
 function buildConstraints(ballerMode, exploreMode) {
-    const price = ballerMode
-        ? "Price range: anything goes, including upscale $$$-$$$$ spots — don't hold back."
-        : "Price range: keep it affordable — $ to $$ only, nothing pricier.";
-    const distance = exploreMode
-        ? "Distance: no limit — further out is fine, even if it's a bit of a trek."
-        : "Distance: keep it realistic — roughly within a 40-minute transit ride of Manhattan.";
-    return price + " " + distance;
+  const price = ballerMode
+    ? "Price range: anything goes, including upscale $$$-$$$$ spots \u2014 don't hold back."
+    : "Price range: keep it affordable \u2014 $ to $$ only, nothing pricier.";
+  const distance = exploreMode
+    ? "Distance: no limit \u2014 further out is fine, even if it's a bit of a trek."
+    : "Distance: keep it realistic \u2014 roughly within a 40-minute transit ride of Manhattan.";
+  return price + " " + distance;
 }
-async function fetchBarDetails(name, hint, barId, forceRefresh) {
-    const prompt = `You are a knowledgeable NYC bar concierge. Identify the currently open NYC venue by searching for the exact query "${name} bar NYC"${hint ? ` and using this location hint: ${hint}` : ""}. The word "bar" is part of the lookup query even if the venue's official name does not include it. Resolve likely spelling variants before deciding it is unavailable.
-    If you still cannot identify it, say so briefly rather than claiming it is absent from a database.
-    Do not invent addresses, hours, or prices.
 
-    Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
-    {"mapsLink": "a google maps search url for it", "neighborhood": "short neighborhood name", "description": "two sentences covering the vibe, typical price range ($, $$, $$$, or $$$$), and location", "tags": ["3 to 5 short lowercase vibe words like cozy, loud, speakeasy, dancing, classy, dive, games"], "happyHour": "short description of happy hour deal with days/times, or null if none found", "capacityHint": an integer estimate of how many people comfortably fit for a casual visit}
-
-    If uncertain, clearly indicate uncertainty instead of inventing specific details.`;
-
-    try {
-        return await callGemini(prompt, barId, forceRefresh);
-    }
-    catch (e) {
-        return null;
-    }
-}
 async function fetchBarSuggestions(vibeQuery, groupSize, excludeNames, ballerMode, exploreMode) {
-    const constraints = buildConstraints(ballerMode, exploreMode);
-    const prompt = `You are a concierge with live web search. Suggest 4 real, currently open bars in New York City matching this vibe request: "${vibeQuery || "a great night out"}". They should comfortably work for a group of about ${groupSize} people. ${constraints} Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary: an array of up to 4 objects, each in exactly this shape:
-{"name": "string", "neighborhood": "short neighborhood name", "description": "two sentences covering vibe, price range ($ $$ $$$ $$$$), and location", "tags": ["3 to 5 short lowercase vibe words"], "happyHour": "short string or null", "capacityHint": integer, "mapsLink": "a google maps search url for it"}`;
-    try {
-        const result = await callGemini(prompt);
-        return Array.isArray(result) ? result : [];
-    }
-    catch (e) {
-        return [];
-    }
+  const constraints = buildConstraints(ballerMode, exploreMode);
+  const prompt = `You are a concierge with live web search. Suggest 4 real, currently open bars in New York City matching this vibe request: "${vibeQuery || "a great night out"}". They should comfortably work for a group of about ${groupSize} people. ${constraints} Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary: an array of up to 4 objects, each in exactly this shape:
+{"name":"string","neighborhood":"short neighborhood name","description":"two sentences covering vibe, price range ($ $$ $$$ $$$$), and location","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","capacityHint":0,"address":"full street address, city, state"}`;
+  try {
+    const result = await callGemini(prompt);
+    return Array.isArray(result) ? result : [];
+  } catch(e) { return []; }
 }
+
 async function fetchRandomBar(groupSize, excludeNames, ballerMode, exploreMode) {
-    const constraints = buildConstraints(ballerMode, exploreMode);
-    const prompt = `You are a concierge with live web search. Pick exactly one real, currently open bar in New York City as a fun surprise recommendation — any vibe, your choice. It should comfortably work for a group of about ${groupSize} people. ${constraints} Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
-{"name": "string", "neighborhood": "short neighborhood name", "description": "two sentences covering vibe, price range ($ $$ $$$ $$$$), and location", "tags": ["3 to 5 short lowercase vibe words"], "happyHour": "short string or null", "capacityHint": integer, "mapsLink": "a google maps search url for it"}`;
-    try {
-        const result = await callGemini(prompt);
-        return (result && !Array.isArray(result)) ? result : null;
-    }
-    catch (e) {
-        return null;
-    }
+  const constraints = buildConstraints(ballerMode, exploreMode);
+  const prompt = `You are a concierge with live web search. Pick exactly one real, currently open bar in New York City as a fun surprise recommendation \u2014 any vibe, your choice. It should comfortably work for a group of about ${groupSize} people. ${constraints} Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
+{"name":"string","neighborhood":"short neighborhood name","description":"two sentences covering vibe, price range ($ $$ $$$ $$$$), and location","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","capacityHint":0,"address":"full street address, city, state"}`;
+  try {
+    const result = await callGemini(prompt);
+    return (result && !Array.isArray(result)) ? result : null;
+  } catch(e) { return null; }
 }
-const emptyVisitedForm = { id: null, name: "", vibe: "", value: "", service: "", food: "", drinks: "", bathroomBonus: "", notes: "" };
-const emptyWishForm = { id: null, name: "", neighborhood: "", notes: "" };
+
+// ---------- Form defaults ----------
+const emptyVisitedForm = { id:null, name:"", vibe:"", value:"", service:"", food:"", drinks:"", bathroomBonus:"", notes:"" };
+const emptyWishForm    = { id:null, name:"", neighborhood:"", notes:"" };
+
+// ---------- App ----------
 function App() {
-    const [bars, setBars] = useState(null);
-    const [groupSize, setGroupSizeState] = useState(4);
-    const [loading, setLoading] = useState(true);
-    const [connError, setConnError] = useState(false);
-    const [tab, setTab] = useState("leaderboard");
-    const [search, setSearch] = useState("");
-    const [foodMode, setFoodMode] = useState("with");
-    const [showVisitedForm, setShowVisitedForm] = useState(false);
-    const [visitedForm, setVisitedForm] = useState(emptyVisitedForm);
-    const [showWishForm, setShowWishForm] = useState(false);
-    const [wishForm, setWishForm] = useState(emptyWishForm);
-    const [saveError, setSaveError] = useState(false);
-    const [vibeQuery, setVibeQuery] = useState("");
-    const [fitsGroupOnly, setFitsGroupOnly] = useState(false);
-    const [ballerMode, setBallerMode] = useState(false);
-    const [exploreMode, setExploreMode] = useState(false);
-    const [searchResults, setSearchResults] = useState([]);
-    const [searching, setSearching] = useState(false);
-    const [searchDone, setSearchDone] = useState(false);
-    const [detailsModal, setDetailsModal] = useState(null);
-    const [fetchingIds, setFetchingIds] = useState(new Set());
-    const [showInfo, setShowInfo] = useState(false);
-    const [visitedSuggestion, setVisitedSuggestion] = useState(null);
-    const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
-    // live sync from Firestore — updates instantly for everyone with this page open
-    useEffect(() => {
-        const unsub = docRef.onSnapshot((snap) => {
-            if (snap.exists) {
-                const data = snap.data();
-                setBars(data.bars || []);
-                if (data.groupSize)
-                    setGroupSizeState(data.groupSize);
-            }
-            else {
-                docRef.set({ bars: seedBars, groupSize: 4 }).catch(() => setConnError(true));
-                setBars(seedBars);
-            }
-            setLoading(false);
-        }, (err) => { console.error(err); setConnError(true); setBars(seedBars); setLoading(false); });
-        return () => unsub();
-        // eslint-disable-next-line
-    }, []);
-    const persist = useCallback((next) => {
-        setBars(next);
-        return docRef.set({ bars: next }, { merge: true }).then(() => setSaveError(false)).catch(() => setSaveError(true));
-        // eslint-disable-next-line
-    }, []);
-    const persistGroup = useCallback((n) => {
-        setGroupSizeState(n);
-        docRef.set({ groupSize: n }, { merge: true }).catch(() => { });
-        // eslint-disable-next-line
-    }, []);
-    const updateBar = useCallback((id, patch) => {
-        setBars((prev) => {
-            const next = prev.map((b) => (b.id === id ? { ...b, ...patch } : b));
-            docRef.set({ bars: next }, { merge: true }).catch(() => setSaveError(true));
-            return next;
-        });
-        // eslint-disable-next-line
-    }, []);
-    const runDetailsFetch = useCallback((bar, forceRefresh) => {
-        setFetchingIds((s) => new Set(s).add(bar.id));
-        fetchBarDetails(bar.name, bar.neighborhood, bar.id, forceRefresh).then((data) => {
-            // The server already returns the fully-merged bar object (or
-            // null on failure) — just apply it directly instead of picking
-            // fields back apart client-side.
-            const patch = data ? { ...data, detailsFetched: true } : null;
-            if (patch) updateBar(bar.id, patch);
-            setFetchingIds((s) => { const n = new Set(s); n.delete(bar.id); return n; });
-            // Also refresh the bar snapshot the details modal is holding —
-            // without this, the modal kept showing stale (empty) data until
-            // it was closed and reopened, even after the fetch completed.
-            setDetailsModal((dm) => (dm && dm.bar.id === bar.id ? { ...dm, loading: false, bar: patch ? { ...dm.bar, ...patch } : dm.bar, error: patch ? "" : "We couldn't find a reliable description yet. Try Refresh." } : dm));
-        });
-    }, [updateBar]);
-    function openDetails(bar) {
-        const shouldFetch = needsDetails(bar);
-        setDetailsModal({ bar, loading: shouldFetch, error: "" });
-        if (shouldFetch && !fetchingIds.has(bar.id))
-            runDetailsFetch(bar);
-    }
-    function refreshDetails(bar) {
-        setDetailsModal({ bar, loading: true, error: "" });
-        runDetailsFetch(bar, true);
-    }
-    const visited = useMemo(() => (bars || []).filter((b) => b.status === "visited"), [bars]);
-    const toTry = useMemo(() => (bars || []).filter((b) => b.status === "to-try"), [bars]);
-    const filteredVisited = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        let list = visited.filter((b) => {
-            if (!q)
-                return true;
-            return b.name.toLowerCase().includes(q) || (b.notes || "").toLowerCase().includes(q) || (b.tags || []).some((t) => t.toLowerCase().includes(q));
-        });
-        list.sort((a, b) => {
-            if (!!a.disqualified !== !!b.disqualified) return a.disqualified ? 1 : -1;
-            const av = foodMode === "with" ? avgWithFood(a) : avgWithoutFood(a);
-            const bv = foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
-            return (bv || 0) - (av || 0);
-        });
-        return list;
-    }, [visited, search, foodMode]);
-    const filteredToTry = useMemo(() => {
-        const q = vibeQuery.trim().toLowerCase();
-        return toTry.filter((b) => {
-            if (fitsGroupOnly && b.capacity && Number(b.capacity) < groupSize)
-                return false;
-            if (!q)
-                return true;
-            return b.name.toLowerCase().includes(q) || (b.description || "").toLowerCase().includes(q) || (b.tags || []).some((t) => t.toLowerCase().includes(q));
-        });
-    }, [toTry, vibeQuery, fitsGroupOnly, groupSize]);
-    async function runSearch() {
-        setSearching(true);
-        setSearchDone(false);
-        const exclude = (bars || []).map((b) => b.name);
-        const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude, ballerMode, exploreMode);
-        const filtered = fitsGroupOnly ? results.filter((r) => !r.capacityHint || r.capacityHint >= groupSize) : results;
-        setSearchResults(filtered);
-        setSearching(false);
-        setSearchDone(true);
-    }
-    async function runRandomSearch() {
-        setSearching(true);
-        setSearchDone(false);
-        const exclude = (bars || []).map((b) => b.name);
-        const pick = await fetchRandomBar(groupSize, exclude, ballerMode, exploreMode);
-        setSearchResults(pick ? [pick] : []);
-        setSearching(false);
-        setSearchDone(true);
-    }
-    function addSuggestionToWishlist(s) {
-        const record = {
-            id: `b${Date.now()}`, name: s.name, status: "to-try",
-            vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0, notes: "",
-            neighborhood: s.neighborhood || "", description: s.description || "", tags: s.tags || [],
-            happyHour: s.happyHour || "", capacity: s.capacityHint || null, mapsLink: s.mapsLink || "", detailsFetched: true,
-        };
-        persist([...(bars || []), record]);
-        setSearchResults((prev) => prev.filter((r) => r.name !== s.name));
-    }
-    function rankSuggestion(s) {
-        setVisitedSuggestion(s);
-        setVisitedForm({ ...emptyVisitedForm, name: s.name });
-        setShowVisitedForm(true);
-    }
-    async function saveVisitedForm(e) {
-        e.preventDefault();
-        if (!visitedForm.name.trim())
-            return;
-        const cleanNum = (v) => (v === "" || v === null ? null : Number(v));
-        const isNew = !visitedForm.id;
-        const id = visitedForm.id || `b${Date.now()}`;
-        const patch = {
-            name: visitedForm.name.trim(), status: "visited",
-            vibe: cleanNum(visitedForm.vibe), value: cleanNum(visitedForm.value), service: cleanNum(visitedForm.service),
-            food: cleanNum(visitedForm.food), drinks: cleanNum(visitedForm.drinks),
-            bathroomBonus: cleanNum(visitedForm.bathroomBonus) || 0, notes: visitedForm.notes.trim(),
-        };
-        let next, record;
-        if (isNew) {
-            record = visitedSuggestion
-                ? { ...base, ...patch, id, neighborhood: visitedSuggestion.neighborhood || "", description: displayDescription(visitedSuggestion.description), tags: visitedSuggestion.tags || [], happyHour: visitedSuggestion.happyHour || "", capacity: visitedSuggestion.capacityHint || null, mapsLink: visitedSuggestion.mapsLink || "", detailsFetched: !!displayDescription(visitedSuggestion.description) }
-                : { ...base, ...patch, id, tags: [] };
-            next = [...bars, record];
-        }
-        else {
-            next = bars.map((b) => (b.id === id ? { ...b, ...patch } : b));
-            record = next.find((b) => b.id === id);
-        }
-        await persist(next);
-        setShowVisitedForm(false);
-        setVisitedForm(emptyVisitedForm);
-        setVisitedSuggestion(null);
-        if (!record.detailsFetched)
-            runDetailsFetch(record);
-    }
-    async function saveWishForm(e) {
-        e.preventDefault();
-        if (!wishForm.name.trim())
-            return;
-        const isNew = !wishForm.id;
-        const id = wishForm.id || `b${Date.now()}`;
-        const patch = { name: wishForm.name.trim(), neighborhood: wishForm.neighborhood.trim(), status: "to-try", notes: wishForm.notes.trim() };
-        let next, record;
-        if (isNew) {
-            record = { ...base, ...patch, id, tags: [], vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0 };
-            next = [...bars, record];
-        }
-        else {
-            next = bars.map((b) => (b.id === id ? { ...b, ...patch } : b));
-            record = next.find((b) => b.id === id);
-        }
-        await persist(next);
-        setShowWishForm(false);
-        setWishForm(emptyWishForm);
-        if (!record.detailsFetched)
-            runDetailsFetch(record);
-    }
-    function markVisited(b) {
-        setVisitedSuggestion(null);
-        setVisitedForm({ id: b.id, name: b.name, vibe: "", value: "", service: "", food: "", drinks: "", bathroomBonus: "", notes: b.notes || "" });
-        setShowVisitedForm(true);
-    }
-    function editVisited(b) {
-        setVisitedSuggestion(null);
-        var _a, _b, _c, _d, _e, _f;
-        setVisitedForm({ id: b.id, name: b.name, vibe: (_a = b.vibe) !== null && _a !== void 0 ? _a : "", value: (_b = b.value) !== null && _b !== void 0 ? _b : "", service: (_c = b.service) !== null && _c !== void 0 ? _c : "", food: (_d = b.food) !== null && _d !== void 0 ? _d : "", drinks: (_e = b.drinks) !== null && _e !== void 0 ? _e : "", bathroomBonus: (_f = b.bathroomBonus) !== null && _f !== void 0 ? _f : "", notes: b.notes || "" });
-        setShowVisitedForm(true);
-    }
-    function removeBar(id) { persist(bars.filter((b) => b.id !== id)); }
-    function toggleDisqualify(b) {
-        if (b.disqualified) {
-            updateBar(b.id, { disqualified: false, disqualifyReason: "" });
-        }
-        else {
-            const reason = window.prompt("Why disqualify this one? (optional — e.g. free drinks, dietary restrictions)", "");
-            if (reason === null) return; // cancelled
-            updateBar(b.id, { disqualified: true, disqualifyReason: reason });
-        }
-    }
-    const findPanel = tab === "find" && React.createElement(React.Fragment, null,
-        React.createElement("div", { className: "tda-search-panel" },
-            React.createElement("div", { className: "tda-search-row" },
-                React.createElement("input", { className: "tda-input", placeholder: "Describe a vibe (optional)", value: vibeQuery, onChange: (e) => setVibeQuery(e.target.value), style: { flex: "1 1 220px" } }),
-                React.createElement("div", { className: "tda-group-stepper" },
-                    React.createElement("span", { style: { color: "#857C8E" } }, "Group of"),
-                    React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(Math.max(1, groupSize - 1)) }, "−"),
-                    React.createElement("b", { style: { color: "#EDE6D9" } }, groupSize),
-                    React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(groupSize + 1) }, "+")),
-                React.createElement("button", { className: `tda-chip ${fitsGroupOnly ? "active" : ""}`, onClick: () => setFitsGroupOnly(!fitsGroupOnly) }, "Fits our group"),
-                React.createElement("button", { className: `tda-chip tda-chip-baller ${ballerMode ? "active" : ""}`, onClick: () => setBallerMode(!ballerMode) }, "💰 Baller mode"),
-                React.createElement("button", { className: `tda-chip tda-chip-explore ${exploreMode ? "active" : ""}`, onClick: () => setExploreMode(!exploreMode) }, "🧭 Explore mode"),
-                React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching }, searching ? "Searching…" : "Find bars"),
-                React.createElement("button", { className: "tda-find-btn tda-surprise-btn", onClick: runRandomSearch, disabled: searching }, "Surprise us")),
-            searching && React.createElement("div", { className: "tda-spinner" }, "scouting the city…"),
-            searchDone && !searching && searchResults.length === 0 && React.createElement("div", { className: "tda-empty" }, "No fresh matches came back — try a different vibe."),
-            searchResults.length > 0 && React.createElement("div", { className: "tda-suggestion-grid" }, searchResults.map((s) => React.createElement("div", { key: s.name, className: "tda-suggestion-card" },
-                React.createElement("div", { className: "tda-suggestion-name" }, s.name),
-                s.neighborhood && React.createElement("div", { className: "tda-suggestion-hood" }, s.neighborhood),
-                React.createElement("div", { className: "tda-suggestion-desc" }, displayDescription(s.description)),
-                s.mapsLink && React.createElement("a", { className: "tda-link-btn", href: s.mapsLink, target: "_blank", rel: "noreferrer" }, "Map ↗"),
-                React.createElement("div", { className: "tda-suggestion-actions" },
-                    React.createElement("button", { className: "tda-suggestion-add", onClick: () => addSuggestionToWishlist(s) }, "+ Wishlist"),
-                    React.createElement("button", { className: "tda-visit-btn", onClick: () => rankSuggestion(s) }, "I visited"))))),
-        React.createElement("div", { className: "tda-section-heading" }, React.createElement("h2", null, "Our Wishlist"), React.createElement("div", { className: "tda-rule" }), React.createElement("span", { className: "tda-section-count" }, filteredToTry.length, " bars")),
-        React.createElement("div", { className: "tda-list" }, filteredToTry.map((b) => React.createElement(BarCard, { key: b.id, b: b, isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id) }))),
-        React.createElement("button", { className: "tda-add-btn", onClick: () => { setWishForm(emptyWishForm); setShowWishForm(true); } }, "+ Add to wishlist by name")));
-    if (loading) {
-        return (React.createElement("div", { style: { minHeight: "100vh", background: "#0E0D10", display: "flex", alignItems: "center", justifyContent: "center" } },
-            React.createElement("div", { style: { color: "#B8965F", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.85rem", letterSpacing: "0.05em" } }, connError ? "couldn't connect — check your Firebase config in index.html" : "setting the table…")));
-    }
-    return (React.createElement("div", { className: "tda-root" },
-        React.createElement("style", null, `
-        .tda-root { min-height: 100vh; background: linear-gradient(180deg, #14121A 0%, #0E0D10 55%); color: #EDE6D9; font-family: 'Inter', sans-serif; padding-bottom: 4rem; }
-        .tda-container { max-width: 980px; margin: 0 auto; padding: 0 1.25rem; }
-        .tda-header { padding: 3rem 0 1.75rem; text-align: center; border-bottom: 1px solid #262029; }
-        .tda-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: clamp(1.9rem, 5.5vw, 2.9rem); letter-spacing: -0.01em; color: #EDE6D9; margin: 0; }
-        .tda-title .accent { color: #C9A876; font-style: italic; font-weight: 500; }
-        .tda-info-btn { margin-left: 0.4rem; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #857C8E; background: transparent; color: #C9A876; font: 600 0.72rem 'IBM Plex Mono', monospace; cursor: pointer; vertical-align: middle; }
-        .tda-sub { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #857C8E; margin-top: 0.7rem; }
+  const [bars, setBars]                   = useState(null);
+  const [groupSize, setGroupSizeState]    = useState(4);
+  const [loading, setLoading]             = useState(true);
+  const [connError, setConnError]         = useState(false);
+  const [tab, setTab]                     = useState("leaderboard");
+  const [search, setSearch]               = useState("");
+  const [foodMode, setFoodMode]           = useState("with");
+  const [showVisitedForm, setShowVisitedForm] = useState(false);
+  const [visitedForm, setVisitedForm]     = useState(emptyVisitedForm);
+  const [showWishForm, setShowWishForm]   = useState(false);
+  const [wishForm, setWishForm]           = useState(emptyWishForm);
+  const [saveError, setSaveError]         = useState(false);
+  const [vibeQuery, setVibeQuery]         = useState("");
+  const [fitsGroupOnly, setFitsGroupOnly] = useState(false);
+  const [ballerMode, setBallerMode]       = useState(false);
+  const [exploreMode, setExploreMode]     = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching]         = useState(false);
+  const [searchDone, setSearchDone]       = useState(false);
+  const [fetchingIds, setFetchingIds]     = useState(new Set());
+  const [showInfo, setShowInfo]           = useState(false);
+  const [visitedSuggestion, setVisitedSuggestion] = useState(null);
+  const [osmModal, setOsmModal]           = useState(null);
 
-        .tda-tabs { display: flex; gap: 0.5rem; justify-content: center; margin: 1.75rem 0; flex-wrap: wrap; }
-        .tda-tab { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.6rem 1.3rem; border-radius: 3px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; transition: all 0.15s ease; }
-        .tda-tab:hover { border-color: #B8965F; color: #EDE6D9; }
-        .tda-tab.active { background: #B8965F; color: #16130F; border-color: #B8965F; font-weight: 600; }
+  const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
 
-        .tda-champion { border: 1px solid #B8965F; border-radius: 4px; padding: 1.1rem 1.4rem; margin: 1.75rem 0 1.25rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; background: linear-gradient(135deg, rgba(184,150,95,0.08), transparent); flex-wrap: wrap; }
-        .tda-champion-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: #C9A876; }
-        .tda-champion-name { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.6rem; margin-top: 0.25rem; }
-        .tda-champion-score { font-family: 'IBM Plex Mono', monospace; font-size: 2rem; color: #C9A876; font-weight: 600; }
+  // Live sync from Firestore
+  useEffect(() => {
+    const unsub = docRef.onSnapshot((snap) => {
+      if (snap.exists) {
+        const data = snap.data();
+        setBars(data.bars || []);
+        if (data.groupSize) setGroupSizeState(data.groupSize);
+      } else {
+        docRef.set({ bars: seedBars, groupSize: 4 }).catch(() => setConnError(true));
+        setBars(seedBars);
+      }
+      setLoading(false);
+    }, (err) => { console.error(err); setConnError(true); setBars(seedBars); setLoading(false); });
+    return () => unsub();
+    // eslint-disable-next-line
+  }, []);
 
-        .tda-controls { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 1rem 0; background: #17141B; border: 1px solid #262029; border-radius: 8px; padding: 0.9rem 1rem; }
-        .tda-input, .tda-select { background: #0E0D10; border: 1px solid #302938; color: #EDE6D9; border-radius: 5px; padding: 0.5rem 0.7rem; font-family: 'Inter', sans-serif; font-size: 0.85rem; }
-        .tda-input:focus, .tda-select:focus { outline: none; border-color: #B8965F; }
-        .tda-toggle { display: inline-flex; border: 1px solid #302938; border-radius: 999px; overflow: hidden; }
-        .tda-toggle button { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 0.4rem 0.85rem; background: transparent; color: #A79EB2; border: none; cursor: pointer; }
-        .tda-toggle button.active { background: #B8965F; color: #16130F; font-weight: 600; }
-        .tda-chip { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 0.38rem 0.75rem; border-radius: 999px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; }
-        .tda-chip.active { background: #3F5D4E; border-color: #3F5D4E; color: #EDE6D9; }
-        .tda-chip-baller.active { background: #8A6D2F; border-color: #8A6D2F; }
-        .tda-chip-explore.active { background: #3A4F66; border-color: #3A4F66; }
-        .tda-group-stepper { display: flex; align-items: center; gap: 0.4rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
-        .tda-group-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid #302938; background: #0E0D10; color: #B8965F; cursor: pointer; font-size: 1rem; line-height: 1; }
+  const persist = useCallback((next) => {
+    setBars(next);
+    return docRef.set({ bars: next }, { merge: true })
+      .then(() => setSaveError(false))
+      .catch(() => setSaveError(true));
+    // eslint-disable-next-line
+  }, []);
 
-        .tda-list { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 1rem; }
-        .tda-card { background: #17141B; border: 1px solid #262029; border-radius: 8px; padding: 1rem 1.2rem; }
-        .tda-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; }
-        .tda-rank { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; font-weight: 600; border: 1.5px solid #302938; color: #A79EB2; margin-right: 0.6rem; flex-shrink: 0; }
-        .tda-rank.gold { border-color: #C9A876; color: #C9A876; }
-        .tda-rank.silver { border-color: #B9B6BC; color: #C9C6CE; }
-        .tda-rank.bronze { border-color: #A9784F; color: #C08E5F; }
-        .tda-rank-na { border-color: #5D5666; color: #857C8E; font-size: 0.62rem; }
-        .tda-name-row { display: flex; align-items: center; gap: 0.5rem; }
-        .tda-card-name { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.1rem; cursor: pointer; }
-        .tda-card-name:hover { color: #C9A876; }
-        .tda-wishlist-badge { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; letter-spacing: 0.04em; color: #7FA88E; text-transform: uppercase; }
-        .tda-wishlist-hood { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: #C9A876; margin: 0.3rem 0 0; }
-        .tda-wishlist-desc { font-size: 0.85rem; color: #A79EB2; line-height: 1.45; margin-top: 0.35rem; }
-        .tda-card.wishlist { border-left: 3px solid #3F5D4E; }
-        .tda-card.disqualified { opacity: 0.7; border-style: dashed; }
-        .tda-card-badges { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.3rem; margin-left: 2.5rem; }
-        .tda-avg { font-family: 'IBM Plex Mono', monospace; font-size: 1.3rem; font-weight: 600; color: #C9A876; text-align: right; }
-        .tda-avg-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #857C8E; text-align: right; }
-        .tda-stats { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.7rem; margin-left: 2.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; color: #A79EB2; }
-        .tda-stats span b { color: #EDE6D9; }
-        .tda-comment { margin-top: 0.5rem; margin-left: 2.5rem; font-size: 0.85rem; color: #A79EB2; font-style: italic; }
-        .tda-tags { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-        .tda-tag { font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; padding: 0.14rem 0.55rem; border-radius: 999px; background: #262029; color: #A79EB2; }
-        .tda-card-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; margin-left: 2.5rem; flex-wrap: wrap; }
-        .tda-link-btn, .tda-edit-btn, .tda-del-btn, .tda-visit-btn { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; padding: 0.35rem 0.7rem; border-radius: 5px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; text-decoration: none; }
-        .tda-link-btn:hover, .tda-edit-btn:hover, .tda-visit-btn:hover { border-color: #B8965F; color: #EDE6D9; }
-        .tda-del-btn:hover { border-color: #9A4B4B; color: #C77676; }
-        .tda-fetching { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: #857C8E; margin-left: 2.5rem; margin-top: 0.4rem; }
+  const persistGroup = useCallback((n) => {
+    setGroupSizeState(n);
+    docRef.set({ groupSize: n }, { merge: true }).catch(() => {});
+    // eslint-disable-next-line
+  }, []);
 
-        .tda-add-btn { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; padding: 0.6rem 1.1rem; border-radius: 5px; border: 1px dashed #302938; background: transparent; color: #B8965F; cursor: pointer; width: 100%; margin-top: 0.75rem; }
-        .tda-add-btn:hover { border-color: #B8965F; background: rgba(184,150,95,0.05); }
+  const updateBar = useCallback((id, patch) => {
+    setBars((prev) => {
+      const next = prev.map(b => b.id === id ? { ...b, ...patch } : b);
+      docRef.set({ bars: next }, { merge: true }).catch(() => setSaveError(true));
+      return next;
+    });
+    // eslint-disable-next-line
+  }, []);
 
-        .tda-search-panel { background: #17141B; border: 1px solid #262029; border-radius: 8px; padding: 1.1rem; margin: 1rem 0; }
-        .tda-search-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
-        .tda-find-btn { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; padding: 0.6rem 1.2rem; border-radius: 999px; border: none; background: #B8965F; color: #16130F; font-weight: 600; cursor: pointer; }
-        .tda-find-btn:hover { background: #C9A876; }
-        .tda-find-btn:disabled { opacity: 0.5; cursor: default; }
-        .tda-surprise-btn { background: transparent; border: 1px solid #B8965F; color: #C9A876; }
-        .tda-surprise-btn:hover { background: rgba(184,150,95,0.12); }
+  const runDetailsFetch = useCallback((bar, forceRefresh) => {
+    setFetchingIds(s => new Set(s).add(bar.id));
+    const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || bar.neighborhood || "New York City"}" has already been verified as a real business.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
+    callGemini(prompt, bar.id, forceRefresh).then((data) => {
+      const patch = data ? { ...data, detailsFetched: true } : null;
+      if (patch) updateBar(bar.id, patch);
+      setFetchingIds(s => { const n = new Set(s); n.delete(bar.id); return n; });
+    });
+  }, [updateBar]);
 
-        .tda-suggestion-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-top: 1.1rem; }
-        .tda-suggestion-card { border: 1px solid #302938; border-radius: 8px; padding: 0.9rem; background: #0E0D10; }
-        .tda-suggestion-name { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.05rem; }
-        .tda-suggestion-hood { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: #857C8E; margin-top: 0.1rem; }
-        .tda-suggestion-desc { font-size: 0.82rem; color: #A79EB2; margin-top: 0.5rem; line-height: 1.4; }
-        .tda-suggestion-add { margin-top: 0.7rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 0.4rem 0.8rem; border-radius: 5px; border: 1px solid #3F5D4E; background: transparent; color: #7FA88E; cursor: pointer; width: 100%; }
-        .tda-suggestion-add:hover { background: #3F5D4E; color: #EDE6D9; }
-        .tda-suggestion-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
-        .tda-suggestion-actions .tda-suggestion-add { margin-top: 0; flex: 1; }
+  // Auto-fetch details for bars that haven't been fetched yet
+  useEffect(() => {
+    if (!bars) return;
+    bars.forEach(bar => {
+      if (!bar.detailsFetched && !fetchingIds.has(bar.id)) runDetailsFetch(bar);
+    });
+    // eslint-disable-next-line
+  }, [bars]);
 
-        .tda-empty { text-align: center; padding: 2.5rem 1rem; color: #857C8E; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
-        .tda-section-heading { display: flex; align-items: center; gap: 0.8rem; margin: 2.25rem 0 0.25rem; }
-        .tda-section-heading h2 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.15rem; margin: 0; color: #EDE6D9; white-space: nowrap; }
-        .tda-section-heading .tda-rule { flex: 1; height: 1px; background: #262029; }
-        .tda-section-count { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: #857C8E; }
+  function startManualAdd(type) {
+    if (type === "visited") {
+      setVisitedSuggestion(null);
+      setVisitedForm(emptyVisitedForm);
+      setShowVisitedForm(true);
+    } else {
+      setWishForm(emptyWishForm);
+      setShowWishForm(true);
+    }
+  }
 
-        .tda-modal-backdrop { position: fixed; inset: 0; background: rgba(6,5,7,0.8); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
-        .tda-modal { background: #17141B; border: 1px solid #302938; border-radius: 10px; padding: 1.5rem; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; }
-        .tda-modal h3 { font-family: 'Fraunces', serif; font-weight: 500; margin-top: 0; }
-        .tda-field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; }
-        .tda-field label { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: #857C8E; }
-        .tda-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
-        .tda-modal-actions { display: flex; gap: 0.6rem; margin-top: 1rem; }
-        .tda-primary-btn { flex: 1; font-family: 'IBM Plex Mono', monospace; font-weight: 600; padding: 0.65rem; border-radius: 5px; border: none; background: #B8965F; color: #16130F; cursor: pointer; }
-        .tda-secondary-btn { flex: 1; font-family: 'IBM Plex Mono', monospace; padding: 0.65rem; border-radius: 5px; border: 1px solid #302938; background: transparent; color: #A79EB2; cursor: pointer; }
+  const visited = useMemo(() => (bars || []).filter(b => b.status === "visited"), [bars]);
+  const toTry   = useMemo(() => (bars || []).filter(b => b.status === "to-try"),  [bars]);
 
-        .tda-details-hood { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: #C9A876; text-transform: uppercase; letter-spacing: 0.08em; }
-        .tda-details-desc { margin-top: 0.7rem; line-height: 1.55; color: #D8D1C4; font-size: 0.92rem; }
-        .tda-details-row { margin-top: 0.9rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: #A79EB2; display: flex; flex-direction: column; gap: 0.35rem; }
-        .tda-spinner { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: #857C8E; padding: 1.5rem 0; text-align: center; }
+  const filteredVisited = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = visited.filter(b => {
+      if (!q) return true;
+      return b.name.toLowerCase().includes(q)
+        || (b.notes || "").toLowerCase().includes(q)
+        || (b.tags || []).some(t => t.toLowerCase().includes(q));
+    });
+    list.sort((a, b) => {
+      if (!!a.disqualified !== !!b.disqualified) return a.disqualified ? 1 : -1;
+      const av = foodMode === "with" ? avgWithFood(a) : avgWithoutFood(a);
+      const bv = foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
+      return (bv || 0) - (av || 0);
+    });
+    return list;
+  }, [visited, search, foodMode]);
 
-        .tda-footnote { text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: #5D5666; margin-top: 2.5rem; }
-      `),
-        React.createElement("div", { className: "tda-container" },
-            React.createElement("div", { className: "tda-header" },
-                React.createElement("h1", { className: "tda-title" },
-                    "Tour de ",
-                    React.createElement("span", { className: "accent" }, "Alcoholism"),
-                    React.createElement("button", { className: "tda-info-btn", type: "button", title: "How Tour de Alcoholism works", "aria-label": "How Tour de Alcoholism works", onClick: () => setShowInfo(true) }, "i")),
-                React.createElement("div", { className: "tda-sub" }, "a running record of the bars we've survived")),
-            React.createElement("div", { className: "tda-tabs" },
-                React.createElement("button", { className: `tda-tab ${tab === "leaderboard" ? "active" : ""}`, onClick: () => setTab("leaderboard") }, "Current Leaderboard"),
-                React.createElement("button", { className: `tda-tab ${tab === "find" ? "active" : ""}`, onClick: () => setTab("find") }, "Find a New Bar")),
-            findPanel,
-            tab === "leaderboard" && (React.createElement(React.Fragment, null,
-                filteredVisited.length > 0 && (() => {
-                    const champ = filteredVisited[0];
-                    const score = foodMode === "with" ? avgWithFood(champ) : avgWithoutFood(champ);
-                    return (React.createElement("div", { className: "tda-champion" },
-                        React.createElement("div", null,
-                            React.createElement("div", { className: "tda-champion-eyebrow" }, "\uD83C\uDFC6 Reigning Champion"),
-                            React.createElement("div", { className: "tda-champion-name" }, champ.name)),
-                        React.createElement("div", { className: "tda-champion-score" }, fmt(score))));
-                })(),
-                React.createElement("div", { className: "tda-controls" },
-                    React.createElement("input", { className: "tda-input", placeholder: "Search name or notes\u2026", value: search, onChange: (e) => setSearch(e.target.value), style: { flex: "1 1 200px" } }),
-                    React.createElement("div", { className: "tda-toggle" },
-                        React.createElement("button", { className: foodMode === "with" ? "active" : "", onClick: () => setFoodMode("with") }, "With food"),
-                        React.createElement("button", { className: foodMode === "without" ? "active" : "", onClick: () => setFoodMode("without") }, "Without food"))),
-                React.createElement("div", { className: "tda-list" },
-                    filteredVisited.length === 0 && React.createElement("div", { className: "tda-empty" }, "No stages match that search yet."),
-                    (() => { let rankCounter = 0; return filteredVisited.map((b) => {
-                        const ranked = !b.disqualified;
-                        if (ranked) rankCounter++;
-                        return React.createElement(BarCard, { key: b.id, b: b, rank: ranked ? rankCounter : null, score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b), scoreLabel: foodMode === "with" ? "with food" : "no food", isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => editVisited(b), onDelete: () => removeBar(b.id), onDisqualify: () => toggleDisqualify(b) });
-                    }); })()),
-                React.createElement("button", { className: "tda-add-btn", onClick: () => { setVisitedSuggestion(null); setVisitedForm(emptyVisitedForm); setShowVisitedForm(true); } }, "+ Add a bar you visited & rank it"))),
-            tab === "find" && (React.createElement(React.Fragment, null,
-                React.createElement("div", { className: "tda-search-panel" },
-                    React.createElement("div", { className: "tda-search-row" },
-                        React.createElement("input", { className: "tda-input", placeholder: "Describe a vibe (optional)", value: vibeQuery, onChange: (e) => setVibeQuery(e.target.value), style: { flex: "1 1 220px" } }),
-                        React.createElement("div", { className: "tda-group-stepper" },
-                            React.createElement("span", { style: { color: "#857C8E" } }, "Group of"),
-                            React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(Math.max(1, groupSize - 1)) }, "\u2212"),
-                            React.createElement("b", { style: { color: "#EDE6D9" } }, groupSize),
-                            React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(groupSize + 1) }, "+")),
-                        React.createElement("button", { className: `tda-chip ${fitsGroupOnly ? "active" : ""}`, onClick: () => setFitsGroupOnly(!fitsGroupOnly) }, "Fits our group"),
-                        React.createElement("button", { className: `tda-chip tda-chip-baller ${ballerMode ? "active" : ""}`, onClick: () => setBallerMode(!ballerMode) }, "\uD83D\uDCB0 Baller mode"),
-                        React.createElement("button", { className: `tda-chip tda-chip-explore ${exploreMode ? "active" : ""}`, onClick: () => setExploreMode(!exploreMode) }, "\uD83E\uDDED Explore mode"),
-                        React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching }, searching ? "Searching…" : "Find bars"),
-                        React.createElement("button", { className: "tda-find-btn tda-surprise-btn", onClick: runRandomSearch, disabled: searching }, searching ? "Searching…" : "🎲 Surprise us")),
-                    searching && React.createElement("div", { className: "tda-spinner" }, "scouting the city\u2026"),
-                    searchDone && !searching && searchResults.length === 0 && (React.createElement("div", { className: "tda-empty" }, "No fresh matches came back \u2014 try a different vibe.")),
-                    searchResults.length > 0 && (React.createElement("div", { className: "tda-suggestion-grid" }, searchResults.map((s) => (React.createElement("div", { key: s.name, className: "tda-suggestion-card" },
-                        React.createElement("div", { className: "tda-suggestion-name" }, s.name),
-                        s.neighborhood && React.createElement("div", { className: "tda-suggestion-hood" }, s.neighborhood),
-                        s.tags && s.tags.length > 0 && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.5rem" } }, s.tags.map((t) => React.createElement("span", { key: t, className: "tda-tag" }, t))),
-                        React.createElement("div", { className: "tda-suggestion-desc" }, s.description),
-                        s.happyHour && React.createElement("div", { className: "tda-suggestion-desc", style: { color: "#C9A876" } },
-                            "\uD83D\uDD54 ",
-                            s.happyHour),
-                        s.mapsLink && React.createElement("a", { className: "tda-link-btn", style: { display: "inline-block", marginTop: "0.7rem" }, href: s.mapsLink, target: "_blank", rel: "noreferrer" }, "Map ↗"),
-                        React.createElement("div", { className: "tda-suggestion-actions" },
-                            React.createElement("button", { className: "tda-suggestion-add", onClick: () => addSuggestionToWishlist(s) }, "+ Wishlist"),
-                            React.createElement("button", { className: "tda-visit-btn", onClick: () => rankSuggestion(s) }, "I visited"))))))),
-                React.createElement("div", { className: "tda-section-heading" },
-                    React.createElement("h2", null, "Our Wishlist"),
-                    React.createElement("div", { className: "tda-rule" }),
-                    React.createElement("span", { className: "tda-section-count" },
-                        filteredToTry.length,
-                        " bar",
-                        filteredToTry.length === 1 ? "" : "s")),
-                React.createElement("div", { className: "tda-list" },
-                    filteredToTry.length === 0 && React.createElement("div", { className: "tda-empty" }, "Nothing on the list yet \u2014 search above or add one below."),
-                    filteredToTry.map((b) => (React.createElement(BarCard, { key: b.id, b: b, isFetching: fetchingIds.has(b.id), onNameClick: () => openDetails(b), onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id) })))),
-                React.createElement("button", { className: "tda-add-btn", onClick: () => { setWishForm(emptyWishForm); setShowWishForm(true); } }, "+ Add to wishlist by name"))),
-            saveError && React.createElement("div", { className: "tda-footnote", style: { color: "#C77676" } }, "Couldn't save that change \u2014 check your connection and try again."),
-            findPanel,
-            React.createElement("div", { className: "tda-footnote" }, "Shared list \u2014 anyone with this page can add stages, rank bars, and edit entries.")),
-        showVisitedForm && (React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowVisitedForm(false) },
-            React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },
-                React.createElement("h3", null, visitedForm.id ? "Rank this bar" : "Rank a bar you visited"),
-                React.createElement("form", { onSubmit: saveVisitedForm },
-                    React.createElement("div", { className: "tda-field" },
-                        React.createElement("label", null, "Name"),
-                        React.createElement("input", { className: "tda-input", required: true, value: visitedForm.name, onChange: (e) => setVisitedForm({ ...visitedForm, name: e.target.value }) })),
-                    React.createElement("div", { className: "tda-field-row" },
-                        React.createElement("div", { className: "tda-field" },
-                            React.createElement("label", null, "Vibe (0-10)"),
-                            React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.vibe, onChange: (e) => setVisitedForm({ ...visitedForm, vibe: e.target.value }) })),
-                        React.createElement("div", { className: "tda-field" },
-                            React.createElement("label", null, "Value (0-10)"),
-                            React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.value, onChange: (e) => setVisitedForm({ ...visitedForm, value: e.target.value }) }))),
-                    React.createElement("div", { className: "tda-field-row" },
-                        React.createElement("div", { className: "tda-field" },
-                            React.createElement("label", null, "Service (0-10)"),
-                            React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.service, onChange: (e) => setVisitedForm({ ...visitedForm, service: e.target.value }) })),
-                        React.createElement("div", { className: "tda-field" },
-                            React.createElement("label", null, "Food (0-10)"),
-                            React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.food, onChange: (e) => setVisitedForm({ ...visitedForm, food: e.target.value }) }))),
-                    React.createElement("div", { className: "tda-field-row" },
-                        React.createElement("div", { className: "tda-field" },
-                            React.createElement("label", null, "Drinks (0-10)"),
-                            React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.drinks, onChange: (e) => setVisitedForm({ ...visitedForm, drinks: e.target.value }) })),
-                        React.createElement("div", { className: "tda-field" },
-                            React.createElement("label", null, "Bathroom bonus"),
-                            React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.bathroomBonus, onChange: (e) => setVisitedForm({ ...visitedForm, bathroomBonus: e.target.value }) }))),
-                    React.createElement("div", { className: "tda-field" },
-                        React.createElement("label", null, "Notes"),
-                        React.createElement("input", { className: "tda-input", value: visitedForm.notes, onChange: (e) => setVisitedForm({ ...visitedForm, notes: e.target.value }) })),
-                    React.createElement("div", { className: "tda-modal-actions" },
-                        React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowVisitedForm(false) }, "Cancel"),
-                        React.createElement("button", { type: "submit", className: "tda-primary-btn" }, visitedForm.id ? "Save ranking" : "Add to leaderboard")))))),
-        showWishForm && (React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowWishForm(false) },
-            React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },
-                React.createElement("h3", null, "Add to wishlist"),
-                React.createElement("form", { onSubmit: saveWishForm },
-                    React.createElement("div", { className: "tda-field" },
-                        React.createElement("label", null, "Name"),
-                        React.createElement("input", { className: "tda-input", required: true, value: wishForm.name, onChange: (e) => setWishForm({ ...wishForm, name: e.target.value }) })),
-                    React.createElement("div", { className: "tda-field" },
-                        React.createElement("label", null, "Neighborhood (optional, helps us find the right one)"),
-                        React.createElement("input", { className: "tda-input", value: wishForm.neighborhood, onChange: (e) => setWishForm({ ...wishForm, neighborhood: e.target.value }) })),
-                    React.createElement("div", { className: "tda-field" },
-                        React.createElement("label", null, "Notes"),
-                        React.createElement("input", { className: "tda-input", value: wishForm.notes, onChange: (e) => setWishForm({ ...wishForm, notes: e.target.value }) })),
-                    React.createElement("div", { className: "tda-modal-actions" },
-                        React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowWishForm(false) }, "Cancel"),
-                        React.createElement("button", { type: "submit", className: "tda-primary-btn" }, "Add to wishlist")))))),
-        showInfo && (React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowInfo(false) },
-            React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },
-                React.createElement("h3", null, "How it works"),
-                React.createElement("div", { className: "tda-details-desc" }, "Find bars by vibe, then add promising ones to the wishlist. When you visit a bar, tap I visited and score the experience — it moves to the leaderboard automatically. Open Details for a grounded description and map; Refresh retries any stale or missing details."),
-                React.createElement("div", { className: "tda-modal-actions" },
-                    React.createElement("button", { className: "tda-primary-btn", onClick: () => setShowInfo(false) }, "Got it"))))),
-        detailsModal && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setDetailsModal(null) },
-            React.createElement("div", { className: "tda-modal", onClick: (e) => e.stopPropagation() },
-                React.createElement("h3", null, detailsModal.bar.name),
-                detailsModal.loading
-                    ? React.createElement("div", { className: "tda-spinner" }, "looking it up\u2026")
-                    : React.createElement(React.Fragment, null,
-                        detailsModal.bar.neighborhood && React.createElement("div", { className: "tda-details-hood" }, detailsModal.bar.neighborhood),
-                        React.createElement("div", { className: "tda-details-desc" }, displayDescription(detailsModal.bar.description) || "No description found yet."),
-                        detailsModal.error && React.createElement("div", { className: "tda-comment", style: { marginLeft: 0 } }, detailsModal.error),
-                        React.createElement("div", { className: "tda-details-row" },
-                            detailsModal.bar.happyHour && React.createElement("span", null, "\uD83D\uDD54 ", detailsModal.bar.happyHour),
-                            detailsModal.bar.capacity && React.createElement("span", null, "Comfortably fits about ", detailsModal.bar.capacity, " people")),
-                        detailsModal.bar.tags && detailsModal.bar.tags.length > 0 && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.7rem" } }, detailsModal.bar.tags.map((t) => React.createElement("span", { key: t, className: "tda-tag" }, t))),
-                        React.createElement("div", { className: "tda-modal-actions" },
-                            detailsModal.bar.mapsLink && React.createElement("a", { className: "tda-secondary-btn", style: { textAlign: "center", textDecoration: "none" }, href: detailsModal.bar.mapsLink, target: "_blank", rel: "noreferrer" }, "Open map \u2197"),
-                            React.createElement("button", { className: "tda-secondary-btn", onClick: () => refreshDetails(detailsModal.bar) }, "Refresh"),
-                            React.createElement("button", { className: "tda-primary-btn", onClick: () => setDetailsModal(null) }, "Close"))))))));
+  const filteredToTry = useMemo(() => {
+    const q = vibeQuery.trim().toLowerCase();
+    return toTry.filter(b => {
+      if (fitsGroupOnly && b.capacity && Number(b.capacity) < groupSize) return false;
+      if (!q) return true;
+      return b.name.toLowerCase().includes(q)
+        || (b.description || "").toLowerCase().includes(q)
+        || (b.tags || []).some(t => t.toLowerCase().includes(q));
+    });
+  }, [toTry, vibeQuery, fitsGroupOnly, groupSize]);
+
+  async function runSearch() {
+    setSearching(true); setSearchDone(false);
+    const exclude = (bars || []).map(b => b.name);
+    const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude, ballerMode, exploreMode);
+    const filtered = fitsGroupOnly ? results.filter(r => !r.capacityHint || r.capacityHint >= groupSize) : results;
+    setSearchResults(filtered); setSearching(false); setSearchDone(true);
+  }
+
+  async function runRandomSearch() {
+    setSearching(true); setSearchDone(false);
+    const exclude = (bars || []).map(b => b.name);
+    const pick = await fetchRandomBar(groupSize, exclude, ballerMode, exploreMode);
+    setSearchResults(pick ? [pick] : []); setSearching(false); setSearchDone(true);
+  }
+
+  function addSuggestionToWishlist(s) {
+    const mapsLink = s.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address)}`
+      : "";
+    // If this came from the manual wishlist form (has _wishFormId), handle edit vs new
+    const isEdit = s._wishFormId;
+    const id = isEdit ? s._wishFormId : `b${Date.now()}`;
+    const record = {
+      id,
+      name: s.name,
+      status: "to-try",
+      vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0,
+      notes: s.notes || "",
+      neighborhood: s.neighborhood || "",
+      description: s.description || "",
+      tags: s.tags || [],
+      happyHour: s.happyHour || "",
+      capacity: s.capacityHint || null,
+      address: s.address || "",
+      latitude: s.latitude || null,
+      longitude: s.longitude || null,
+      mapsLink,
+      detailsFetched: false,
+    };
+    if (isEdit) {
+      persist((bars || []).map(b => b.id === id ? { ...b, ...record } : b));
+    } else {
+      persist([...(bars || []), record]);
+    }
+    setSearchResults(prev => prev.filter(r => r.name !== s.name));
+  }
+
+  async function startVerifiedWishlistAdd(s) {
+    setOsmModal({ suggestion: s, results: [], searching: true });
+    try {
+      const response = await fetch("/api/search-bar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: s.name, neighborhood: s.neighborhood }),
+      });
+      const results = await response.json();
+      setOsmModal({ suggestion: s, results: Array.isArray(results) ? results : [], searching: false });
+    } catch(e) {
+      setOsmModal({ suggestion: s, results: [], searching: false });
+    }
+  }
+
+  function confirmOsmSelection(osmResult) {
+    addSuggestionToWishlist({ ...osmModal.suggestion, ...osmResult });
+    setWishForm(emptyWishForm);
+    setOsmModal(null);
+  }
+
+  function rankSuggestion(s) {
+    setVisitedSuggestion(s);
+    setVisitedForm({ ...emptyVisitedForm, name: s.name });
+    setShowVisitedForm(true);
+  }
+
+  async function saveVisitedForm(e) {
+    e.preventDefault();
+    if (!visitedForm.name.trim()) return;
+    const cleanNum = v => (v === "" || v === null ? null : Number(v));
+    const isNew = !visitedForm.id;
+    const id = visitedForm.id || `b${Date.now()}`;
+    const patch = {
+      name: visitedForm.name.trim(), status: "visited",
+      vibe: cleanNum(visitedForm.vibe), value: cleanNum(visitedForm.value),
+      service: cleanNum(visitedForm.service), food: cleanNum(visitedForm.food),
+      drinks: cleanNum(visitedForm.drinks),
+      bathroomBonus: cleanNum(visitedForm.bathroomBonus) || 0,
+      notes: visitedForm.notes.trim(),
+    };
+    let next, record;
+    if (isNew) {
+      const mapsLink = visitedSuggestion
+        ? (visitedSuggestion.address
+            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visitedSuggestion.address)}`
+            : visitedSuggestion.mapsLink || "")
+        : "";
+      record = visitedSuggestion
+        ? { ...base, ...patch, id,
+            neighborhood: visitedSuggestion.neighborhood || "",
+            description: displayDescription(visitedSuggestion.description),
+            tags: visitedSuggestion.tags || [],
+            happyHour: visitedSuggestion.happyHour || "",
+            capacity: visitedSuggestion.capacityHint || null,
+            address: visitedSuggestion.address || "",
+            latitude: visitedSuggestion.latitude || null,
+            longitude: visitedSuggestion.longitude || null,
+            mapsLink, detailsFetched: false }
+        : { ...base, ...patch, id, tags: [] };
+      next = [...bars, record];
+    } else {
+      next = bars.map(b => b.id === id ? { ...b, ...patch } : b);
+      record = next.find(b => b.id === id);
+    }
+    await persist(next);
+    setShowVisitedForm(false); setVisitedForm(emptyVisitedForm); setVisitedSuggestion(null);
+    if (!record.detailsFetched) runDetailsFetch(record);
+  }
+
+  async function saveWishForm(e) {
+    e.preventDefault();
+    if (!wishForm.name.trim()) return;
+    // Route through OSM lookup so every bar has a verified address
+    const suggestion = {
+      name: wishForm.name.trim(),
+      neighborhood: wishForm.neighborhood.trim(),
+      notes: wishForm.notes.trim(),
+      // carry the form id so we know if this is an edit
+      _wishFormId: wishForm.id,
+    };
+    setShowWishForm(false);
+    setOsmModal({ suggestion, results: [], searching: true });
+    try {
+      const response = await fetch("/api/search-bar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: suggestion.name, neighborhood: suggestion.neighborhood }),
+      });
+      const results = await response.json();
+      setOsmModal({ suggestion, results: Array.isArray(results) ? results : [], searching: false });
+    } catch(e) {
+      setOsmModal({ suggestion, results: [], searching: false });
+    }
+  }
+
+  function markVisited(b) {
+    setVisitedSuggestion(null);
+    setVisitedForm({ id: b.id, name: b.name, vibe: "", value: "", service: "", food: "", drinks: "", bathroomBonus: "", notes: b.notes || "" });
+    setShowVisitedForm(true);
+  }
+
+  function editVisited(b) {
+    setVisitedSuggestion(null);
+    setVisitedForm({
+      id: b.id, name: b.name,
+      vibe: b.vibe ?? "", value: b.value ?? "", service: b.service ?? "",
+      food: b.food ?? "", drinks: b.drinks ?? "", bathroomBonus: b.bathroomBonus ?? "",
+      notes: b.notes || "",
+    });
+    setShowVisitedForm(true);
+  }
+
+  function removeBar(id) { persist(bars.filter(b => b.id !== id)); }
+
+  function toggleDisqualify(b) {
+    if (b.disqualified) {
+      updateBar(b.id, { disqualified: false, disqualifyReason: "" });
+    } else {
+      const reason = window.prompt("Why disqualify this one? (optional)", "");
+      if (reason === null) return;
+      updateBar(b.id, { disqualified: true, disqualifyReason: reason });
+    }
+  }
+
+  // ---------- Find panel (shared between findPanel variable and tab render) ----------
+  const searchPanel = React.createElement("div", { className: "tda-search-panel" },
+    React.createElement("div", { className: "tda-search-row" },
+      React.createElement("input", { className: "tda-input", placeholder: "Describe a vibe (optional)", value: vibeQuery, onChange: e => setVibeQuery(e.target.value), style: { flex: "1 1 220px" } }),
+      React.createElement("div", { className: "tda-group-stepper" },
+        React.createElement("span", { style: { color: "#857C8E" } }, "Group of"),
+        React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(Math.max(1, groupSize - 1)) }, "\u2212"),
+        React.createElement("b", { style: { color: "#EDE6D9" } }, groupSize),
+        React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(groupSize + 1) }, "+")),
+      React.createElement("button", { className: `tda-chip ${fitsGroupOnly ? "active" : ""}`, onClick: () => setFitsGroupOnly(!fitsGroupOnly) }, "Fits our group"),
+      React.createElement("button", { className: `tda-chip tda-chip-baller ${ballerMode ? "active" : ""}`, onClick: () => setBallerMode(!ballerMode) }, "\uD83D\uDCB0 Baller mode"),
+      React.createElement("button", { className: `tda-chip tda-chip-explore ${exploreMode ? "active" : ""}`, onClick: () => setExploreMode(!exploreMode) }, "\uD83E\uDDED Explore mode"),
+      React.createElement("div", { className: "tda-search-btn-group" },
+        React.createElement("div", { className: "tda-search-btn-wrap" },
+          React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching }, searching ? "Searching\u2026" : "Find Bars"),
+          React.createElement("span", { className: "tda-search-btn-hint" }, "Search for a specific bar or location.")),
+        React.createElement("div", { className: "tda-search-btn-wrap" },
+          React.createElement("button", { className: "tda-find-btn tda-surprise-btn", onClick: runRandomSearch, disabled: searching }, "\uD83C\uDFB2 Surprise Us"),
+          React.createElement("span", { className: "tda-search-btn-hint" }, "Discover random bars based on your filters.")))),
+    searching && React.createElement("div", { className: "tda-spinner" }, "scouting the city\u2026"),
+    searchDone && !searching && searchResults.length === 0 && React.createElement("div", { className: "tda-empty" }, "No fresh matches came back \u2014 try a different vibe."),
+    searchResults.length > 0 && React.createElement("div", { className: "tda-suggestion-grid" },
+      searchResults.map(s => React.createElement("div", { key: s.name, className: "tda-suggestion-card" },
+        React.createElement("div", { className: "tda-suggestion-name" }, s.name),
+        s.neighborhood && React.createElement("div", { className: "tda-suggestion-hood" }, s.neighborhood),
+        s.tags && s.tags.length > 0 && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.5rem" } },
+          s.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t))),
+        React.createElement("div", { className: "tda-suggestion-desc" }, displayDescription(s.description)),
+        s.happyHour && React.createElement("div", { className: "tda-suggestion-desc", style: { color: "#C9A876" } }, "\uD83D\uDD54 ", s.happyHour),
+        s.address && React.createElement("a", { className: "tda-link-btn", style: { display: "inline-block", marginTop: "0.7rem" }, href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address)}`, target: "_blank", rel: "noreferrer" }, "Map \u2197"),
+        React.createElement("div", { className: "tda-suggestion-actions" },
+          React.createElement("button", { className: "tda-suggestion-add", onClick: () => startVerifiedWishlistAdd(s) }, "+ Wishlist"),
+          React.createElement("button", { className: "tda-visit-btn", onClick: () => rankSuggestion(s) }, "I visited"))))));
+
+  // ---------- Loading screen ----------
+  if (loading) {
+    return React.createElement("div", { style: { minHeight: "100vh", background: "#0E0D10", display: "flex", alignItems: "center", justifyContent: "center" } },
+      React.createElement("div", { style: { color: "#B8965F", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.85rem", letterSpacing: "0.05em" } },
+        connError ? "couldn't connect \u2014 check your Firebase config in index.html" : "setting the table\u2026"));
+  }
+
+  // ---------- Main render ----------
+  const appContent = React.createElement("div", { className: "tda-root" },
+    React.createElement("style", null, `
+      .tda-root { min-height:100vh; background:linear-gradient(180deg,#14121A 0%,#0E0D10 55%); color:#EDE6D9; font-family:'Inter',sans-serif; padding-bottom:4rem; }
+      .tda-container { max-width:980px; margin:0 auto; padding:0 1.25rem; }
+      .tda-header { padding:3rem 0 1.75rem; text-align:center; border-bottom:1px solid #262029; }
+      .tda-title { font-family:'Fraunces',serif; font-weight:500; font-size:clamp(1.9rem,5.5vw,2.9rem); letter-spacing:-0.01em; color:#EDE6D9; margin:0; }
+      .tda-title .accent { color:#C9A876; font-style:italic; font-weight:500; }
+      .tda-info-btn { margin-left:0.4rem; width:22px; height:22px; border-radius:50%; border:1px solid #857C8E; background:transparent; color:#C9A876; font:600 0.72rem 'IBM Plex Mono',monospace; cursor:pointer; vertical-align:middle; }
+      .tda-sub { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#857C8E; margin-top:0.7rem; }
+      .tda-tabs { display:flex; gap:0.5rem; justify-content:center; margin:1.75rem 0; flex-wrap:wrap; }
+      .tda-tab { font-family:'IBM Plex Mono',monospace; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase; padding:0.6rem 1.3rem; border-radius:3px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; transition:all 0.15s ease; }
+      .tda-tab:hover { border-color:#B8965F; color:#EDE6D9; }
+      .tda-tab.active { background:#B8965F; color:#16130F; border-color:#B8965F; font-weight:600; }
+      .tda-champion { border:1px solid #B8965F; border-radius:4px; padding:1.1rem 1.4rem; margin:1.75rem 0 1.25rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; background:linear-gradient(135deg,rgba(184,150,95,0.08),transparent); flex-wrap:wrap; }
+      .tda-champion-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase; color:#C9A876; }
+      .tda-champion-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.6rem; margin-top:0.25rem; }
+      .tda-champion-score { font-family:'IBM Plex Mono',monospace; font-size:2rem; color:#C9A876; font-weight:600; }
+      .tda-controls { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; margin:1rem 0; background:#17141B; border:1px solid #262029; border-radius:8px; padding:0.9rem 1rem; }
+      .tda-input,.tda-select { background:#0E0D10; border:1px solid #302938; color:#EDE6D9; border-radius:5px; padding:0.5rem 0.7rem; font-family:'Inter',sans-serif; font-size:0.85rem; }
+      .tda-input:focus,.tda-select:focus { outline:none; border-color:#B8965F; }
+      .tda-toggle { display:inline-flex; border:1px solid #302938; border-radius:999px; overflow:hidden; }
+      .tda-toggle button { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.85rem; background:transparent; color:#A79EB2; border:none; cursor:pointer; }
+      .tda-toggle button.active { background:#B8965F; color:#16130F; font-weight:600; }
+      .tda-chip { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.38rem 0.75rem; border-radius:999px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; }
+      .tda-chip.active { background:#3F5D4E; border-color:#3F5D4E; color:#EDE6D9; }
+      .tda-chip-baller.active { background:#8A6D2F; border-color:#8A6D2F; }
+      .tda-chip-explore.active { background:#3A4F66; border-color:#3A4F66; }
+      .tda-group-stepper { display:flex; align-items:center; gap:0.4rem; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; }
+      .tda-group-btn { width:26px; height:26px; border-radius:5px; border:1px solid #302938; background:#0E0D10; color:#B8965F; cursor:pointer; font-size:1rem; line-height:1; }
+      .tda-list { display:flex; flex-direction:column; gap:0.7rem; margin-top:1rem; }
+      .tda-card { background:#17141B; border:1px solid #262029; border-radius:8px; padding:1rem 1.2rem; }
+      .tda-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap; }
+      .tda-rank { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; font-weight:600; border:1.5px solid #302938; color:#A79EB2; margin-right:0.6rem; flex-shrink:0; }
+      .tda-rank.gold { border-color:#C9A876; color:#C9A876; }
+      .tda-rank.silver { border-color:#B9B6BC; color:#C9C6CE; }
+      .tda-rank.bronze { border-color:#A9784F; color:#C08E5F; }
+      .tda-rank-na { border-color:#5D5666; color:#857C8E; font-size:0.62rem; }
+      .tda-name-row { display:flex; align-items:center; gap:0.5rem; }
+      .tda-card-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.1rem; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+      .tda-card-name:hover { color:#C9A876; opacity:0.8; }
+      .tda-wishlist-badge { font-family:'IBM Plex Mono',monospace; font-size:0.62rem; letter-spacing:0.04em; color:#7FA88E; text-transform:uppercase; }
+      .tda-wishlist-hood { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#C9A876; margin:0.3rem 0 0; }
+      .tda-wishlist-desc { font-size:0.85rem; color:#A79EB2; line-height:1.45; margin-top:0.35rem; }
+      .tda-card.wishlist { border-left:3px solid #3F5D4E; }
+      .tda-card.disqualified { opacity:0.7; border-style:dashed; }
+      .tda-card-badges { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.3rem; margin-left:2.5rem; }
+      .tda-avg { font-family:'IBM Plex Mono',monospace; font-size:1.3rem; font-weight:600; color:#C9A876; text-align:right; }
+      .tda-avg-label { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.06em; color:#857C8E; text-align:right; }
+      .tda-stats { display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.7rem; margin-left:2.5rem; font-family:'IBM Plex Mono',monospace; font-size:0.76rem; color:#A79EB2; }
+      .tda-stats span b { color:#EDE6D9; }
+      .tda-comment { margin-top:0.5rem; margin-left:2.5rem; font-size:0.85rem; color:#A79EB2; font-style:italic; }
+      .tda-tags { display:flex; gap:0.35rem; flex-wrap:wrap; }
+      .tda-tag { font-family:'IBM Plex Mono',monospace; font-size:0.66rem; padding:0.14rem 0.55rem; border-radius:999px; background:#262029; color:#A79EB2; }
+      .tda-card-actions { display:flex; gap:0.5rem; margin-top:0.75rem; margin-left:2.5rem; flex-wrap:wrap; }
+      .tda-link-btn,.tda-edit-btn,.tda-del-btn,.tda-visit-btn { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; padding:0.35rem 0.7rem; border-radius:5px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; text-decoration:none; }
+      .tda-link-btn:hover,.tda-edit-btn:hover,.tda-visit-btn:hover { border-color:#B8965F; color:#EDE6D9; }
+      .tda-del-btn:hover { border-color:#9A4B4B; color:#C77676; }
+      .tda-fetching { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-left:2.5rem; margin-top:0.4rem; }
+      .tda-add-btn { font-family:'IBM Plex Mono',monospace; font-size:0.78rem; padding:0.6rem 1.1rem; border-radius:5px; border:1px dashed #302938; background:transparent; color:#B8965F; cursor:pointer; width:100%; margin-top:0.75rem; }
+      .tda-add-btn:hover { border-color:#B8965F; background:rgba(184,150,95,0.05); }
+      .tda-search-panel { background:#17141B; border:1px solid #262029; border-radius:8px; padding:1.1rem; margin:1rem 0; }
+      .tda-search-row { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; }
+      .tda-find-btn { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; padding:0.6rem 1.2rem; border-radius:999px; border:none; background:#B8965F; color:#16130F; font-weight:600; cursor:pointer; }
+      .tda-find-btn:hover { background:#C9A876; }
+      .tda-find-btn:disabled { opacity:0.5; cursor:default; }
+      .tda-surprise-btn { background:transparent; border:1px solid #B8965F; color:#C9A876; }
+      .tda-surprise-btn:hover { background:rgba(184,150,95,0.12); }
+      .tda-search-btn-group { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:flex-start; }
+      .tda-search-btn-wrap { display:flex; flex-direction:column; gap:0.2rem; }
+      .tda-search-btn-hint { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#5D5666; white-space:nowrap; }
+      .tda-suggestion-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:0.75rem; margin-top:1.1rem; }
+      .tda-suggestion-card { border:1px solid #302938; border-radius:8px; padding:0.9rem; background:#0E0D10; }
+      .tda-suggestion-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.05rem; }
+      .tda-suggestion-hood { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-top:0.1rem; }
+      .tda-suggestion-desc { font-size:0.82rem; color:#A79EB2; margin-top:0.5rem; line-height:1.4; }
+      .tda-suggestion-add { margin-top:0.7rem; font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.8rem; border-radius:5px; border:1px solid #3F5D4E; background:transparent; color:#7FA88E; cursor:pointer; width:100%; }
+      .tda-suggestion-add:hover { background:#3F5D4E; color:#EDE6D9; }
+      .tda-suggestion-actions { display:flex; gap:0.5rem; margin-top:0.7rem; }
+      .tda-suggestion-actions .tda-suggestion-add { margin-top:0; flex:1; }
+      .tda-empty { text-align:center; padding:2.5rem 1rem; color:#857C8E; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; }
+      .tda-section-heading { display:flex; align-items:center; gap:0.8rem; margin:2.25rem 0 0.25rem; }
+      .tda-section-heading h2 { font-family:'Fraunces',serif; font-weight:500; font-size:1.15rem; margin:0; color:#EDE6D9; white-space:nowrap; }
+      .tda-section-heading .tda-rule { flex:1; height:1px; background:#262029; }
+      .tda-section-count { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; }
+      .tda-modal-backdrop { position:fixed; inset:0; background:rgba(6,5,7,0.8); display:flex; align-items:center; justify-content:center; padding:1rem; z-index:50; }
+      .tda-modal { background:#17141B; border:1px solid #302938; border-radius:10px; padding:1.5rem; max-width:460px; width:100%; max-height:85vh; overflow-y:auto; }
+      .tda-modal h3 { font-family:'Fraunces',serif; font-weight:500; margin-top:0; }
+      .tda-field { display:flex; flex-direction:column; gap:0.3rem; margin-bottom:0.7rem; }
+      .tda-field label { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:#857C8E; }
+      .tda-field-row { display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; }
+      .tda-modal-actions { display:flex; gap:0.6rem; margin-top:1rem; }
+      .tda-primary-btn { flex:1; font-family:'IBM Plex Mono',monospace; font-weight:600; padding:0.65rem; border-radius:5px; border:none; background:#B8965F; color:#16130F; cursor:pointer; }
+      .tda-secondary-btn { flex:1; font-family:'IBM Plex Mono',monospace; padding:0.65rem; border-radius:5px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; }
+      .tda-details-desc { margin-top:0.7rem; line-height:1.55; color:#D8D1C4; font-size:0.92rem; }
+      .tda-details-row { margin-top:0.9rem; font-family:'IBM Plex Mono',monospace; font-size:0.78rem; color:#A79EB2; display:flex; flex-direction:column; gap:0.35rem; }
+      .tda-spinner { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; color:#857C8E; padding:1.5rem 0; text-align:center; }
+      .tda-footnote { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#5D5666; margin-top:2.5rem; }
+    `),
+
+    React.createElement("div", { className: "tda-container" },
+      React.createElement("div", { className: "tda-header" },
+        React.createElement("h1", { className: "tda-title" },
+          "Tour de ", React.createElement("span", { className: "accent" }, "Alcoholism"),
+          React.createElement("button", { className: "tda-info-btn", type: "button", title: "How Tour de Alcoholism works", "aria-label": "How Tour de Alcoholism works", onClick: () => setShowInfo(true) }, "i")),
+        React.createElement("div", { className: "tda-sub" }, "a running record of the bars we've survived")),
+      React.createElement("div", { className: "tda-tabs" },
+        React.createElement("button", { className: `tda-tab ${tab === "leaderboard" ? "active" : ""}`, onClick: () => setTab("leaderboard") }, "Current Leaderboard"),
+        React.createElement("button", { className: `tda-tab ${tab === "find" ? "active" : ""}`, onClick: () => setTab("find") }, "Find a New Bar")),
+
+      tab === "find" && React.createElement(React.Fragment, null,
+        searchPanel,
+        React.createElement("div", { className: "tda-section-heading" },
+          React.createElement("h2", null, "Our Wishlist"),
+          React.createElement("div", { className: "tda-rule" }),
+          React.createElement("span", { className: "tda-section-count" }, filteredToTry.length, " bar", filteredToTry.length === 1 ? "" : "s")),
+        React.createElement("div", { className: "tda-list" },
+          filteredToTry.length === 0 && React.createElement("div", { className: "tda-empty" }, "Nothing on the list yet \u2014 search above or add one below."),
+          filteredToTry.map(b => React.createElement(BarCard, {
+            key: b.id, b: b, isFetching: fetchingIds.has(b.id),
+            onNameClick: () => { if (b.mapsLink) window.open(b.mapsLink, "_blank"); },
+            onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id),
+          }))),
+        React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("wishlist") }, "+ Add to wishlist by name")),
+
+      tab === "leaderboard" && React.createElement(React.Fragment, null,
+        filteredVisited.length > 0 && (() => {
+          const champ = filteredVisited[0];
+          const score = foodMode === "with" ? avgWithFood(champ) : avgWithoutFood(champ);
+          return React.createElement("div", { className: "tda-champion" },
+            React.createElement("div", null,
+              React.createElement("div", { className: "tda-champion-eyebrow" }, "\uD83C\uDFC6 Reigning Champion"),
+              React.createElement("div", { className: "tda-champion-name" }, champ.name)),
+            React.createElement("div", { className: "tda-champion-score" }, fmt(score)));
+        })(),
+        React.createElement("div", { className: "tda-controls" },
+          React.createElement("input", { className: "tda-input", placeholder: "Search name or notes\u2026", value: search, onChange: e => setSearch(e.target.value), style: { flex: "1 1 200px" } }),
+          React.createElement("div", { className: "tda-toggle" },
+            React.createElement("button", { className: foodMode === "with" ? "active" : "", onClick: () => setFoodMode("with") }, "With food"),
+            React.createElement("button", { className: foodMode === "without" ? "active" : "", onClick: () => setFoodMode("without") }, "Without food"))),
+        React.createElement("div", { className: "tda-list" },
+          filteredVisited.length === 0 && React.createElement("div", { className: "tda-empty" }, "No stages match that search yet."),
+          (() => {
+            let rankCounter = 0;
+            return filteredVisited.map(b => {
+              const ranked = !b.disqualified;
+              if (ranked) rankCounter++;
+              return React.createElement(BarCard, {
+                key: b.id, b: b,
+                rank: ranked ? rankCounter : null,
+                score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b),
+                scoreLabel: foodMode === "with" ? "with food" : "no food",
+                isFetching: fetchingIds.has(b.id),
+                onNameClick: () => { if (b.mapsLink) window.open(b.mapsLink, "_blank"); },
+                onEdit: () => editVisited(b), onDelete: () => removeBar(b.id), onDisqualify: () => toggleDisqualify(b),
+              });
+            });
+          })()),
+        React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("visited") }, "+ Add a bar you visited & rank it")),
+
+      saveError && React.createElement("div", { className: "tda-footnote", style: { color: "#C77676" } }, "Couldn't save that change \u2014 check your connection and try again."),
+      React.createElement("div", { className: "tda-footnote" }, "Shared list \u2014 anyone with this page can add stages, rank bars, and edit entries.")),
+
+
+    // ---------- Modals ----------
+    showVisitedForm && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowVisitedForm(false) },
+      React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
+        React.createElement("h3", null, visitedForm.id ? "Rank this bar" : "Rank a bar you visited"),
+        React.createElement("form", { onSubmit: saveVisitedForm },
+          React.createElement("div", { className: "tda-field" },
+            React.createElement("label", null, "Name"),
+            React.createElement("input", { className: "tda-input", required: true, value: visitedForm.name, onChange: e => setVisitedForm({ ...visitedForm, name: e.target.value }) })),
+          React.createElement("div", { className: "tda-field-row" },
+            React.createElement("div", { className: "tda-field" },
+              React.createElement("label", null, "Vibe (0-10)"),
+              React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.vibe, onChange: e => setVisitedForm({ ...visitedForm, vibe: e.target.value }) })),
+            React.createElement("div", { className: "tda-field" },
+              React.createElement("label", null, "Value (0-10)"),
+              React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.value, onChange: e => setVisitedForm({ ...visitedForm, value: e.target.value }) }))),
+          React.createElement("div", { className: "tda-field-row" },
+            React.createElement("div", { className: "tda-field" },
+              React.createElement("label", null, "Service (0-10)"),
+              React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.service, onChange: e => setVisitedForm({ ...visitedForm, service: e.target.value }) })),
+            React.createElement("div", { className: "tda-field" },
+              React.createElement("label", null, "Food (0-10)"),
+              React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.food, onChange: e => setVisitedForm({ ...visitedForm, food: e.target.value }) }))),
+          React.createElement("div", { className: "tda-field-row" },
+            React.createElement("div", { className: "tda-field" },
+              React.createElement("label", null, "Drinks (0-10)"),
+              React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.drinks, onChange: e => setVisitedForm({ ...visitedForm, drinks: e.target.value }) })),
+            React.createElement("div", { className: "tda-field" },
+              React.createElement("label", null, "Bathroom bonus"),
+              React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.bathroomBonus, onChange: e => setVisitedForm({ ...visitedForm, bathroomBonus: e.target.value }) }))),
+          React.createElement("div", { className: "tda-field" },
+            React.createElement("label", null, "Notes"),
+            React.createElement("input", { className: "tda-input", value: visitedForm.notes, onChange: e => setVisitedForm({ ...visitedForm, notes: e.target.value }) })),
+          React.createElement("div", { className: "tda-modal-actions" },
+            React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowVisitedForm(false) }, "Cancel"),
+            React.createElement("button", { type: "submit", className: "tda-primary-btn" }, visitedForm.id ? "Save ranking" : "Add to leaderboard"))))),
+
+    showWishForm && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowWishForm(false) },
+      React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
+        React.createElement("h3", null, "Add to wishlist"),
+        React.createElement("form", { onSubmit: saveWishForm },
+          React.createElement("div", { className: "tda-field" },
+            React.createElement("label", null, "Name"),
+            React.createElement("input", { className: "tda-input", required: true, value: wishForm.name, onChange: e => setWishForm({ ...wishForm, name: e.target.value }) })),
+          React.createElement("div", { className: "tda-field" },
+            React.createElement("label", null, "Neighborhood (optional)"),
+            React.createElement("input", { className: "tda-input", value: wishForm.neighborhood, onChange: e => setWishForm({ ...wishForm, neighborhood: e.target.value }) })),
+          React.createElement("div", { className: "tda-field" },
+            React.createElement("label", null, "Notes"),
+            React.createElement("input", { className: "tda-input", value: wishForm.notes, onChange: e => setWishForm({ ...wishForm, notes: e.target.value }) })),
+          React.createElement("div", { className: "tda-modal-actions" },
+            React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowWishForm(false) }, "Cancel"),
+            React.createElement("button", { type: "submit", className: "tda-primary-btn" }, "Add to wishlist"))))),
+
+    showInfo && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowInfo(false) },
+      React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
+        React.createElement("h3", null, "How it works"),
+        React.createElement("div", { className: "tda-details-desc" }, "Find bars by vibe, then add promising ones to the wishlist. When you visit a bar, tap \u201cI visited\u201d and score the experience \u2014 it moves to the leaderboard automatically."),
+        React.createElement("div", { className: "tda-details-row" },
+          React.createElement("div", null,
+            React.createElement("b", { style: { color: "#C9A876" } }, "Baller Mode \uD83D\uDCB0\uD83D\uDCB0\uD83D\uDCB0\uD83D\uDCB0"),
+            React.createElement("div", { style: { marginTop: "0.25rem" } }, "Allows recommendations from more expensive bars. Useful for special occasions, rooftops, and premium experiences.")),
+          React.createElement("div", { style: { marginTop: "0.75rem" } },
+            React.createElement("b", { style: { color: "#C9A876" } }, "Explore Mode \uD83C\uDF0E"),
+            React.createElement("div", { style: { marginTop: "0.25rem" } }, "Expands the search distance beyond the normal limit. Useful when discovering bars outside your usual area."))),
+        React.createElement("div", { className: "tda-modal-actions" },
+          React.createElement("button", { className: "tda-primary-btn", onClick: () => setShowInfo(false) }, "Got it")))));
+
+
+  // OSM selection modal
+  const osmModalEl = osmModal && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setOsmModal(null) },
+    React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
+      React.createElement("h3", null, "Pick the right \u201c", osmModal.suggestion.name, "\u201d"),
+      osmModal.searching
+        ? React.createElement("div", { className: "tda-spinner" }, "Searching OpenStreetMap\u2026")
+        : osmModal.results.length === 0
+          ? React.createElement(React.Fragment, null,
+              React.createElement("div", { className: "tda-details-desc" }, "No matches found on OpenStreetMap. Add it manually?"),
+              React.createElement("div", { className: "tda-modal-actions" },
+                React.createElement("button", { className: "tda-secondary-btn", onClick: () => setOsmModal(null) }, "Cancel"),
+                React.createElement("button", { className: "tda-primary-btn", onClick: () => { addSuggestionToWishlist(osmModal.suggestion); setWishForm(emptyWishForm); setOsmModal(null); } }, "Add anyway")))
+          : React.createElement(React.Fragment, null,
+              React.createElement("div", { style: { fontSize: "0.82rem", color: "#857C8E", marginBottom: "0.75rem", fontFamily: "'IBM Plex Mono', monospace" } }, "Select the correct location:"),
+              osmModal.results.map((r, i) => React.createElement("div", {
+                key: i,
+                style: { border: "1px solid #302938", borderRadius: "6px", padding: "0.75rem", marginBottom: "0.5rem", cursor: "pointer", background: "#0E0D10" },
+                onClick: () => confirmOsmSelection(r),
+              },
+                React.createElement("div", { style: { fontFamily: "'Fraunces', serif", fontSize: "1rem", fontWeight: 500 } }, r.name),
+                React.createElement("div", { style: { fontSize: "0.78rem", color: "#A79EB2", marginTop: "0.2rem" } }, r.address))),
+              React.createElement("div", { className: "tda-modal-actions" },
+                React.createElement("button", { className: "tda-secondary-btn", onClick: () => setOsmModal(null) }, "Cancel"),
+                React.createElement("button", { className: "tda-secondary-btn", onClick: () => { addSuggestionToWishlist(osmModal.suggestion); setWishForm(emptyWishForm); setOsmModal(null); } }, "None of these \u2014 add anyway")))));
+
+  return React.createElement(React.Fragment, null, appContent, osmModalEl);
 }
+
+// ---------- BarCard ----------
 function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, editLabel, onDelete, onDisqualify }) {
-    const rankClass = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
-    const isWishlist = b.status === "to-try";
-    const cardClass = `tda-card ${isWishlist ? "wishlist" : ""} ${b.disqualified ? "disqualified" : ""}`;
-    const cleanDescription = displayDescription(b.description);
-    const shortDesc = cleanDescription && cleanDescription.length > 140 ? cleanDescription.slice(0, 140) + "…" : cleanDescription;
-    return (React.createElement("div", { className: cardClass },
-        React.createElement("div", { className: "tda-card-top" },
-            React.createElement("div", { className: "tda-name-row" },
-                rank ? React.createElement("span", { className: `tda-rank ${rankClass}` }, rank)
-                    : (b.disqualified && React.createElement("span", { className: "tda-rank tda-rank-na" }, "N/A")),
-                React.createElement("div", { className: "tda-card-name", onClick: onNameClick }, b.name),
-                isWishlist && React.createElement("span", { className: "tda-wishlist-badge" }, "\u2606 wishlist")),
-            score !== undefined && score !== null && (React.createElement("div", null,
-                React.createElement("div", { className: "tda-avg" }, b.disqualified ? "N/A" : fmt(score)),
-                React.createElement("div", { className: "tda-avg-label" }, b.disqualified ? "disqualified" : scoreLabel)))),
-        b.disqualified && b.disqualifyReason && React.createElement("div", { className: "tda-comment", style: { marginLeft: rank || b.disqualified ? "2.5rem" : 0 } },
-            "Disqualified \u2014 ", b.disqualifyReason),
-        b.tags && b.tags.length > 0 && React.createElement("div", { className: "tda-card-badges" },
-            React.createElement("div", { className: "tda-tags" }, b.tags.map((t) => React.createElement("span", { key: t, className: "tda-tag" }, t)))),
-        isWishlist && b.neighborhood && React.createElement("div", { className: "tda-wishlist-hood" }, b.neighborhood),
-        isWishlist && shortDesc && React.createElement("div", { className: "tda-wishlist-desc" }, shortDesc),
-        b.status === "visited" && (React.createElement("div", { className: "tda-stats" },
-            React.createElement("span", null,
-                "Vibe ",
-                React.createElement("b", null, fmt(b.vibe))),
-            React.createElement("span", null,
-                "Value ",
-                React.createElement("b", null, fmt(b.value))),
-            React.createElement("span", null,
-                "Service ",
-                React.createElement("b", null, fmt(b.service))),
-            React.createElement("span", null,
-                "Food ",
-                React.createElement("b", null, fmt(b.food))),
-            React.createElement("span", null,
-                "Drinks ",
-                React.createElement("b", null, fmt(b.drinks))),
-            b.bathroomBonus > 0 && React.createElement("span", null,
-                "\uD83D\uDEBB bonus ",
-                React.createElement("b", null, fmt(b.bathroomBonus))))),
-        b.happyHour && React.createElement("div", { className: "tda-comment" },
-            "\uD83D\uDD54 ",
-            b.happyHour),
-        b.notes && React.createElement("div", { className: "tda-comment" },
-            "\"",
-            b.notes,
-            "\""),
-        isFetching && React.createElement("div", { className: "tda-fetching" }, "finding details\u2026"),
-        React.createElement("div", { className: "tda-card-actions" },
-            b.mapsLink && React.createElement("a", { className: "tda-link-btn", href: b.mapsLink, target: "_blank", rel: "noreferrer" }, "Map \u2197"),
-            React.createElement("button", { className: "tda-edit-btn", onClick: onNameClick }, "Details"),
-            React.createElement("button", { className: "tda-visit-btn", onClick: onEdit }, editLabel || "Edit"),
-            b.status === "visited" && onDisqualify && React.createElement("button", { className: "tda-visit-btn", onClick: onDisqualify }, b.disqualified ? "Un-disqualify" : "Disqualify"),
-            React.createElement("button", { className: "tda-del-btn", onClick: onDelete }, "Remove"))));
+  const rankClass   = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
+  const isWishlist  = b.status === "to-try";
+  const cardClass   = `tda-card ${isWishlist ? "wishlist" : ""} ${b.disqualified ? "disqualified" : ""}`;
+  const cleanDesc   = displayDescription(b.description);
+  const shortDesc   = cleanDesc && cleanDesc.length > 140 ? cleanDesc.slice(0, 140) + "\u2026" : cleanDesc;
+
+  return React.createElement("div", { className: cardClass },
+    React.createElement("div", { className: "tda-card-top" },
+      React.createElement("div", { className: "tda-name-row" },
+        rank
+          ? React.createElement("span", { className: `tda-rank ${rankClass}` }, rank)
+          : b.disqualified && React.createElement("span", { className: "tda-rank tda-rank-na" }, "N/A"),
+        React.createElement("div", { className: "tda-card-name", onClick: onNameClick },
+          b.mapsLink
+            ? React.createElement("a", { href: b.mapsLink, target: "_blank", rel: "noreferrer", style: { textDecoration: "underline", color: "inherit" } }, b.name)
+            : b.name),
+        isWishlist && React.createElement("span", { className: "tda-wishlist-badge" }, "\u2606 wishlist")),
+      score !== undefined && score !== null && React.createElement("div", null,
+        React.createElement("div", { className: "tda-avg" }, b.disqualified ? "N/A" : fmt(score)),
+        React.createElement("div", { className: "tda-avg-label" }, b.disqualified ? "disqualified" : scoreLabel))),
+    b.disqualified && b.disqualifyReason && React.createElement("div", { className: "tda-comment", style: { marginLeft: rank || b.disqualified ? "2.5rem" : 0 } }, "Disqualified \u2014 ", b.disqualifyReason),
+    b.tags && b.tags.length > 0 && React.createElement("div", { className: "tda-card-badges" },
+      React.createElement("div", { className: "tda-tags" }, b.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t)))),
+    isWishlist && b.neighborhood && React.createElement("div", { className: "tda-wishlist-hood" }, b.neighborhood),
+    shortDesc && React.createElement("div", { className: "tda-wishlist-desc" }, shortDesc),
+    b.status === "visited" && React.createElement("div", { className: "tda-stats" },
+      React.createElement("span", null, "Vibe ",    React.createElement("b", null, fmt(b.vibe))),
+      React.createElement("span", null, "Value ",   React.createElement("b", null, fmt(b.value))),
+      React.createElement("span", null, "Service ", React.createElement("b", null, fmt(b.service))),
+      React.createElement("span", null, "Food ",    React.createElement("b", null, fmt(b.food))),
+      React.createElement("span", null, "Drinks ",  React.createElement("b", null, fmt(b.drinks))),
+      b.bathroomBonus > 0 && React.createElement("span", null, "\uD83D\uDEBB bonus ", React.createElement("b", null, fmt(b.bathroomBonus)))),
+    b.happyHour && React.createElement("div", { className: "tda-comment" }, "\uD83D\uDD54 ", b.happyHour),
+    b.notes && React.createElement("div", { className: "tda-comment" }, "\"", b.notes, "\""),
+    isFetching && React.createElement("div", { className: "tda-fetching" }, "finding details\u2026"),
+    React.createElement("div", { className: "tda-card-actions" },
+      b.mapsLink && React.createElement("a", { className: "tda-link-btn", href: b.mapsLink, target: "_blank", rel: "noreferrer" }, "Map \u2197"),
+      React.createElement("button", { className: "tda-visit-btn", onClick: onEdit }, editLabel || "Edit"),
+      b.status === "visited" && onDisqualify && React.createElement("button", { className: "tda-visit-btn", onClick: onDisqualify }, b.disqualified ? "Un-disqualify" : "Disqualify"),
+      React.createElement("button", { className: "tda-del-btn", onClick: onDelete }, "Remove")));
 }
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(App, null));
-
 </script>
 </body>
 </html>

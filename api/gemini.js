@@ -13,9 +13,6 @@ if (getApps().length === 0) {
 
 const db = getFirestore();
 
-// Parses whatever the model sent back into real JSON (object or array).
-// Tries a direct parse first, then falls back to pulling out the first
-// {...} or [...] block in case the model added stray text around it.
 function safeParse(text) {
   const cleaned = (text || "").replace(/```json/gi, "").replace(/```/g, "").trim();
   try {
@@ -25,19 +22,11 @@ function safeParse(text) {
   }
   const arrMatch = cleaned.match(/\[[\s\S]*\]/);
   if (arrMatch) {
-    try {
-      return JSON.parse(arrMatch[0]);
-    } catch (e) {
-      // fall through
-    }
+    try { return JSON.parse(arrMatch[0]); } catch (e) { /* fall through */ }
   }
   const objMatch = cleaned.match(/\{[\s\S]*\}/);
   if (objMatch) {
-    try {
-      return JSON.parse(objMatch[0]);
-    } catch (e) {
-      // fall through
-    }
+    try { return JSON.parse(objMatch[0]); } catch (e) { /* fall through */ }
   }
   return null;
 }
@@ -49,24 +38,46 @@ function isUsefulDescription(value) {
 function normalizeDetails(parsed) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
   const nested = typeof parsed.description === "string" ? safeParse(parsed.description) : null;
-  const source = nested && typeof nested === "object" && !Array.isArray(nested) ? { ...parsed, ...nested } : parsed;
-  const description = typeof source.description === "string" ? source.description.trim() : "";
+  const source =
+    nested && typeof nested === "object" && !Array.isArray(nested)
+      ? { ...parsed, ...nested }
+      : parsed;
+  const description =
+    typeof source.description === "string" ? source.description.trim() : "";
   return {
     name: typeof source.name === "string" ? source.name.trim() : "",
-    mapsLink: typeof source.mapsLink === "string" ? source.mapsLink.trim() : "",
     neighborhood: typeof source.neighborhood === "string" ? source.neighborhood.trim() : "",
     description,
-    tags: Array.isArray(source.tags) ? source.tags.filter((tag) => typeof tag === "string" && tag.trim()).slice(0, 5) : [],
+    tags: Array.isArray(source.tags)
+      ? source.tags.filter((t) => typeof t === "string" && t.trim()).slice(0, 5)
+      : [],
     happyHour: typeof source.happyHour === "string" ? source.happyHour.trim() : "",
-    capacityHint: Number.isFinite(Number(source.capacityHint)) ? Number(source.capacityHint) : null,
+    capacityHint: Number.isFinite(Number(source.capacityHint))
+      ? Number(source.capacityHint)
+      : null,
+  };
+}
+
+function normalizeSuggestion(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return {
+    name: typeof parsed.name === "string" ? parsed.name.trim() : "",
+    neighborhood: typeof parsed.neighborhood === "string" ? parsed.neighborhood.trim() : "",
+    description: typeof parsed.description === "string" ? parsed.description.trim() : "",
+    tags: Array.isArray(parsed.tags)
+      ? parsed.tags.filter((t) => typeof t === "string" && t.trim()).slice(0, 5)
+      : [],
+    happyHour: typeof parsed.happyHour === "string" ? parsed.happyHour.trim() : "",
+    capacityHint: Number.isFinite(Number(parsed.capacityHint))
+      ? Number(parsed.capacityHint)
+      : null,
+    mapsLink: typeof parsed.mapsLink === "string" ? parsed.mapsLink.trim() : "",
   };
 }
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({
-      error: "Method not allowed",
-    });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
@@ -76,60 +87,59 @@ export default async function handler(req, res) {
     let bars = null;
     let docRef = null;
 
-    // Only use Firebase caching when we are fetching details
-    // for an existing bar
+    // Only use Firebase caching when fetching details for an existing bar
     if (barId) {
       docRef = db.collection("tourDeAlcoholism").doc("sharedList");
-
       const snapshot = await docRef.get();
       const data = snapshot.data();
-
       bars = data?.bars || [];
-
       existingBar = bars.find((bar) => bar.id === barId);
 
       if (!existingBar) {
-        return res.status(404).json({
-          error: "Bar not found",
-        });
+        return res.status(404).json({ error: "Bar not found" });
       }
 
-      // Return cached result — already structured, no parsing needed
-      if (existingBar.detailsFetched && isUsefulDescription(existingBar.description) && !forceRefresh) {
+      // Return cached result if already fetched
+      if (
+        existingBar.detailsFetched &&
+        isUsefulDescription(existingBar.description) &&
+        !forceRefresh
+      ) {
         return res.status(200).json({ result: existingBar });
       }
     }
 
-    // Call Gemini
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": process.env.GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        }),
-      }
-    );
+    // Call Gemini with a 10-second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const geminiData = await response.json();
+    let geminiResponse;
+    try {
+      geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${
+          process.env.GEMINI_MODEL || "gemini-2.0-flash-lite"
+        }:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": process.env.GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+          signal: controller.signal,
+        }
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
-    // Surface Gemini errors (quota, invalid key, etc.)
-    if (!response.ok) {
+    const geminiData = await geminiResponse.json();
+
+    if (!geminiResponse.ok) {
       console.error("Gemini error:", geminiData);
-
-      return res.status(response.status).json({
+      return res.status(geminiResponse.status).json({
         error: geminiData?.error?.message || "Gemini request failed",
       });
     }
@@ -141,28 +151,25 @@ export default async function handler(req, res) {
 
     const parsed = safeParse(rawText);
 
-    // Search / random-pick calls (no barId): hand back whatever shape the
-    // prompt asked for — an array for search suggestions, an object for a
-    // single random pick. Never touches Firebase.
+    // Search / random-pick calls (no barId): return suggestions array or single object
     if (!barId) {
       const result = Array.isArray(parsed)
-        ? parsed.map(normalizeDetails).filter((bar) => bar && bar.name)
-        : normalizeDetails(parsed);
+        ? parsed.map(normalizeSuggestion).filter((b) => b && b.name)
+        : normalizeSuggestion(parsed);
       return res.status(200).json({ result });
     }
 
-    // Bar-details call for a specific bar. If parsing failed, still mark it
-    // fetched (so we don't hammer Gemini again every time it's opened) but
-    // don't overwrite real fields with junk.
+    // Bar-details call for a specific verified bar
     const details = normalizeDetails(parsed);
     if (!details || !isUsefulDescription(details.description)) {
-      // Never cache a failed lookup: Details/Refresh can safely retry it.
-      return res.status(422).json({ error: "No usable bar description returned. Please try again." });
+      return res.status(422).json({
+        error: "No usable bar description returned. Please try again.",
+      });
     }
 
     const mergedBar = {
       ...existingBar,
-      mapsLink: details.mapsLink || existingBar.mapsLink,
+      // Never overwrite verified address/location data from OSM
       neighborhood: details.neighborhood || existingBar.neighborhood,
       description: details.description,
       tags: details.tags.length ? details.tags : existingBar.tags,
@@ -173,18 +180,15 @@ export default async function handler(req, res) {
     };
 
     const updatedBars = bars.map((bar) => (bar.id === barId ? mergedBar : bar));
-
-    await docRef.update({
-      bars: updatedBars,
-    });
+    await docRef.update({ bars: updatedBars });
 
     return res.status(200).json({ result: mergedBar });
-
   } catch (error) {
+    if (error.name === "AbortError") {
+      console.error("Gemini request timed out");
+      return res.status(504).json({ error: "Gemini request timed out" });
+    }
     console.error("Server error:", error);
-
-    return res.status(500).json({
-      error: error.message || "Failed to generate details",
-    });
+    return res.status(500).json({ error: error.message || "Failed to generate details" });
   }
 }
