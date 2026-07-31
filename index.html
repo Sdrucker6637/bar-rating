@@ -192,6 +192,7 @@ function App() {
   const [osmModal, setOsmModal]           = useState(null);
   const [showVisitedNamePrompt, setShowVisitedNamePrompt] = useState(false);
   const [visitedNameInput, setVisitedNameInput] = useState("");
+  const [visitedHoodInput, setVisitedHoodInput] = useState("");
 
   const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
 
@@ -407,11 +408,12 @@ function App() {
       mapsLink,
       detailsFetched: hasDescription,
     };
-    if (isEdit) {
-      persist((bars || []).map(b => b.id === id ? { ...b, ...record } : b));
-    } else {
-      persist([...(bars || []), record]);
-    }
+    const persistPromise = isEdit
+      ? persist((bars || []).map(b => b.id === id ? { ...b, ...record } : b))
+      : persist([...(bars || []), record]);
+    persistPromise.then(() => {
+      if (!record.detailsFetched) runDetailsFetch(record);
+    });
     setSearchResults(prev => prev.filter(r => r.name !== s.name));
   }
 
@@ -692,7 +694,7 @@ function App() {
             React.createElement("div", { className: "tda-champion-score" }, fmt(score)));
         })(),
         React.createElement("div", { className: "tda-controls" },
-          React.createElement("input", { className: "tda-input", placeholder: "Search name, hood, notes\u2026", value: search, onChange: e => setSearch(e.target.value), style: { flex: "1 1 200px" } }),
+          React.createElement("input", { className: "tda-input", placeholder: "Search name, neighborhood, notes\u2026", value: search, onChange: e => setSearch(e.target.value), style: { flex: "1 1 200px" } }),
           React.createElement("div", { className: "tda-toggle" },
             React.createElement("button", { className: foodMode === "with" ? "active" : "", onClick: () => setFoodMode("with") }, "With food"),
             React.createElement("button", { className: foodMode === "without" ? "active" : "", onClick: () => setFoodMode("without") }, "Without food"))),
@@ -763,12 +765,16 @@ function App() {
           e.preventDefault();
           if (!visitedNameInput.trim()) return;
           setShowVisitedNamePrompt(false);
-          startOsmLookup({ name: visitedNameInput.trim(), _osmIntent: "visited" });
+          startOsmLookup({ name: visitedNameInput.trim(), neighborhood: visitedHoodInput.trim(), _osmIntent: "visited" });
           setVisitedNameInput("");
+          setVisitedHoodInput("");
         }},
           React.createElement("div", { className: "tda-field" },
             React.createElement("label", null, "Bar name"),
             React.createElement("input", { className: "tda-input", required: true, autoFocus: true, placeholder: "e.g. The Dead Rabbit", value: visitedNameInput, onChange: e => setVisitedNameInput(e.target.value) })),
+          React.createElement("div", { className: "tda-field" },
+            React.createElement("label", null, "Neighborhood (optional)"),
+            React.createElement("input", { className: "tda-input", placeholder: "e.g. East Village", value: visitedHoodInput, onChange: e => setVisitedHoodInput(e.target.value) })),
           React.createElement("div", { className: "tda-modal-actions" },
             React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowVisitedNamePrompt(false) }, "Cancel"),
             React.createElement("button", { type: "submit", className: "tda-primary-btn" }, "Look up"))))),
@@ -843,7 +849,9 @@ function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, 
   const isWishlist  = b.status === "to-try";
   const cardClass   = `tda-card ${isWishlist ? "wishlist" : ""} ${b.disqualified ? "disqualified" : ""}`;
   const cleanDesc   = displayDescription(b.description);
-  const shortDesc   = cleanDesc && cleanDesc.length > 140 ? cleanDesc.slice(0, 140) + "\u2026" : cleanDesc;
+  const isLong      = cleanDesc && cleanDesc.length > 140;
+  const [expanded, setExpanded] = React.useState(false);
+  const descText = isLong && !expanded ? cleanDesc.slice(0, 140) + "\u2026" : cleanDesc;
 
   return React.createElement("div", { className: cardClass },
     React.createElement("div", { className: "tda-card-top" },
@@ -863,7 +871,12 @@ function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, 
     b.tags && b.tags.length > 0 && React.createElement("div", { className: "tda-card-badges" },
       React.createElement("div", { className: "tda-tags" }, b.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t)))),
     b.neighborhood && React.createElement("div", { className: "tda-wishlist-hood" }, b.neighborhood),
-    shortDesc && React.createElement("div", { className: "tda-wishlist-desc" }, shortDesc),
+    descText && React.createElement("div", null,
+      React.createElement("div", { className: "tda-wishlist-desc" }, descText),
+      isLong && React.createElement("button", {
+        onClick: () => setExpanded(!expanded),
+        style: { background: "none", border: "none", color: "#C9A876", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7rem", cursor: "pointer", padding: "0.15rem 0 0", textDecoration: "underline", textUnderlineOffset: "2px" }
+      }, expanded ? "Show less" : "Read more")),
     b.status === "visited" && React.createElement("div", { className: "tda-stats" },
       React.createElement("span", null, "\uD83C\uDFAD Vibe ",    React.createElement("b", null, fmt(b.vibe))),
       React.createElement("span", null, "\uD83D\uDCB0 Value ",   React.createElement("b", null, fmt(b.value))),
