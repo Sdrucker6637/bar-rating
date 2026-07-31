@@ -33,10 +33,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { query, neighborhood } = req.body;
+    const { query, neighborhood, address } = req.body;
 
     // Always include "bar" to bias Nominatim toward bar/restaurant POIs
-    const baseTerms = [query + " bar", "New York City", neighborhood || ""].filter(Boolean).join(", ");
+    // Include neighborhood and address when available to disambiguate same-name bars
+    const baseTerms = [query + " bar", "New York City", neighborhood || "", address || ""].filter(Boolean).join(", ");
 
     const nyPlaces = await nominatimSearch(baseTerms);
 
