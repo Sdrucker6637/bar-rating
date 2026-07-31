@@ -72,6 +72,9 @@ function normalizeSuggestion(parsed) {
       ? Number(parsed.capacityHint)
       : null,
     mapsLink: typeof parsed.mapsLink === "string" ? parsed.mapsLink.trim() : "",
+    address: typeof parsed.address === "string" ? parsed.address.trim() : "",
+    latitude: Number.isFinite(Number(parsed.latitude)) ? Number(parsed.latitude) : null,
+    longitude: Number.isFinite(Number(parsed.longitude)) ? Number(parsed.longitude) : null,
   };
 }
 

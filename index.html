@@ -116,12 +116,16 @@ async function callGemini(prompt, barId, forceRefresh) {
     response = await fetch("/api/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, barId, forceRefresh: false }),
+      body: JSON.stringify({ prompt, barId, forceRefresh: !!forceRefresh }),
       signal: controller.signal,
     });
-  } finally {
+  } catch(e) {
+    // fetch threw (network error, abort, etc.) — clear timeout and bail
     clearTimeout(timeoutId);
+    return null;
   }
+  clearTimeout(timeoutId);
+  if (!response) return null;
   const data = await response.json();
   if (data.result) geminiCache[key] = data.result;
   return data.result || null;
@@ -142,7 +146,7 @@ async function fetchBarSuggestions(vibeQuery, groupSize, excludeNames, ballerMod
   const prompt = `You are a concierge with live web search. Suggest 4 real, currently open bars in New York City matching this vibe request: "${vibeQuery || "a great night out"}". They should comfortably work for a group of about ${groupSize} people. ${constraints} Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary: an array of up to 4 objects, each in exactly this shape:
 {"name":"string","neighborhood":"short neighborhood name","description":"two sentences covering vibe, price range ($ $$ $$$ $$$$), and location","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","capacityHint":0,"address":"full street address, city, state"}`;
   try {
-    const result = await callGemini(prompt);
+    const result = await callGemini(prompt, null, true);
     return Array.isArray(result) ? result : [];
   } catch(e) { return []; }
 }
@@ -152,7 +156,7 @@ async function fetchRandomBar(groupSize, excludeNames, ballerMode, exploreMode) 
   const prompt = `You are a concierge with live web search. Pick exactly one real, currently open bar in New York City as a fun surprise recommendation \u2014 any vibe, your choice. It should comfortably work for a group of about ${groupSize} people. ${constraints} Do not suggest any of these bars we already know: ${excludeNames.join(", ") || "none"}. Respond with ONLY raw JSON, no markdown fences, no commentary, in exactly this shape:
 {"name":"string","neighborhood":"short neighborhood name","description":"two sentences covering vibe, price range ($ $$ $$$ $$$$), and location","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","capacityHint":0,"address":"full street address, city, state"}`;
   try {
-    const result = await callGemini(prompt);
+    const result = await callGemini(prompt, null, true);
     return (result && !Array.isArray(result)) ? result : null;
   } catch(e) { return null; }
 }
@@ -271,14 +275,56 @@ function App() {
         body: JSON.stringify({ query: suggestion.name, neighborhood: suggestion.neighborhood || "" }),
       });
       const results = await response.json();
-      setOsmModal({ suggestion, results: Array.isArray(results) ? results : [], searching: false });
+      const osmResults = Array.isArray(results) ? results : [];
+      if (osmResults.length > 0) {
+        setOsmModal({ suggestion, results: osmResults, searching: false });
+        return;
+      }
+      // OSM found nothing — fall back to Gemini for location data
+      const geminiGeo = await geocodeWithGemini(suggestion);
+      if (geminiGeo) {
+        setOsmModal({ suggestion, results: [geminiGeo], searching: false, fromGemini: true });
+      } else {
+        setOsmModal({ suggestion, results: [], searching: false });
+      }
     } catch(e) {
+      // On error, try Gemini as last resort
+      try {
+        const geminiGeo = await geocodeWithGemini(suggestion);
+        if (geminiGeo) {
+          setOsmModal({ suggestion, results: [geminiGeo], searching: false, fromGemini: true });
+          return;
+        }
+      } catch(e2) { /* ignore */ }
       setOsmModal({ suggestion, results: [], searching: false });
     }
   }
 
+  async function geocodeWithGemini(suggestion) {
+    const prompt = `You are a geocoding assistant. Find the exact street address and coordinates for "${suggestion.name}" ${suggestion.neighborhood ? "in " + suggestion.neighborhood + ", " : "in "}New York City, NY. Respond with ONLY raw JSON, no markdown fences: {"address":"full street address, city, state, zip","latitude":40.7,"longitude":-74.0,"name":"verified business name"}`;
+    const result = await callGemini(prompt, null, true);
+    if (!result) return null;
+    return {
+      name: result.name || suggestion.name,
+      address: result.address || suggestion.address || "",
+      latitude: result.latitude || null,
+      longitude: result.longitude || null,
+      mapsLink: result.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(result.address)}` : "",
+      _fromGemini: true,
+    };
+  }
+
   function confirmOsmSelection(osmResult) {
     const merged = { ...osmModal.suggestion, ...osmResult };
+    // Preserve Gemini-provided description/tags if OSM result overwrote them
+    if (osmResult._fromGemini || Object.keys(osmResult).length === 0) {
+      // These fields should already be in osmModal.suggestion — ensure they survive
+      merged.description = osmModal.suggestion.description || merged.description || "";
+      merged.tags = osmModal.suggestion.tags || merged.tags || [];
+      merged.neighborhood = osmModal.suggestion.neighborhood || merged.neighborhood || "";
+      merged.happyHour = osmModal.suggestion.happyHour || merged.happyHour || "";
+      merged.capacityHint = osmModal.suggestion.capacityHint || merged.capacityHint || null;
+    }
     if (osmModal.suggestion._osmIntent === "visited") {
       // Pre-fill the visited scoring form with verified location data
       setVisitedSuggestion(merged);
@@ -331,7 +377,7 @@ function App() {
   }
 
   async function runRandomSearch() {
-    setSearching(true); setSearchDone(false);
+    setSearchResults([]); setSearching(true); setSearchDone(false);
     const exclude = (bars || []).map(b => b.name);
     const pick = await fetchRandomBar(groupSize, exclude, ballerMode, exploreMode);
     setSearchResults(pick ? [pick] : []); setSearching(false); setSearchDone(true);
@@ -341,9 +387,10 @@ function App() {
     const mapsLink = s.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address)}`
       : "";
-    // If this came from the manual wishlist form (has _wishFormId), handle edit vs new
     const isEdit = s._wishFormId;
     const id = isEdit ? s._wishFormId : `b${Date.now()}`;
+    // If Gemini already gave us a real description, don't re-fetch and overwrite it
+    const hasDescription = typeof s.description === "string" && s.description.trim().length > 10;
     const record = {
       id,
       name: s.name,
@@ -359,7 +406,7 @@ function App() {
       latitude: s.latitude || null,
       longitude: s.longitude || null,
       mapsLink,
-      detailsFetched: false,
+      detailsFetched: hasDescription,
     };
     if (isEdit) {
       persist((bars || []).map(b => b.id === id ? { ...b, ...record } : b));
@@ -776,7 +823,9 @@ function App() {
                 React.createElement("button", { className: "tda-secondary-btn", onClick: () => setOsmModal(null) }, "Cancel"),
                 React.createElement("button", { className: "tda-primary-btn", onClick: () => { confirmOsmSelection({}); } }, "Add anyway")))
           : React.createElement(React.Fragment, null,
-              React.createElement("div", { className: "tda-osm-eyebrow" }, "Select the correct location"),
+              osmModal.fromGemini
+                ? React.createElement("p", { style: { fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", color: "#7FA88E", margin: "0 0 0.9rem" } }, "\u2728 AI-suggested location")
+                : React.createElement("div", { className: "tda-osm-eyebrow" }, "Select the correct location"),
               osmModal.results.map((r, i) => React.createElement("div", {
                 key: i,
                 className: "tda-osm-result",
