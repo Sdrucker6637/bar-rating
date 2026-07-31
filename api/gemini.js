@@ -114,7 +114,7 @@ export default async function handler(req, res) {
 
     // Call Gemini with a 10-second timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     let geminiResponse;
     try {
@@ -130,6 +130,7 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
+            tools: [{ google_search: {} }],
           }),
           signal: controller.signal,
         }
