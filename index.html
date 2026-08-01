@@ -118,11 +118,26 @@ signal: controller.signal,
 });
 } catch(e) {
 clearTimeout(timeoutId);
+console.error("[gemini] request failed", e);
 return null;
 }
 clearTimeout(timeoutId);
 if (!response) return null;
-const data = await response.json();
+if (!response.ok) {
+const errText = await response.text().catch(() => "");
+console.error(`[gemini] ${response.status} for barId=${barId || "(none)"}`, errText);
+return null;
+}
+let data;
+try {
+data = await response.json();
+} catch(e) {
+console.error("[gemini] response was not valid JSON", e);
+return null;
+}
+if (!data.result) {
+console.warn(`[gemini] no result field for barId=${barId || "(none)"}`, data);
+}
 if (data.result) geminiCache[key] = data.result;
 return data.result || null;
 }
@@ -343,17 +358,25 @@ return true;
 // neighborhood in place via Gemini, once its existence is already confirmed
 // by Places. Ephemeral — nothing here is persisted unless the user adds the
 // bar, at which point the same fields carry over via addSuggestionToWishlist.
+//
+// Deliberately called WITHOUT a barId: api/gemini.js only does its Firestore
+// bar lookup/caching when barId is present, and 404s if that id isn't an
+// existing saved bar — which a fresh search result never is. Omitting barId
+// routes it through the plain "generate and return, no Firestore" path.
 const enrichSearchResult = useCallback((result) => {
 setEnrichingNames(s => new Set(s).add(result.name));
-const prompt = `You are a NYC bar description writer.\n\nThe bar "${result.name}" located at "${result.address || result.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
-callGemini(prompt, `search-${result.placeId || result.name}`, false).then((data) => {
-if (data) {
+const prompt = `You are a NYC bar description writer.\n\nThe bar "${result.name}" located at "${result.address || result.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY a single JSON object (not an array):\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
+callGemini(prompt, null, false).then((data) => {
+// Defensive: the server returns an array for multi-suggestion calls, so
+// unwrap just in case Gemini ever ignores the "single object" instruction.
+const info = Array.isArray(data) ? data[0] : data;
+if (info) {
 setSearchResults(prev => prev.map(r => r.name === result.name ? {
 ...r,
-description: data.description || r.description,
-tags: (data.tags && data.tags.length) ? data.tags : r.tags,
-happyHour: data.happyHour || r.happyHour,
-neighborhood: data.neighborhood || r.neighborhood,
+description: info.description || r.description,
+tags: (info.tags && info.tags.length) ? info.tags : r.tags,
+happyHour: info.happyHour || r.happyHour,
+neighborhood: info.neighborhood || r.neighborhood,
 } : r));
 }
 setEnrichingNames(s => { const n = new Set(s); n.delete(result.name); return n; });
