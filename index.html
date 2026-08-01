@@ -130,7 +130,20 @@ return data.result || null;
 // ---------- Google Places (source of truth for existence + location) ----------
 const SURPRISE_VIBES = ["cozy neighborhood", "lively cocktail", "classic dive", "speakeasy", "rooftop", "wine", "beer hall", "late night", "live music"];
 
-async function fetchPlaces(query, { neighborhood, address, ballerMode, exploreMode, limit } = {}) {
+// Session-only cache: repeating the same vibe search (or the same manual
+// lookup) within PLACES_CACHE_TTL_MS reuses the prior response instead of
+// re-billing the Places API. Cleared on page reload — bars you've already
+// saved never hit this path again anyway, since verification only happens
+// once, at add-time, and the result is persisted to Firestore.
+const placesCache = new Map();
+const PLACES_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+async function fetchPlaces(query, { neighborhood, address, ballerMode, exploreMode, limit, noCache } = {}) {
+const cacheKey = JSON.stringify({ query, neighborhood, address, ballerMode: !!ballerMode, exploreMode: !!exploreMode, limit: limit || 5 });
+if (!noCache) {
+const cached = placesCache.get(cacheKey);
+if (cached && Date.now() - cached.time < PLACES_CACHE_TTL_MS) return cached.results;
+}
 try {
 const response = await fetch("/api/places", {
 method: "POST",
@@ -138,7 +151,9 @@ headers: { "Content-Type": "application/json" },
 body: JSON.stringify({ query, neighborhood, address, ballerMode: !!ballerMode, exploreMode: !!exploreMode, limit: limit || 5 }),
 });
 const results = await response.json();
-return Array.isArray(results) ? results : [];
+const safe = Array.isArray(results) ? results : [];
+if (!noCache) placesCache.set(cacheKey, { time: Date.now(), results: safe });
+return safe;
 } catch(e) { return []; }
 }
 
@@ -149,7 +164,8 @@ return results.filter(r => !excludeNames.includes(r.name)).slice(0, 4);
 
 async function fetchRandomBar(groupSize, excludeNames, ballerMode, exploreMode) {
 const vibe = SURPRISE_VIBES[Math.floor(Math.random() * SURPRISE_VIBES.length)];
-const results = await fetchPlaces(vibe, { ballerMode, exploreMode, limit: 10 });
+// noCache: true — Surprise Us should actually surprise you, not replay a cached batch.
+const results = await fetchPlaces(vibe, { ballerMode, exploreMode, limit: 10, noCache: true });
 const fresh = results.filter(r => !excludeNames.includes(r.name));
 if (fresh.length === 0) return null;
 return fresh[Math.floor(Math.random() * fresh.length)];
@@ -162,6 +178,10 @@ const emptyWishForm = { id:null, name:"", neighborhood:"", notes:"" };
 // ---------- App ----------
 function App() {
 const [bars, setBars] = useState(null);
+// Every bar name shown as a search/surprise result this session, whether or
+// not it was saved — kept out of future results so retrying a search or
+// hitting Surprise Us repeatedly doesn't just replay what you already saw.
+const [seenNames, setSeenNames] = useState(() => new Set());
 const [groupSize, setGroupSizeState] = useState(4);
 const [loading, setLoading] = useState(true);
 const [connError, setConnError] = useState(false);
@@ -320,20 +340,22 @@ return true;
 
 async function runSearch() {
 setSearchResults([]); setSearching(true); setSearchDone(false);
-const exclude = (bars || []).map(b => b.name);
+const exclude = [...new Set([...(bars || []).map(b => b.name), ...seenNames])];
 const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude, ballerMode, exploreMode);
 // Google doesn't expose venue capacity, so this only filters bars that already
 // have a capacity set from a prior manual edit; new Places results pass through.
 const fitFiltered = fitsGroupOnly ? results.filter(r => !r.capacityHint || r.capacityHint >= groupSize) : results;
 setSearchResults(fitFiltered); setSearching(false); setSearchDone(true);
+if (fitFiltered.length > 0) setSeenNames(prev => new Set([...prev, ...fitFiltered.map(r => r.name)]));
 }
 
 async function runRandomSearch() {
 setSearchResults([]); setSearching(true); setSearchDone(false);
-const exclude = (bars || []).map(b => b.name);
+const exclude = [...new Set([...(bars || []).map(b => b.name), ...seenNames])];
 const pick = await fetchRandomBar(groupSize, exclude, ballerMode, exploreMode);
 setSearchResults(pick ? [pick] : []);
 setSearching(false); setSearchDone(true);
+if (pick) setSeenNames(prev => new Set([...prev, pick.name]));
 }
 
 function addSuggestionToWishlist(s) {
