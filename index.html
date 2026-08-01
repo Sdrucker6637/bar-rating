@@ -553,17 +553,30 @@ React.createElement("span", { className: "tda-search-btn-hint" }, "Discover rand
 searching && React.createElement("div", { className: "tda-spinner" }, "scouting the city…"),
 searchDone && !searching && searchResults.length === 0 && React.createElement("div", { className: "tda-empty" }, "No fresh matches came back — try a different vibe."),
 searchResults.length > 0 && React.createElement("div", { className: "tda-suggestion-grid" },
-searchResults.map(s => React.createElement("div", { key: s.name, className: "tda-suggestion-card" },
+searchResults.map(s => {
+const isEnriching = enrichingNames.has(s.name);
+const desc = displayDescription(s.description);
+return React.createElement("div", { key: s.name, className: "tda-suggestion-card" },
 React.createElement("div", { className: "tda-suggestion-name" }, s.name),
 s.neighborhood && React.createElement("div", { className: "tda-suggestion-hood" }, s.neighborhood),
-s.tags && s.tags.length > 0 && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.5rem" } },
-s.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t))),
-React.createElement("div", { className: "tda-suggestion-desc" }, displayDescription(s.description) || s.address || ""),
+s.tags && s.tags.length > 0
+? React.createElement("div", { className: "tda-tags", style: { marginTop: "0.5rem" } },
+s.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t)))
+: isEnriching && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.5rem" } },
+React.createElement("span", { className: "tda-tag tda-tag-skeleton" }),
+React.createElement("span", { className: "tda-tag tda-tag-skeleton" }),
+React.createElement("span", { className: "tda-tag tda-tag-skeleton" })),
+desc
+? React.createElement("div", { className: "tda-suggestion-desc" }, desc)
+: isEnriching
+? React.createElement("div", { className: "tda-suggestion-desc tda-desc-loading" }, "finding details…")
+: React.createElement("div", { className: "tda-suggestion-desc" }, s.address || ""),
 s.happyHour && React.createElement("div", { className: "tda-suggestion-desc", style: { color: "#C9A876" } }, "🕔 ", s.happyHour),
 s.mapsLink && React.createElement("a", { className: "tda-link-btn", style: { display: "inline-block", marginTop: "0.7rem" }, href: s.mapsLink, target: "_blank", rel: "noreferrer" }, "Map ↗"),
 React.createElement("div", { className: "tda-suggestion-actions" },
 React.createElement("button", { className: "tda-suggestion-add", onClick: () => addSuggestionToWishlist(s) }, "+ Wishlist"),
-React.createElement("button", { className: "tda-visit-btn", onClick: () => rankSuggestion(s) }, "I visited"))))));
+React.createElement("button", { className: "tda-visit-btn", onClick: () => rankSuggestion(s) }, "I visited")));
+})));
 
 if (loading) {
 return React.createElement("div", { style: { minHeight: "100vh", background: "#0E0D10", display: "flex", alignItems: "center", justifyContent: "center" } },
@@ -646,6 +659,9 @@ React.createElement("style", null, `
 .tda-suggestion-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.05rem; }
 .tda-suggestion-hood { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-top:0.1rem; }
 .tda-suggestion-desc { font-size:0.82rem; color:#A79EB2; margin-top:0.5rem; line-height:1.4; }
+.tda-desc-loading { color:#5D5666; font-style:italic; animation:tda-pulse 1.4s ease-in-out infinite; }
+.tda-tag-skeleton { background:#1E1A24; color:transparent; width:3.2rem; display:inline-block; animation:tda-pulse 1.4s ease-in-out infinite; }
+@keyframes tda-pulse { 0%,100% { opacity:0.35; } 50% { opacity:0.9; } }
 .tda-suggestion-add { margin-top:0.7rem; font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.8rem; border-radius:5px; border:1px solid #3F5D4E; background:transparent; color:#7FA88E; cursor:pointer; width:100%; }
 .tda-suggestion-add:hover { background:#3F5D4E; color:#EDE6D9; }
 .tda-suggestion-actions { display:flex; gap:0.5rem; margin-top:0.7rem; }
