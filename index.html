@@ -201,6 +201,7 @@ const [searchResults, setSearchResults] = useState([]);
 const [searching, setSearching] = useState(false);
 const [searchDone, setSearchDone] = useState(false);
 const [fetchingIds, setFetchingIds] = useState(new Set());
+const [enrichingNames, setEnrichingNames] = useState(() => new Set());
 const [showInfo, setShowInfo] = useState(false);
 const [visitedSuggestion, setVisitedSuggestion] = useState(null);
 const [placesModal, setPlacesModal] = useState(null);
@@ -338,52 +339,51 @@ return true;
 });
 }, [toTry, fitsGroupOnly, groupSize]);
 
-// ---------- Enrich Places results with Gemini descriptions/tags ----------
-async function enrichBarDetails(bar) {
-  // Skip if the bar already has rich metadata (e.g. came from a cached/disambiguation flow)
-  if (typeof bar.description === "string" && bar.description.trim().length > 10 && bar.tags && bar.tags.length > 0) return bar;
-
-  const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
-
-  try {
-    const data = await callGemini(prompt, null, false);
-    if (data && !Array.isArray(data)) {
-      return {
-        ...bar,
-        description: data.description || "",
-        tags: data.tags || [],
-        neighborhood: bar.neighborhood || data.neighborhood || "",
-        happyHour: bar.happyHour || data.happyHour || "",
-        capacityHint: bar.capacityHint || data.capacityHint || null,
-      };
-    }
-  } catch(e) { /* fall through — show bar as-is without enrichment */ }
-  return bar;
+// Fills in a search/surprise result's description, tags, happyHour, and
+// neighborhood in place via Gemini, once its existence is already confirmed
+// by Places. Ephemeral — nothing here is persisted unless the user adds the
+// bar, at which point the same fields carry over via addSuggestionToWishlist.
+const enrichSearchResult = useCallback((result) => {
+setEnrichingNames(s => new Set(s).add(result.name));
+const prompt = `You are a NYC bar description writer.\n\nThe bar "${result.name}" located at "${result.address || result.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
+callGemini(prompt, `search-${result.placeId || result.name}`, false).then((data) => {
+if (data) {
+setSearchResults(prev => prev.map(r => r.name === result.name ? {
+...r,
+description: data.description || r.description,
+tags: (data.tags && data.tags.length) ? data.tags : r.tags,
+happyHour: data.happyHour || r.happyHour,
+neighborhood: data.neighborhood || r.neighborhood,
+} : r));
 }
+setEnrichingNames(s => { const n = new Set(s); n.delete(result.name); return n; });
+});
+}, []);
 
 async function runSearch() {
 setSearchResults([]); setSearching(true); setSearchDone(false);
 const exclude = [...new Set([...(bars || []).map(b => b.name), ...seenNames])];
 const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude, ballerMode, exploreMode);
+// Google doesn't expose venue capacity, so this only filters bars that already
+// have a capacity set from a prior manual edit; new Places results pass through.
 const fitFiltered = fitsGroupOnly ? results.filter(r => !r.capacityHint || r.capacityHint >= groupSize) : results;
-// Enrich with Gemini descriptions, tags, and neighborhood — all in parallel
-const enriched = await Promise.all(fitFiltered.map(enrichBarDetails));
-setSearchResults(enriched); setSearching(false); setSearchDone(true);
-if (enriched.length > 0) setSeenNames(prev => new Set([...prev, ...enriched.map(r => r.name)]));
+setSearchResults(fitFiltered); setSearching(false); setSearchDone(true);
+if (fitFiltered.length > 0) {
+setSeenNames(prev => new Set([...prev, ...fitFiltered.map(r => r.name)]));
+fitFiltered.forEach(r => enrichSearchResult(r));
+}
 }
 
 async function runRandomSearch() {
 setSearchResults([]); setSearching(true); setSearchDone(false);
 const exclude = [...new Set([...(bars || []).map(b => b.name), ...seenNames])];
 const pick = await fetchRandomBar(groupSize, exclude, ballerMode, exploreMode);
-if (pick) {
-  const enriched = await enrichBarDetails(pick);
-  setSearchResults([enriched]);
-  setSeenNames(prev => new Set([...prev, enriched.name]));
-} else {
-  setSearchResults([]);
-}
+setSearchResults(pick ? [pick] : []);
 setSearching(false); setSearchDone(true);
+if (pick) {
+setSeenNames(prev => new Set([...prev, pick.name]));
+enrichSearchResult(pick);
+}
 }
 
 function addSuggestionToWishlist(s) {

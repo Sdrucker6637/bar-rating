@@ -7,12 +7,26 @@
 // The Gemini endpoint (api/gemini.js) is unchanged and is only used to write
 // flavor-text descriptions for bars that have already been verified here.
 //
-// Required env var (set in Vercel Project Settings -> Environment Variables):
+// SHARED CACHE: every successful Google Places search is cached in Firestore
+// (collection "placesSearchCache"), keyed by the normalized search text +
+// explore-mode radius. Identical searches from ANY user, on ANY device,
+// within CACHE_TTL_MS of each other reuse the cached result instead of
+// calling Google again. Baller Mode is intentionally NOT part of the cache
+// key — the raw (unfiltered by price) result set is cached once, and the
+// price/type filtering happens after every read, cached or not. This uses
+// Firestore's REST API directly with no auth header, matching this app's
+// existing open security rules (same access model the browser already uses
+// via the Firebase web SDK) — no service account or extra dependency needed.
+//
+// Required env vars (set in Vercel Project Settings -> Environment Variables):
 //   GOOGLE_PLACES_API_KEY
+//   FIREBASE_PROJECT_ID   (e.g. "bar-rating" — same project as index.html)
 
 const NYC_CENTER = { latitude: 40.7128, longitude: -74.006 };
 const NORMAL_RADIUS_METERS = 12000; // roughly a 30-40 min transit ride from Manhattan
 const EXPLORE_RADIUS_METERS = 40000;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_COLLECTION = "placesSearchCache";
 
 // Places API (New) priceLevel enum, ranked low to high.
 const PRICE_LEVEL_RANK = {
@@ -25,6 +39,126 @@ const PRICE_LEVEL_RANK = {
 
 const BAR_TYPES = ["bar", "night_club", "pub", "wine_bar"];
 
+// ---------- tiny cache-key helper (no crypto module needed) ----------
+function hashString(str) {
+  // FNV-1a, good enough for a stable, short, collision-resistant doc id.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+  }
+  return hash.toString(16);
+}
+function cacheKeyFor(textQuery, exploreMode) {
+  const normalized = textQuery.trim().toLowerCase().replace(/\s+/g, " ");
+  const slug = normalized.replace(/[^a-z0-9]+/g, "-").slice(0, 60).replace(/^-+|-+$/g, "");
+  return `${slug || "q"}-${exploreMode ? "explore" : "normal"}-${hashString(normalized + "|" + exploreMode)}`;
+}
+
+// ---------- Firestore REST <-> JS value conversion ----------
+function toFirestoreValue(value) {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (Array.isArray(value)) {
+    return { arrayValue: { values: value.map(toFirestoreValue) } };
+  }
+  if (typeof value === "object") {
+    const fields = {};
+    for (const k of Object.keys(value)) fields[k] = toFirestoreValue(value[k]);
+    return { mapValue: { fields } };
+  }
+  return { nullValue: null };
+}
+function fromFirestoreValue(v) {
+  if (!v) return null;
+  if ("nullValue" in v) return null;
+  if ("stringValue" in v) return v.stringValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("integerValue" in v) return parseInt(v.integerValue, 10);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("arrayValue" in v) return (v.arrayValue.values || []).map(fromFirestoreValue);
+  if ("mapValue" in v) {
+    const out = {};
+    const fields = v.mapValue.fields || {};
+    for (const k of Object.keys(fields)) out[k] = fromFirestoreValue(fields[k]);
+    return out;
+  }
+  return null;
+}
+function docToObject(doc) {
+  const fields = (doc && doc.fields) || {};
+  const out = {};
+  for (const k of Object.keys(fields)) out[k] = fromFirestoreValue(fields[k]);
+  return out;
+}
+
+function firestoreDocUrl(projectId, docId) {
+  return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${CACHE_COLLECTION}/${docId}`;
+}
+
+async function readCache(projectId, docId) {
+  try {
+    const response = await fetch(firestoreDocUrl(projectId, docId));
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      console.error("Firestore cache read failed", response.status, await response.text());
+      return null;
+    }
+    const doc = await response.json();
+    return docToObject(doc);
+  } catch (e) {
+    console.error("Firestore cache read error", e);
+    return null;
+  }
+}
+
+async function writeCache(projectId, docId, data) {
+  try {
+    const fields = {};
+    for (const k of Object.keys(data)) fields[k] = toFirestoreValue(data[k]);
+    const response = await fetch(firestoreDocUrl(projectId, docId), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields }),
+    });
+    if (!response.ok) {
+      console.error("Firestore cache write failed", response.status, await response.text());
+    }
+  } catch (e) {
+    // Caching is a pure optimization — never fail the request over this.
+    console.error("Firestore cache write error", e);
+  }
+}
+
+// ---------- filter + shape a raw Places result set for the client ----------
+function filterAndShape(rawPlaces, { ballerMode, query, maxResultCount }) {
+  return rawPlaces
+    // Hard requirement: never surface permanently (or temporarily) closed spots.
+    .filter((p) => p.businessStatus === "OPERATIONAL")
+    .filter((p) => (p.types || []).some((t) => BAR_TYPES.includes(t)))
+    .filter((p) => {
+      if (ballerMode) return true;
+      const rank = PRICE_LEVEL_RANK[p.priceLevel];
+      // Unknown price level -> let it through rather than losing a real bar
+      // just because Google hasn't classified its price yet.
+      return rank === undefined || rank <= 2;
+    })
+    .slice(0, maxResultCount)
+    .map((p) => ({
+      name: p.displayName || query,
+      address: p.formattedAddress || "",
+      latitude: p.latitude ?? null,
+      longitude: p.longitude ?? null,
+      placeId: p.placeId || null,
+      mapsLink: p.mapsLink || (p.placeId ? `https://www.google.com/maps/place/?q=place_id:${p.placeId}` : ""),
+      rating: typeof p.rating === "number" ? p.rating : null,
+    }));
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
@@ -36,6 +170,7 @@ module.exports = async function handler(req, res) {
     res.status(500).json({ error: "Server is missing GOOGLE_PLACES_API_KEY" });
     return;
   }
+  const projectId = process.env.FIREBASE_PROJECT_ID;
 
   const {
     query,
@@ -53,7 +188,21 @@ module.exports = async function handler(req, res) {
 
   const textQuery = [query, neighborhood, address].filter(Boolean).join(", ") + " bar";
   const maxResultCount = Math.min(Math.max(Number(limit) || 5, 1), 10);
+  const cacheDocId = projectId ? cacheKeyFor(textQuery, exploreMode) : null;
 
+  // ---- 1. Try the shared cache first ----
+  if (cacheDocId) {
+    const cached = await readCache(projectId, cacheDocId);
+    if (cached && Array.isArray(cached.places) && typeof cached.timestamp === "number") {
+      if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        const shaped = filterAndShape(cached.places, { ballerMode, query, maxResultCount });
+        res.status(200).json(shaped);
+        return;
+      }
+    }
+  }
+
+  // ---- 2. Cache miss (or no Firestore project configured) — call Google ----
   const requestBody = {
     textQuery,
     includedType: "bar",
@@ -97,29 +246,28 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
     const places = Array.isArray(data.places) ? data.places : [];
 
-    const results = places
-      // Hard requirement: never surface permanently (or temporarily) closed spots.
-      .filter((p) => p.businessStatus === "OPERATIONAL")
-      .filter((p) => (p.types || []).some((t) => BAR_TYPES.includes(t)))
-      .filter((p) => {
-        if (ballerMode) return true;
-        const rank = PRICE_LEVEL_RANK[p.priceLevel];
-        // Unknown price level -> let it through rather than losing a real bar
-        // just because Google hasn't classified its price yet.
-        return rank === undefined || rank <= 2;
-      })
-      .slice(0, maxResultCount)
-      .map((p) => ({
-        name: p.displayName?.text || query,
-        address: p.formattedAddress || "",
-        latitude: p.location?.latitude ?? null,
-        longitude: p.location?.longitude ?? null,
-        placeId: p.id || null,
-        mapsLink: p.googleMapsUri || (p.id ? `https://www.google.com/maps/place/?q=place_id:${p.id}` : ""),
-        rating: typeof p.rating === "number" ? p.rating : null,
-      }));
+    // Normalize into a flat shape once, so both the cache write and the
+    // response shaping downstream work off the same simple structure.
+    const rawPlaces = places.map((p) => ({
+      displayName: p.displayName?.text || "",
+      formattedAddress: p.formattedAddress || "",
+      latitude: p.location?.latitude ?? null,
+      longitude: p.location?.longitude ?? null,
+      placeId: p.id || null,
+      mapsLink: p.googleMapsUri || "",
+      businessStatus: p.businessStatus || "",
+      priceLevel: p.priceLevel || "",
+      types: p.types || [],
+      rating: typeof p.rating === "number" ? p.rating : null,
+    }));
 
-    res.status(200).json(results);
+    // ---- 3. Cache the successful (even if empty) result for next time ----
+    if (cacheDocId) {
+      await writeCache(projectId, cacheDocId, { places: rawPlaces, timestamp: Date.now(), query: textQuery });
+    }
+
+    const shaped = filterAndShape(rawPlaces, { ballerMode, query, maxResultCount });
+    res.status(200).json(shaped);
   } catch (e) {
     console.error("Places lookup failed", e);
     res.status(500).json({ error: "Places lookup failed" });
