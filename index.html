@@ -346,8 +346,8 @@ async function enrichBarDetails(bar) {
   const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
 
   try {
-    const data = await callGemini(prompt, bar.placeId || bar.name, false);
-    if (data) {
+    const data = await callGemini(prompt, null, false);
+    if (data && !Array.isArray(data)) {
       return {
         ...bar,
         description: data.description || "",
