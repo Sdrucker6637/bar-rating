@@ -217,6 +217,11 @@ const [searchResults, setSearchResults] = useState([]);
 const [searching, setSearching] = useState(false);
 const [searchDone, setSearchDone] = useState(false);
 const [fetchingIds, setFetchingIds] = useState(new Set());
+// Bars where the last enrichment attempt this session failed (Gemini error,
+// timeout, or "no usable description"). Skipped by the auto-fetch effect so
+// a permanently-stuck bar doesn't retry on every single bars-state change —
+// it'll get one fresh attempt again on the next full page load.
+const [failedIds, setFailedIds] = useState(() => new Set());
 const [enrichingNames, setEnrichingNames] = useState(() => new Set());
 const [showInfo, setShowInfo] = useState(false);
 const [visitedSuggestion, setVisitedSuggestion] = useState(null);
@@ -270,16 +275,20 @@ const runDetailsFetch = useCallback((bar, forceRefresh) => {
 setFetchingIds(s => new Set(s).add(bar.id));
 const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || bar.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
 callGemini(prompt, bar.id, forceRefresh).then((data) => {
-const patch = data ? { ...data, detailsFetched: true } : null;
-if (patch) updateBar(bar.id, patch);
+// No client-side write here on purpose: api/gemini.js now persists this
+// bar's details itself inside a Firestore transaction. Writing it again
+// from here, based on this client's local (possibly a beat stale) copy
+// of `bars`, would risk silently reverting someone else's concurrent
+// edit — the live onSnapshot listener will pick up the server's write.
+if (!data) setFailedIds(s => new Set(s).add(bar.id));
 setFetchingIds(s => { const n = new Set(s); n.delete(bar.id); return n; });
 });
-}, [updateBar]);
+}, []);
 
 useEffect(() => {
 if (!bars) return;
 bars.forEach(bar => {
-if (!bar.detailsFetched && !fetchingIds.has(bar.id)) runDetailsFetch(bar);
+if (!bar.detailsFetched && !fetchingIds.has(bar.id) && !failedIds.has(bar.id)) runDetailsFetch(bar);
 });
 // eslint-disable-next-line
 }, [bars]);

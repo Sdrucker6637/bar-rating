@@ -170,20 +170,44 @@ export default async function handler(req, res) {
       });
     }
 
-    const mergedBar = {
-      ...existingBar,
-      // Never overwrite verified address/location data from OSM
-      neighborhood: details.neighborhood || existingBar.neighborhood,
-      description: details.description,
-      tags: details.tags.length ? details.tags : existingBar.tags,
-      happyHour: details.happyHour || existingBar.happyHour,
-      capacity: details.capacityHint || existingBar.capacity,
-      detailsFetched: true,
-      lastUpdated: new Date().toISOString(),
-    };
-
-    const updatedBars = bars.map((bar) => (bar.id === barId ? mergedBar : bar));
-    await docRef.update({ bars: updatedBars });
+    // Merge this bar's new details back into the array inside a transaction
+    // that re-reads the doc at commit time, not using the `bars` snapshot
+    // captured before the (up to 10s) Gemini call above. Without this, a
+    // concurrent edit (disqualify, maps link, another bar's enrichment)
+    // made while this request was in flight would get silently reverted
+    // when this write landed with a stale full-array copy. Firestore
+    // transactions also auto-retry if another write races this one.
+    let mergedBar;
+    try {
+      mergedBar = await db.runTransaction(async (tx) => {
+        const freshSnap = await tx.get(docRef);
+        const freshBars = freshSnap.data()?.bars || [];
+        const freshExisting = freshBars.find((bar) => bar.id === barId);
+        if (!freshExisting) {
+          throw new Error("BAR_REMOVED");
+        }
+        const merged = {
+          ...freshExisting,
+          // Never overwrite verified address/location data from Places
+          neighborhood: details.neighborhood || freshExisting.neighborhood,
+          description: details.description,
+          tags: details.tags.length ? details.tags : freshExisting.tags,
+          happyHour: details.happyHour || freshExisting.happyHour,
+          capacity: details.capacityHint || freshExisting.capacity,
+          detailsFetched: true,
+          lastUpdated: new Date().toISOString(),
+        };
+        const updatedBars = freshBars.map((bar) => (bar.id === barId ? merged : bar));
+        tx.update(docRef, { bars: updatedBars });
+        return merged;
+      });
+    } catch (txError) {
+      if (txError.message === "BAR_REMOVED") {
+        // The bar was deleted by someone else while this request was in flight.
+        return res.status(404).json({ error: "Bar not found" });
+      }
+      throw txError;
+    }
 
     return res.status(200).json({ result: mergedBar });
   } catch (error) {
