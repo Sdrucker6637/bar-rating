@@ -29,8 +29,7 @@ const db = firebase.firestore();
 </script>
 <script>
 "use strict";
-const { useState, useEffect, useMemo, useCallback } = React;
-
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
 // ---------- Base bar shape ----------
 const base = {
 neighborhood: "", description: "", tags: [], happyHour: "", capacity: null,
@@ -194,6 +193,8 @@ const emptyWishForm = { id:null, name:"", neighborhood:"", notes:"" };
 // ---------- App ----------
 function App() {
 const [bars, setBars] = useState(null);
+const barsRef = useRef(null);
+useEffect(() => { barsRef.current = bars; }, [bars]);
 // Every bar name shown as a search/surprise result this session, whether or
 // not it was saved — kept out of future results so retrying a search or
 // hitting Surprise Us repeatedly doesn't just replay what you already saw.
@@ -248,13 +249,16 @@ return () => unsub();
 // eslint-disable-next-line
 }, []);
 
-const persist = useCallback((next) => {
-setBars(next);
-return docRef.set({ bars: next }, { merge: true })
-.then(() => setSaveError(false))
-.catch(() => setSaveError(true));
-// eslint-disable-next-line
-}, []);
+const persist = useCallback((updater) => {
+   const prevBars = barsRef.current || [];
+   const next = typeof updater === "function" ? updater(prevBars) : updater;
+   barsRef.current = next;
+   setBars(next);
+   return docRef.set({ bars: next }, { merge: true })
+     .then(() => setSaveError(false))
+     .catch(() => setSaveError(true));
+   // eslint-disable-next-line
+ }, []);
 
 const persistGroup = useCallback((n) => {
 setGroupSizeState(n);
@@ -265,6 +269,7 @@ docRef.set({ groupSize: n }, { merge: true }).catch(() => {});
 const updateBar = useCallback((id, patch) => {
 setBars((prev) => {
 const next = prev.map(b => b.id === id ? { ...b, ...patch } : b);
+barsRef.current = next;
 docRef.set({ bars: next }, { merge: true }).catch(() => setSaveError(true));
 return next;
 });
@@ -442,9 +447,9 @@ placeId: s.placeId || null,
 mapsLink,
 detailsFetched: hasDescription,
 };
-const persistPromise = isEdit
-? persist((bars || []).map(b => b.id === id ? { ...b, ...record } : b))
-: persist([...(bars || []), record]);
+ const persistPromise = persist(prev => isEdit
+   ? prev.map(b => b.id === id ? { ...b, ...record } : b)
+   : [...prev, record]);
 persistPromise.then(() => {
 if (!record.detailsFetched) runDetailsFetch(record);
 });
@@ -471,30 +476,33 @@ drinks: cleanNum(visitedForm.drinks),
 bathroomBonus: cleanNum(visitedForm.bathroomBonus) || 0,
 notes: visitedForm.notes.trim(),
 };
-let next, record;
-if (isNew) {
-const mapsLink = visitedSuggestion
-? (visitedSuggestion.mapsLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visitedSuggestion.name + (visitedSuggestion.address ? ", " + visitedSuggestion.address : ", New York City"))}`)
-: "";
-record = visitedSuggestion
-? { ...base, ...patch, id,
-neighborhood: visitedSuggestion.neighborhood || "",
-description: displayDescription(visitedSuggestion.description),
-tags: visitedSuggestion.tags || [],
-happyHour: visitedSuggestion.happyHour || "",
-capacity: visitedSuggestion.capacityHint || null,
-address: visitedSuggestion.address || "",
-latitude: visitedSuggestion.latitude || null,
-longitude: visitedSuggestion.longitude || null,
-placeId: visitedSuggestion.placeId || null,
-mapsLink, detailsFetched: false }
-: { ...base, ...patch, id, tags: [] };
-next = [...bars, record];
-} else {
-next = bars.map(b => b.id === id ? { ...b, ...patch } : b);
-record = next.find(b => b.id === id);
-}
-await persist(next);
+   let record;
+   await persist(prev => {
+     let next;
+     if (isNew) {
+       const mapsLink = visitedSuggestion
+         ? (visitedSuggestion.mapsLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visitedSuggestion.name + (visitedSuggestion.address ? ", " + visitedSuggestion.address : ", New York City"))}`)
+         : "";
+       record = visitedSuggestion
+         ? { ...base, ...patch, id,
+             neighborhood: visitedSuggestion.neighborhood || "",
+             description: displayDescription(visitedSuggestion.description),
+             tags: visitedSuggestion.tags || [],
+             happyHour: visitedSuggestion.happyHour || "",
+             capacity: visitedSuggestion.capacityHint || null,
+             address: visitedSuggestion.address || "",
+             latitude: visitedSuggestion.latitude || null,
+             longitude: visitedSuggestion.longitude || null,
+             placeId: visitedSuggestion.placeId || null,
+             mapsLink, detailsFetched: false }
+         : { ...base, ...patch, id, tags: [] };
+       next = [...prev, record];
+     } else {
+       next = prev.map(b => b.id === id ? { ...b, ...patch } : b);
+       record = next.find(b => b.id === id);
+     }
+     return next;
+   });
 setShowVisitedForm(false); setVisitedForm(emptyVisitedForm); setVisitedSuggestion(null);
 if (!record.detailsFetched) runDetailsFetch(record);
 }
@@ -530,7 +538,7 @@ notes: b.notes || "",
 setShowVisitedForm(true);
 }
 
-function removeBar(id) { persist(bars.filter(b => b.id !== id)); }
+function removeBar(id) { persist(prev => prev.filter(b => b.id !== id)); }
 
 function toggleDisqualify(b) {
 if (b.disqualified) {
