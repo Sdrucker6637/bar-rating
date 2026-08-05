@@ -691,7 +691,7 @@
           useState(false);
         const [visitedNameInput, setVisitedNameInput] = useState("");
         const [visitedHoodInput, setVisitedHoodInput] = useState("");
-        const [showCrawlPanel, setShowCrawlPanel] = useState(false);
+        const [showcrawlModal, setShowcrawlModal] = useState(false);
         const [crawlStartInput, setCrawlStartInput] = useState("");
         const [crawlCount, setCrawlCount] = useState(3);
         const [crawlPlanning, setCrawlPlanning] = useState(false);
@@ -1296,202 +1296,237 @@
           }
         }
 
-        const crawlPanel =
+        const crawlModal =
           showCrawlPanel &&
           React.createElement(
             "div",
-            { className: "tda-search-panel" },
+            {
+              className: "tda-modal-backdrop",
+              onClick: () => setShowCrawlPanel(false),
+            },
             React.createElement(
               "div",
-              { className: "tda-search-row" },
-              React.createElement("input", {
-                className: "tda-input",
-                placeholder: "Starting bar (optional)",
-                value: crawlStartInput,
-                onChange: (e) => setCrawlStartInput(e.target.value),
-                style: { flex: "1 1 220px" },
-              }),
+              {
+                className: "tda-modal tda-crawl-modal",
+                onClick: (e) => e.stopPropagation(),
+              },
+              React.createElement("h3", null, "🚶 Plan a Crawl"),
               React.createElement(
                 "div",
-                { className: "tda-group-stepper" },
+                {
+                  className: "tda-search-row",
+                  style: { marginBottom: "0.6rem" },
+                },
+                React.createElement("input", {
+                  className: "tda-input",
+                  placeholder: "Starting bar (optional)",
+                  value: crawlStartInput,
+                  onChange: (e) => setCrawlStartInput(e.target.value),
+                  style: { flex: "1 1 200px" },
+                }),
                 React.createElement(
-                  "span",
-                  { style: { color: "#857C8E" } },
-                  "Bars",
-                ),
-                React.createElement(
-                  "button",
-                  {
-                    className: "tda-group-btn",
-                    onClick: () => setCrawlCount(Math.max(2, crawlCount - 1)),
-                  },
-                  "−",
-                ),
-                React.createElement(
-                  "b",
-                  { style: { color: "#EDE6D9" } },
-                  crawlCount,
-                ),
-                React.createElement(
-                  "button",
-                  {
-                    className: "tda-group-btn",
-                    onClick: () => setCrawlCount(Math.min(8, crawlCount + 1)),
-                  },
-                  "+",
+                  "div",
+                  { className: "tda-group-stepper" },
+                  React.createElement(
+                    "span",
+                    { style: { color: "#857C8E" } },
+                    "Bars",
+                  ),
+                  React.createElement(
+                    "button",
+                    {
+                      className: "tda-group-btn",
+                      onClick: () => setCrawlCount(Math.max(2, crawlCount - 1)),
+                    },
+                    "−",
+                  ),
+                  React.createElement(
+                    "b",
+                    { style: { color: "#EDE6D9" } },
+                    crawlCount,
+                  ),
+                  React.createElement(
+                    "button",
+                    {
+                      className: "tda-group-btn",
+                      onClick: () => setCrawlCount(Math.min(8, crawlCount + 1)),
+                    },
+                    "+",
+                  ),
                 ),
               ),
               React.createElement(
                 "button",
                 {
                   className: "tda-find-btn",
+                  style: { width: "100%" },
                   onClick: startCrawlPlanning,
                   disabled: crawlPlanning,
                 },
                 crawlPlanning ? "Planning…" : "Plan Crawl",
               ),
-            ),
-            crawlPlanning &&
-              React.createElement(
-                "div",
-                { className: "tda-spinner" },
-                "mapping out a route…",
-              ),
-            crawlError &&
-              React.createElement(
-                "div",
-                { className: "tda-empty" },
-                crawlError,
-              ),
-            crawlStops.length > 0 &&
-              React.createElement(
-                "div",
-                { className: "tda-crawl-list" },
-                crawlStops.map((s, i) => {
-                  const isEnriching = crawlEnrichingNames.has(s.name);
-                  const desc = displayDescription(s.description);
-                  const next = crawlStops[i + 1];
-                  return React.createElement(
-                    React.Fragment,
-                    { key: s.name },
-                    React.createElement(
-                      "div",
-                      { className: "tda-crawl-stop" },
+              crawlPlanning &&
+                React.createElement(
+                  "div",
+                  { className: "tda-spinner" },
+                  "mapping out a route…",
+                ),
+              crawlError &&
+                React.createElement(
+                  "div",
+                  { className: "tda-empty" },
+                  crawlError,
+                ),
+              crawlStops.length > 0 &&
+                React.createElement(
+                  "div",
+                  { className: "tda-crawl-list", style: { marginTop: "1rem" } },
+                  crawlStops.map((s, i) => {
+                    const isEnriching = crawlEnrichingNames.has(s.name);
+                    const desc = displayDescription(s.description);
+                    const next = crawlStops[i + 1];
+                    return React.createElement(
+                      React.Fragment,
+                      { key: s.name },
                       React.createElement(
                         "div",
-                        { className: "tda-crawl-stop-number" },
-                        i + 1,
-                      ),
-                      React.createElement(
-                        "div",
-                        { className: "tda-crawl-stop-content" },
+                        { className: "tda-crawl-stop" },
                         React.createElement(
                           "div",
-                          { className: "tda-suggestion-name" },
-                          s.name,
+                          { className: "tda-crawl-stop-number" },
+                          i + 1,
                         ),
-                        s.neighborhood &&
+                        React.createElement(
+                          "div",
+                          { className: "tda-crawl-stop-content" },
                           React.createElement(
                             "div",
-                            { className: "tda-suggestion-hood" },
-                            s.neighborhood,
+                            { className: "tda-suggestion-name" },
+                            s.name,
                           ),
-                        s.tags && s.tags.length > 0
-                          ? React.createElement(
+                          s.neighborhood &&
+                            React.createElement(
                               "div",
-                              { className: "tda-tags" },
-                              s.tags.map((t) =>
-                                React.createElement(
-                                  "span",
-                                  { key: t, className: "tda-tag" },
-                                  t,
-                                ),
-                              ),
-                            )
-                          : isEnriching &&
-                              React.createElement(
-                                "div",
-                                { className: "tda-tags" },
-                                React.createElement("span", {
-                                  className: "tda-tag tda-tag-skeleton",
-                                }),
-                                React.createElement("span", {
-                                  className: "tda-tag tda-tag-skeleton",
-                                }),
-                              ),
-                        desc
-                          ? React.createElement(
-                              "div",
-                              { className: "tda-suggestion-desc" },
-                              desc,
-                            )
-                          : isEnriching
+                              { className: "tda-suggestion-hood" },
+                              s.neighborhood,
+                            ),
+                          s.tags && s.tags.length > 0
                             ? React.createElement(
                                 "div",
-                                {
-                                  className:
-                                    "tda-suggestion-desc tda-desc-loading",
-                                },
-                                "finding details…",
+                                { className: "tda-tags" },
+                                s.tags.map((t) =>
+                                  React.createElement(
+                                    "span",
+                                    { key: t, className: "tda-tag" },
+                                    t,
+                                  ),
+                                ),
                               )
-                            : React.createElement(
+                            : isEnriching &&
+                                React.createElement(
+                                  "div",
+                                  { className: "tda-tags" },
+                                  React.createElement("span", {
+                                    className: "tda-tag tda-tag-skeleton",
+                                  }),
+                                  React.createElement("span", {
+                                    className: "tda-tag tda-tag-skeleton",
+                                  }),
+                                ),
+                          desc
+                            ? React.createElement(
                                 "div",
                                 { className: "tda-suggestion-desc" },
-                                s.address || "",
+                                desc,
+                              )
+                            : isEnriching
+                              ? React.createElement(
+                                  "div",
+                                  {
+                                    className:
+                                      "tda-suggestion-desc tda-desc-loading",
+                                  },
+                                  "finding details…",
+                                )
+                              : React.createElement(
+                                  "div",
+                                  { className: "tda-suggestion-desc" },
+                                  s.address || "",
+                                ),
+                          React.createElement(
+                            "div",
+                            { className: "tda-suggestion-actions" },
+                            s.mapsLink &&
+                              React.createElement(
+                                "a",
+                                {
+                                  className: "tda-link-btn",
+                                  href: s.mapsLink,
+                                  target: "_blank",
+                                  rel: "noreferrer",
+                                },
+                                "Map ↗",
                               ),
+                            React.createElement(
+                              "button",
+                              {
+                                className: "tda-suggestion-add",
+                                onClick: () => {
+                                  addSuggestionToWishlist(s);
+                                  setCrawlStops((prev) =>
+                                    prev.filter((x) => x.name !== s.name),
+                                  );
+                                },
+                              },
+                              "+ Wishlist",
+                            ),
+                            React.createElement(
+                              "button",
+                              {
+                                className: "tda-visit-btn",
+                                onClick: () => rankSuggestion(s),
+                              },
+                              "I visited",
+                            ),
+                          ),
+                        ),
+                      ),
+                      next &&
                         React.createElement(
                           "div",
-                          { className: "tda-suggestion-actions" },
-                          s.mapsLink &&
-                            React.createElement(
-                              "a",
-                              {
-                                className: "tda-link-btn",
-                                href: s.mapsLink,
-                                target: "_blank",
-                                rel: "noreferrer",
-                              },
-                              "Map ↗",
-                            ),
-                          React.createElement(
-                            "button",
-                            {
-                              className: "tda-suggestion-add",
-                              onClick: () => {
-                                addSuggestionToWishlist(s);
-                                setCrawlStops((prev) =>
-                                  prev.filter((x) => x.name !== s.name),
-                                );
-                              },
-                            },
-                            "+ Wishlist",
-                          ),
-                        ),
-                      ),
-                    ),
-                    next &&
-                      React.createElement(
-                        "div",
-                        { className: "tda-crawl-connector" },
-                        "↓ ~",
-                        Math.max(
-                          1,
-                          Math.round(
-                            estimateWalkMinutes(
-                              haversineMeters(
-                                s.latitude,
-                                s.longitude,
-                                next.latitude,
-                                next.longitude,
+                          { className: "tda-crawl-connector" },
+                          "↓ ~",
+                          Math.max(
+                            1,
+                            Math.round(
+                              estimateWalkMinutes(
+                                haversineMeters(
+                                  s.latitude,
+                                  s.longitude,
+                                  next.latitude,
+                                  next.longitude,
+                                ),
                               ),
                             ),
                           ),
+                          " min walk",
                         ),
-                        " min walk",
-                      ),
-                  );
-                }),
+                    );
+                  }),
+                ),
+              React.createElement(
+                "div",
+                { className: "tda-modal-actions" },
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-secondary-btn",
+                    onClick: () => setShowCrawlPanel(false),
+                  },
+                  "Close",
+                ),
               ),
+            ),
           );
 
         const searchPanel = React.createElement(
@@ -1561,6 +1596,7 @@
               },
               "🧭 Explore mode",
             ),
+
             React.createElement(
               "div",
               { className: "tda-search-btn-group" },
@@ -1602,59 +1638,19 @@
               ),
               React.createElement(
                 "div",
-                { className: "tda-search-btn-group" },
+                { className: "tda-search-btn-wrap" },
                 React.createElement(
-                  "div",
-                  { className: "tda-search-btn-wrap" },
-                  React.createElement(
-                    "button",
-                    {
-                      className: "tda-find-btn",
-                      onClick: runSearch,
-                      disabled: searching || !vibeQuery.trim(),
-                    },
-                    searching ? "Searching…" : "Find Bars",
-                  ),
-                  React.createElement(
-                    "span",
-                    { className: "tda-search-btn-hint" },
-                    "Search for a specific bar or location.",
-                  ),
+                  "button",
+                  {
+                    className: "tda-find-btn tda-crawl-btn",
+                    onClick: () => setShowCrawlPanel(true),
+                  },
+                  "🚶 Plan a Crawl",
                 ),
                 React.createElement(
-                  "div",
-                  { className: "tda-search-btn-wrap" },
-                  React.createElement(
-                    "button",
-                    {
-                      className: "tda-find-btn tda-surprise-btn",
-                      onClick: runRandomSearch,
-                      disabled: searching,
-                    },
-                    "🎲 Surprise Us",
-                  ),
-                  React.createElement(
-                    "span",
-                    { className: "tda-search-btn-hint" },
-                    "Discover random bars based on your filters.",
-                  ),
-                ),
-                React.createElement(
-                  "div",
-                  { className: "tda-search-btn-wrap" },
-                  React.createElement(
-                    "button",
-                    {
-                      className: `tda-find-btn tda-crawl-btn ${showCrawlPanel ? "active" : ""}`,
-                      onClick: () => setShowCrawlPanel(!showCrawlPanel),
-                    },
-                    "🚶 Plan a Crawl",
-                  ),
-                  React.createElement(
-                    "span",
-                    { className: "tda-search-btn-hint" },
-                    "Chain nearby bars into a walking route.",
-                  ),
+                  "span",
+                  { className: "tda-search-btn-hint" },
+                  "Chain nearby bars into a walking route.",
                 ),
               ),
             ),
@@ -1963,6 +1959,10 @@
       .tda-crawl-stop .tda-suggestion-desc { margin-top:0.65rem; line-height:1.55; }
       .tda-crawl-stop .tda-suggestion-actions { margin-top:1rem; }
       .tda-crawl-connector { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; padding:0.6rem 0; }
+      .tda-crawl-modal { max-width:640px; }
+      .tda-search-btn-group { display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start; }
+.tda-search-btn-wrap { display:flex; flex-direction:column; align-items:center; gap:0.35rem; flex:1 1 200px; text-align:center; }
+.tda-search-btn-hint { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#5D5666; white-space:normal; line-height:1.4; }
       `,
           ),
           React.createElement(
@@ -2031,7 +2031,6 @@
                 React.Fragment,
                 null,
                 searchPanel,
-                crawlPanel,
                 React.createElement(
                   "button",
                   {
@@ -2770,6 +2769,7 @@
           null,
           appContent,
           placesModalEl,
+          crawlModal,
         );
       }
 
