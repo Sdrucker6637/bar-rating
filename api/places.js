@@ -307,7 +307,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const shaped = filterAndShape(cached.places, {
+    const shaped = filterAndShape(rawPlaces, {
       ballerMode,
       query,
       maxResultCount,
