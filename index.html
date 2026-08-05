@@ -399,6 +399,14 @@
       const DOC_PATH = { collection: "tourDeAlcoholism", doc: "sharedList" };
 
       // ---------- Crawl planning (straight-line walking-time approximation) ----------
+      function closeCrawlModal() {
+        closeCrawlModal();
+        setCrawlStops([]);
+        setCrawlError(null);
+        setCrawlStartInput("");
+        setCrawlEnrichingNames(new Set());
+      }
+
       const WALK_SPEED_MPS = 1.34; // ~4.8 km/h average walking pace
       const WALK_DETOUR_FACTOR = 1.3; // streets aren't straight lines
       const MAX_BEELINE_METERS = 600; // straight-line cutoff approximating a 10-min walk
@@ -697,6 +705,7 @@
         const [crawlPlanning, setCrawlPlanning] = useState(false);
         const [crawlStops, setCrawlStops] = useState([]);
         const [crawlError, setCrawlError] = useState(null);
+        const [replacingIndex, setReplacingIndex] = useState(null);
         const [crawlEnrichingNames, setCrawlEnrichingNames] = useState(
           () => new Set(),
         );
@@ -803,6 +812,63 @@
           }
         }
 
+        async function replaceStop(index) {
+          setReplacingIndex(index);
+          const prev = index === 0 ? null : crawlStops[index - 1];
+          const next = crawlStops[index + 1] || null;
+          const usedNames = new Set([
+            ...(bars || []).map((b) => b.name),
+            ...crawlStops.map((s) => s.name),
+          ]);
+
+          // Search near the surrounding stops — if replacing the first stop, search
+          // near the second; if last, near the second-to-last; otherwise near prev.
+          const anchor = prev || next;
+          if (!anchor || !Number.isFinite(anchor.latitude)) {
+            setReplacingIndex(null);
+            return;
+          }
+
+          const results = await fetchPlaces("great bar", {
+            limit: 10,
+            noCache: true,
+            centerLat: anchor.latitude,
+            centerLng: anchor.longitude,
+            radiusMeters: 900,
+          });
+
+          const candidates = results
+            .filter(
+              (r) =>
+                !usedNames.has(r.name) &&
+                Number.isFinite(r.latitude) &&
+                Number.isFinite(r.longitude),
+            )
+            .map((r) => ({
+              ...r,
+              distanceMeters: haversineMeters(
+                anchor.latitude,
+                anchor.longitude,
+                r.latitude,
+                r.longitude,
+              ),
+            }))
+            .filter((r) => r.distanceMeters <= MAX_BEELINE_METERS);
+
+          if (candidates.length === 0) {
+            setReplacingIndex(null);
+            return;
+          }
+
+          const replacement =
+            candidates[Math.floor(Math.random() * candidates.length)];
+          setCrawlStops((prev) =>
+            prev.map((s, i) => (i === index ? replacement : s)),
+          );
+          setReplacingIndex(null);
+          enrichCrawlStop(replacement);
+        }
+
         async function startPlacesLookup(suggestion) {
           setPlacesModal({ suggestion, results: [], searching: true });
           try {
@@ -842,8 +908,10 @@
               setCrawlError(
                 "Couldn't pin down that bar's location — try a different search, or leave it blank to pick automatically.",
               );
+              setShowCrawlPanel(true);
               return;
             }
+            setShowCrawlPanel(true); // re-open crawl modal before planning starts
             runCrawlPlan(merged);
           } else {
             addSuggestionToWishlist(merged);
@@ -932,7 +1000,7 @@
 
         const enrichCrawlStop = useCallback((stop) => {
           setCrawlEnrichingNames((s) => new Set(s).add(stop.name));
-          const prompt = `You are a NYC bar description writer.\n\nThe bar "${stop.name}" located at "${stop.address || stop.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY a single JSON object (not an array):\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
+          const prompt = `You are a NYC bar description writer.\n\nThe bar "${stop.name}" located at "${stop.address || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY a single JSON object (not an array):\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
           callGemini(prompt, null, false).then((data) => {
             const info = Array.isArray(data) ? data[0] : data;
             if (info) {
@@ -1047,12 +1115,14 @@
           setCrawlError(null);
           setCrawlStops([]);
           if (crawlStartInput.trim()) {
+            setShowCrawlPanel(false); // close crawl modal so places picker has a clean surface
             await startPlacesLookup({
               name: crawlStartInput.trim(),
               _placeIntent: "crawlStart",
             });
             return;
           }
+          // no starting bar — plan directly
           setCrawlPlanning(true);
           const exclude = [
             ...new Set([...(bars || []).map((b) => b.name), ...seenNames]),
@@ -1487,6 +1557,15 @@
                                 onClick: () => rankSuggestion(s),
                               },
                               "I visited",
+                            ),
+                            React.createElement(
+                              "button",
+                              {
+                                className: "tda-edit-btn",
+                                disabled: replacingIndex !== null,
+                                onClick: () => replaceStop(i),
+                              },
+                              replacingIndex === i ? "Finding…" : "↺ Replace",
                             ),
                           ),
                         ),
@@ -1943,8 +2022,7 @@
       .tda-map-popup-score { font-family:'IBM Plex Mono',monospace; font-size:0.82rem; color:#C9A876; margin-top:0.3rem; }
       .tda-map-popup-score.tda-muted { color:#A79EB2; }
       .tda-crawl-list { display:flex; flex-direction:column; gap:0; margin-top:1.1rem; }
-      .tda-crawl-stop { display:flex; gap:0.8rem; align-items:flex-start; }
-      .tda-crawl-stop-number { flex-shrink:0; width:28px; height:28px; border-radius:50%; background:#B8965F; color:#16130F; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.85rem; display:flex; align-items:center; justify-content:center; }
+      .tda-crawl-stop .tda-suggestion-name { color:#EDE6D9; }      .tda-crawl-stop-number { flex-shrink:0; width:28px; height:28px; border-radius:50%; background:#B8965F; color:#16130F; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.85rem; display:flex; align-items:center; justify-content:center; }
       .tda-crawl-connector { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; padding:0.4rem 0; }
       .tda-crawl-btn { background:transparent; border:1px solid #7FA88E; color:#7FA88E; }
       .tda-crawl-btn:hover { background:rgba(127,168,142,0.12); }
