@@ -2103,9 +2103,9 @@
       .tda-crawl-connector { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; padding:0.6rem 0; }
       .tda-crawl-modal { max-width:640px; }
       .tda-search-btn-group { display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start; }
-      .tda-nearby-btn{
-    background:#5c7cff;
-}
+    .tda-nearby-btn { background:transparent; border:1px solid #7FA8C9; color:#7FA8C9; }
+    .tda-nearby-btn:hover { background:rgba(127,168,201,0.12); }
+    .tda-nearby-btn.active { background:#3F566B; border-color:#3F566B; color:#EDE6D9; } 
 .tda-search-btn-wrap { display:flex; flex-direction:column; align-items:center; gap:0.35rem; flex:1 1 200px; text-align:center; }
 .tda-search-btn-hint { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#5D5666; white-space:normal; line-height:1.4; }
       `,
@@ -2708,14 +2708,17 @@
                 React.createElement(
                   "div",
                   { className: "tda-details-row" },
+
                   React.createElement(
                     "div",
                     null,
+
                     React.createElement(
                       "b",
                       { style: { color: "#C9A876" } },
                       "Baller Mode 💰💰💰💰",
                     ),
+
                     React.createElement(
                       "div",
                       {
@@ -2729,77 +2732,107 @@
                       },
                       "Allows recommendations from more expensive bars. Useful for special occasions, rooftops, and premium experiences.",
                     ),
-                  ),
-                  React.createElement(
-                    "div",
-                    { style: { marginTop: "0.75rem" } },
-                    React.createElement(
-                      "b",
-                      { style: { color: "#C9A876" } },
-                      "Explore Mode 🌎",
-                    ),
-                    React.createElement(
-                      "div",
-                      {
-                        style: {
-                          marginTop: "0.3rem",
-                          fontFamily: "'Inter', sans-serif",
-                          fontSize: "0.92rem",
-                          lineHeight: "1.55",
-                          color: "#D8D1C4",
-                        },
-                      },
-                      "Expands the search distance beyond the normal limit. Useful when discovering bars outside your usual area.",
-                    ),
-                  ),
-                  React.createElement(
-                    "div",
-                    { className: "tda-details-row" },
 
                     React.createElement(
                       "div",
-                      null,
+                      { style: { marginTop: "0.75rem" } },
 
-                      React.createElement("b", null, "🚶 Plan a Crawl"),
+                      React.createElement(
+                        "b",
+                        { style: { color: "#C9A876" } },
+                        "Explore Mode 🌎",
+                      ),
 
                       React.createElement(
                         "div",
-                        null,
+                        {
+                          style: {
+                            marginTop: "0.3rem",
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: "0.92rem",
+                            lineHeight: "1.55",
+                            color: "#D8D1C4",
+                          },
+                        },
+                        "Expands the search distance beyond the normal limit. Useful when discovering bars outside your usual area.",
+                      ),
+                    ),
+
+                    React.createElement(
+                      "div",
+                      { style: { marginTop: "0.75rem" } },
+
+                      React.createElement(
+                        "b",
+                        { style: { color: "#C9A876" } },
+                        "🚶 Plan a Crawl",
+                      ),
+
+                      React.createElement(
+                        "div",
+                        {
+                          style: {
+                            marginTop: "0.3rem",
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: "0.92rem",
+                            lineHeight: "1.55",
+                            color: "#D8D1C4",
+                          },
+                        },
                         "Without a starting bar, Tour de Alcoholism picks a random starting point and builds a walkable crawl.",
                       ),
 
                       React.createElement(
                         "div",
                         {
-                          style: { marginTop: "0.5rem" },
+                          style: {
+                            marginTop: "0.5rem",
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: "0.92rem",
+                            lineHeight: "1.55",
+                            color: "#D8D1C4",
+                          },
                         },
                         "If you enter a starting bar, the crawl is built around that location.",
                       ),
                     ),
-                  ),
-                  React.createElement(
-                    "div",
-                    { className: "tda-details-row" },
 
                     React.createElement(
                       "div",
-                      null,
-
-                      React.createElement("b", null, "🍻 OG Rules"),
+                      { style: { marginTop: "0.75rem" } },
 
                       React.createElement(
-                        "ul",
-                        null,
+                        "b",
+                        { style: { color: "#C9A876" } },
+                        "🍻 OG Rules",
+                      ),
 
-                        React.createElement("li", null, "No American Whiskey."),
+                      React.createElement(
+                        "div",
+                        {
+                          style: {
+                            marginTop: "0.3rem",
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: "0.92rem",
+                            lineHeight: "1.55",
+                            color: "#D8D1C4",
+                          },
+                        },
+                        "No American Whiskey.",
+                      ),
 
-                        React.createElement("li", null, "No uncool people."),
-
-                        React.createElement(
-                          "li",
-                          null,
-                          "If you know you know.",
-                        ),
+                      React.createElement(
+                        "div",
+                        {
+                          style: {
+                            marginTop: "0.5rem",
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: "0.92rem",
+                            lineHeight: "1.55",
+                            color: "#D8D1C4",
+                          },
+                        },
+                        "No uncool people. If you know you know.",
                       ),
                     ),
                   ),
