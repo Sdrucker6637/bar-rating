@@ -614,8 +614,8 @@ React.createElement("style", null, `
 .tda-title .accent { color:#C9A876; font-style:italic; font-weight:500; }
 .tda-info-btn { margin-left:0.4rem; width:22px; height:22px; border-radius:50%; border:1px solid #857C8E; background:transparent; color:#C9A876; font:600 0.72rem 'IBM Plex Mono',monospace; cursor:pointer; vertical-align:middle; }
 .tda-sub { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#857C8E; margin-top:0.7rem; }
-.tda-tabs { display:flex; gap:0.5rem; justify-content:center; margin:1.75rem 0; flex-wrap:wrap; }
-.tda-tab { font-family:'IBM Plex Mono',monospace; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase; padding:0.6rem 1.3rem; border-radius:3px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; transition:all 0.15s ease; }
+.tda-tabs { display:flex; gap:0.5rem; margin:1.75rem 0; }
+.tda-tab { flex:1 1 0; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase; padding:0.65rem 0.8rem; border-radius:3px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; transition:all 0.15s ease; }
 .tda-tab:hover { border-color:#B8965F; color:#EDE6D9; }
 .tda-tab.active { background:#B8965F; color:#16130F; border-color:#B8965F; font-weight:600; }
 .tda-champion { border:1px solid #B8965F; border-radius:4px; padding:1.1rem 1.4rem; margin:1.75rem 0 1.25rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; background:linear-gradient(135deg,rgba(184,150,95,0.08),transparent); flex-wrap:wrap; }
@@ -715,6 +715,16 @@ React.createElement("style", null, `
 .tda-heatmap-note { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:1rem; }
 .tda-heatmap-legend { display:flex; align-items:center; gap:0.6rem; margin-top:0.6rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; }
 .tda-heatmap-swatch { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:0.3rem; }
+.tda-heatmap-container { height:560px; width:100%; border-radius:8px; border:1px solid #262029; margin-top:1rem; overflow:hidden; }
+.tda-heatmap-note { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:1rem; }
+.tda-heatmap-legend { display:flex; align-items:center; gap:0.6rem; margin-top:0.6rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; }
+.tda-heatmap-gradient { width:120px; height:8px; border-radius:4px; }
+.tda-heatmap-container .leaflet-popup-content-wrapper { background:#17141B; color:#EDE6D9; border-radius:8px; border:1px solid #302938; box-shadow:0 4px 16px rgba(0,0,0,0.4); }
+.tda-heatmap-container .leaflet-popup-tip { background:#17141B; border:1px solid #302938; }
+.tda-heatmap-container .leaflet-popup-close-button { color:#857C8E !important; }
+.tda-map-popup-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.02rem; color:#EDE6D9; }
+.tda-map-popup-score { font-family:'IBM Plex Mono',monospace; font-size:0.82rem; color:#C9A876; margin-top:0.3rem; }
+.tda-map-popup-score.tda-muted { color:#A79EB2; }
 `),
 React.createElement("div", { className: "tda-container" },
 React.createElement("div", { className: "tda-header" },
@@ -725,7 +735,7 @@ React.createElement("div", { className: "tda-sub" }, "a running record of the ba
 React.createElement("div", { className: "tda-tabs" },
 React.createElement("button", { className: `tda-tab ${tab === "leaderboard" ? "active" : ""}`, onClick: () => setTab("leaderboard") }, "Current Leaderboard"),
 React.createElement("button", { className: `tda-tab ${tab === "find" ? "active" : ""}`, onClick: () => setTab("find") }, "Find a New Bar")),
-React.createElement("button", { className: `tda-tab ${tab === "heatmap" ? "active" : ""}`, onClick: () => setTab("heatmap") }, "Heat Map"),
+React.createElement("button", { className: `tda-tab ${tab === "heatmap" ? "active" : ""}`, onClick: () => setTab("heatmap") }, "Tour Map"),
 tab === "find" && React.createElement(React.Fragment, null,
 searchPanel,
 React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("wishlist") }, "+ Add to wishlist by name"),
@@ -896,14 +906,26 @@ React.createElement("button", { className: "tda-secondary-btn", onClick: () => {
 return React.createElement(React.Fragment, null, appContent, placesModalEl);
 }
 
-// ---------- HeatMapView ----------
-function HeatMapView({ bars }) {
-  const mapNodeRef = useRef(null);
+// ---------- Tour Map ----------
+const HEAT_GRADIENTS = {
+  visited: { 0.2: "#302938", 0.4: "#3A4F66", 0.6: "#8A6D2F", 0.8: "#C9A876", 1.0: "#E5B93F" },
+  wishlist: { 0.2: "#1F2E28", 0.4: "#2E4438", 0.6: "#3F5D4E", 0.8: "#5C8D74", 1.0: "#7FA88E" },
+};
+const HEAT_DOT_COLOR = { visited: "#C9A876", wishlist: "#7FA88E" };
 
-  const geoBars = useMemo(
-    () => bars.filter(b => b.status === "visited" && Number.isFinite(b.latitude) && Number.isFinite(b.longitude)),
+function TourMapView({ bars }) {
+  const mapNodeRef = useRef(null);
+  const [mode, setMode] = useState("visited");
+
+  const visitedGeo = useMemo(
+    () => bars.filter(b => b.status === "visited" && !b.disqualified && Number.isFinite(b.latitude) && Number.isFinite(b.longitude)),
     [bars]
   );
+  const wishlistGeo = useMemo(
+    () => bars.filter(b => b.status === "to-try" && Number.isFinite(b.latitude) && Number.isFinite(b.longitude)),
+    [bars]
+  );
+  const geoBars = mode === "visited" ? visitedGeo : wishlistGeo;
 
   useEffect(() => {
     if (!mapNodeRef.current || geoBars.length === 0) return;
@@ -916,46 +938,57 @@ function HeatMapView({ bars }) {
     }).addTo(map);
 
     const points = geoBars.map(b => {
-      const score = avgWithFood(b) ?? avgWithoutFood(b) ?? 5;
-      return [b.latitude, b.longitude, Math.max(0.25, score / 10)];
+      if (mode === "visited") {
+        const score = avgWithFood(b) ?? avgWithoutFood(b) ?? 5;
+        return [b.latitude, b.longitude, Math.max(0.25, score / 10)];
+      }
+      return [b.latitude, b.longitude, 0.6]; // no score to weight by on the wishlist
     });
 
     L.heatLayer(points, {
       radius: 32,
       blur: 24,
       maxZoom: 17,
-      gradient: { 0.2: "#302938", 0.4: "#3A4F66", 0.6: "#8A6D2F", 0.8: "#C9A876", 1.0: "#E5B93F" },
+      gradient: HEAT_GRADIENTS[mode],
     }).addTo(map);
 
+    const dotColor = HEAT_DOT_COLOR[mode];
     geoBars.forEach(b => {
       const score = avgWithFood(b) ?? avgWithoutFood(b);
+      const scoreLine = mode === "visited"
+        ? `<div class="tda-map-popup-score">${fmt(score)} avg</div>`
+        : '<div class="tda-map-popup-score tda-muted">Wishlist</div>';
       L.circleMarker([b.latitude, b.longitude], {
-        radius: 6, color: "#C9A876", weight: 1, fillColor: "#C9A876", fillOpacity: 0.85,
+        radius: 6, color: dotColor, weight: 1, fillColor: dotColor, fillOpacity: 0.85,
       })
         .addTo(map)
-        .bindPopup(`<b>${b.name}</b><br/>${b.disqualified ? "disqualified" : fmt(score) + " avg"}`);
+        .bindPopup(`<div class="tda-map-popup-name">${b.name}</div>${scoreLine}`);
     });
 
     const bounds = L.latLngBounds(geoBars.map(b => [b.latitude, b.longitude]));
     map.fitBounds(bounds, { padding: [40, 40] });
 
-    // Container size isn't always settled the instant the tab mounts
     setTimeout(() => map.invalidateSize(), 100);
 
     return () => map.remove();
-  }, [geoBars]);
-
-  if (geoBars.length === 0) {
-    return React.createElement("div", { className: "tda-empty" },
-      "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup.");
-  }
+  }, [geoBars, mode]);
 
   return React.createElement("div", null,
-    React.createElement("div", { ref: mapNodeRef, className: "tda-heatmap-container" }),
-    React.createElement("div", { className: "tda-heatmap-note" }, geoBars.length, " visited bar", geoBars.length === 1 ? "" : "s", " plotted."),
-    React.createElement("div", { className: "tda-heatmap-legend" },
-      React.createElement("span", { className: "tda-heatmap-swatch", style: { background: "#3A4F66" } }), "lower rated",
-      React.createElement("span", { className: "tda-heatmap-swatch", style: { background: "#E5B93F", marginLeft: "0.8rem" } }), "top rated"));
+    React.createElement("div", { className: "tda-toggle", style: { marginBottom: "1rem" } },
+      React.createElement("button", { className: mode === "visited" ? "active" : "", onClick: () => setMode("visited") }, "Visited"),
+      React.createElement("button", { className: mode === "wishlist" ? "active" : "", onClick: () => setMode("wishlist") }, "Wishlist")),
+    geoBars.length === 0
+      ? React.createElement("div", { className: "tda-empty" },
+          mode === "visited"
+            ? "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."
+            : "No wishlist bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup.")
+      : React.createElement(React.Fragment, null,
+          React.createElement("div", { ref: mapNodeRef, className: "tda-heatmap-container" }),
+          React.createElement("div", { className: "tda-heatmap-note" }, geoBars.length, " bar", geoBars.length === 1 ? "" : "s", " plotted."),
+          React.createElement("div", { className: "tda-heatmap-legend" },
+            "cooler",
+            React.createElement("span", { className: "tda-heatmap-gradient", style: { background: `linear-gradient(90deg, ${Object.values(HEAT_GRADIENTS[mode]).join(",")})` } }),
+            mode === "visited" ? "top rated" : "denser cluster")));
 }
 
 // ---------- BarCard ----------
