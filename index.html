@@ -1,612 +1,1374 @@
-﻿<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Tour de Alcoholism</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHBhdGggZD0iTTM5IDMwIGg2IGE5IDkgMCAwIDEgMCAxOCBoLTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzE2MTMwRiIgc3Ryb2tlLXdpZHRoPSI4IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cGF0aCBkPSJNMzkgMzAgaDYgYTkgOSAwIDAgMSAwIDE4IGgtNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRENFQUVFIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC45MiIvPgogIDxyZWN0IHg9IjkiIHk9IjE4IiB3aWR0aD0iMzAiIGhlaWdodD0iNDIiIHJ4PSI1IiBmaWxsPSIjRTVCOTNGIiBmaWxsLW9wYWNpdHk9IjAuODgiIHN0cm9rZT0iIzE2MTMwRiIgc3Ryb2tlLW9wYWNpdHk9IjAuNSIgc3Ryb2tlLXdpZHRoPSIzLjUiLz4KICA8cmVjdCB4PSIxMyIgeT0iMzgiIHdpZHRoPSIyNCIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iIzhBNkQyRiIgb3BhY2l0eT0iMC41Ii8+CiAgPHJlY3QgeD0iMTUiIHk9IjI0IiB3aWR0aD0iNSIgaGVpZ2h0PSIzMiIgcng9IjIuNSIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iMC40Ii8+CiAgPHJlY3QgeD0iMzIiIHk9IjI2IiB3aWR0aD0iMi41IiBoZWlnaHQ9IjI4IiByeD0iMS4yNSIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iMC4yMiIvPgogIDxwYXRoIGQ9Ik0zLjYgMjIuMCBDMi44IDEzLjAgNy45IDYuMCAxMy4wIDkuMCBDMTQuNyAxLjAgMjIuMyAtMS4wIDI1LjcgNS4wIEMyOS45IC0yLjAgMzcuNiAxLjAgMzcuNiA5LjAgQzQyLjcgNy4wIDQ1LjIgMTUuMCA0MS44IDIyLjAgWiIgZmlsbD0iI0Y3RjBFMSIvPgo8L3N2Zz4K">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script crossorigin="anonymous" src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
-<script crossorigin="anonymous" src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<style>body { margin: 0; }</style>
-</head>
-<body>
-<div id="root"></div>
-<script>
-const FIREBASE_CONFIG = {
-apiKey: "AIzaSyB10NK8lIz26T6NzObu421kg7wX6YQoFxg",
-authDomain: "bar-rating.firebaseapp.com",
-projectId: "bar-rating",
-storageBucket: "bar-rating.firebasestorage.app",
-messagingSenderId: "372554240407",
-appId: "1:372554240407:web:103646f876f9c8416234d2"
-};
-firebase.initializeApp(FIREBASE_CONFIG);
-const db = firebase.firestore();
-</script>
-<script>
-"use strict";
-const { useState, useEffect, useMemo, useCallback, useRef } = React;
-// ---------- Base bar shape ----------
-const base = {
-neighborhood: "", description: "", tags: [], happyHour: "", capacity: null,
-mapsLink: "", address: "", latitude: null, longitude: null, placeId: null,
-detailsFetched: false, notes: "", disqualified: false, disqualifyReason: ""
-};
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tour de Alcoholism</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHBhdGggZD0iTTM5IDMwIGg2IGE5IDkgMCAwIDEgMCAxOCBoLTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzE2MTMwRiIgc3Ryb2tlLXdpZHRoPSI4IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cGF0aCBkPSJNMzkgMzAgaDYgYTkgOSAwIDAgMSAwIDE4IGgtNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRENFQUVFIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC45MiIvPgogIDxyZWN0IHg9IjkiIHk9IjE4IiB3aWR0aD0iMzAiIGhlaWdodD0iNDIiIHJ4PSI1IiBmaWxsPSIjRTVCOTNGIiBmaWxsLW9wYWNpdHk9IjAuODgiIHN0cm9rZT0iIzE2MTMwRiIgc3Ryb2tlLW9wYWNpdHk9IjAuNSIgc3Ryb2tlLXdpZHRoPSIzLjUiLz4KICA8cmVjdCB4PSIxMyIgeT0iMzgiIHdpZHRoPSIyNCIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iIzhBNkQyRiIgb3BhY2l0eT0iMC41Ii8+CiAgPHJlY3QgeD0iMTUiIHk9IjI0IiB3aWR0aD0iNSIgaGVpZ2h0PSIzMiIgcng9IjIuNSIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iMC40Ii8+CiAgPHJlY3QgeD0iMzIiIHk9IjI2IiB3aWR0aD0iMi41IiBoZWlnaHQ9IjI4IiByeD0iMS4yNSIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iMC4yMiIvPgogIDxwYXRoIGQ9Ik0zLjYgMjIuMCBDMi44IDEzLjAgNy45IDYuMCAxMy4wIDkuMCBDMTQuNyAxLjAgMjIuMyAtMS4wIDI1LjcgNS4wIEMyOS45IC0yLjAgMzcuNiAxLjAgMzcuNiA5LjAgQzQyLjcgNy4wIDQ1LjIgMTUuMCA0MS44IDIyLjAgWiIgZmlsbD0iI0Y3RjBFMSIvPgo8L3N2Zz4K"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script
+      crossorigin="anonymous"
+      src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin="anonymous"
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"
+    ></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <style>
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyB10NK8lIz26T6NzObu421kg7wX6YQoFxg",
+        authDomain: "bar-rating.firebaseapp.com",
+        projectId: "bar-rating",
+        storageBucket: "bar-rating.firebasestorage.app",
+        messagingSenderId: "372554240407",
+        appId: "1:372554240407:web:103646f876f9c8416234d2",
+      };
+      firebase.initializeApp(FIREBASE_CONFIG);
+      const db = firebase.firestore();
+    </script>
+    <script>
+      "use strict";
+      const { useState, useEffect, useMemo, useCallback, useRef } = React;
+      // ---------- Base bar shape ----------
+      const base = {
+        neighborhood: "",
+        description: "",
+        tags: [],
+        happyHour: "",
+        capacity: null,
+        mapsLink: "",
+        address: "",
+        latitude: null,
+        longitude: null,
+        placeId: null,
+        detailsFetched: false,
+        notes: "",
+        disqualified: false,
+        disqualifyReason: "",
+      };
 
-// ---------- Seed data ----------
-const seedBars = [
-{ id:"b1", name:"ShyShy", status:"visited", vibe:8, value:7, service:9, food:6, drinks:7, bathroomBonus:0, notes:"", ...base },
-{ id:"b2", name:"Jungle Bird", status:"visited", vibe:6, value:6, service:7, food:9, drinks:7, bathroomBonus:0, notes:"Spacious but really loud, nice food, options bad", ...base },
-{ id:"b3", name:"P.S. Kitchen", status:"visited", vibe:4, value:5, service:5, food:7, drinks:7, bathroomBonus:0, notes:"Vegan restaurant, decent food, decent drinks, super loud", ...base },
-{ id:"b4", name:"Rose Vale", status:"visited", vibe:10, value:7, service:6, food:6.5, drinks:7, bathroomBonus:0, notes:"", ...base },
-{ id:"b5", name:"Fig 19", status:"visited", vibe:9, value:7, service:8, food:3, drinks:9, bathroomBonus:0, notes:"", ...base },
-{ id:"b6", name:"Sir Henrys", status:"visited", vibe:5.5, value:7, service:7, food:7, drinks:7, bathroomBonus:2, notes:"", ...base },
-{ id:"b7", name:"The WooWoo", status:"visited", vibe:9, value:7.5, service:6, food:6, drinks:6, bathroomBonus:0, notes:"", ...base },
-{ id:"b8", name:"Malachy Back Room", status:"visited", vibe:4, value:10, service:10, food:4.5, drinks:8, bathroomBonus:0, notes:"", ...base },
-{ id:"b9", name:"Pineapple Club", status:"visited", vibe:7, value:8, service:8, food:5, drinks:6, bathroomBonus:0, notes:"", ...base },
-{ id:"b10", name:"Mr. Paradise", status:"visited", vibe:6.5, value:5, service:6, food:8, drinks:6.5, bathroomBonus:0, notes:"", ...base },
-{ id:"b11", name:"Banshee", status:"visited", vibe:8.5, value:8.5, service:6, food:3.5, drinks:7, bathroomBonus:0, notes:"really nice atmosphere but the food was very mid", ...base },
-{ id:"b12", name:"Old Town Bar", status:"visited", vibe:6.5, value:3.5, service:6, food:6.5, drinks:7, bathroomBonus:0, notes:"", ...base },
-{ id:"b13", name:"Lillie's Victorian Establishment", status:"visited", vibe:9, value:6, service:9, food:6.5, drinks:6, bathroomBonus:0, notes:"", ...base },
-{ id:"b14", name:"929", status:"visited", vibe:9, value:5.5, service:8, food:8.5, drinks:8, bathroomBonus:0, notes:"20/10, hot guy there", ...base },
-{ id:"b15", name:"Célon (Bryant Park Hotel Basement)", status:"visited", vibe:9, value:4, service:9, food:8, drinks:8, bathroomBonus:0, notes:"", ...base },
-{ id:"b16", name:"Sid Golds Request Room", status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/f6FM5FQSTSxA8L8F6" },
-{ id:"b17", name:"Please Don't Tell (Hotdog Speakeasy)",status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/Y1ZcLk9hWY8mk5Vv9?g_st=ac" },
-{ id:"b18", name:"A10 Kitchen", status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/L16byLwbc1kHYUYr5" },
-{ id:"b19", name:"Ten Degrees", status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/mYhdYHCaMBDSKwm6A?g_st=ac" },
-{ id:"b20", name:"Angels Share", status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/FPoVDSXT5j3a8qHw9?g_st=ac" },
-{ id:"b21", name:"Katana Kitten", status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/8o7mvD7TGBkBHoHGA" },
-{ id:"b22", name:"Izakaya MEW", status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/hc3V1X4nY4vrAoBz6?g_st=ac" },
-{ id:"b23", name:"Lucky Cat", status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/dU2moYJoBgjvcQ966?g_st=ac" },
-{ id:"b24", name:"Ippudo NY", status:"to-try", vibe:null, value:null, service:null, food:null, drinks:null, bathroomBonus:0, notes:"", ...base, mapsLink:"https://maps.app.goo.gl/j1p1VbJUSEbTvKZW6?g_st=ac" },
-];
+      // ---------- Seed data ----------
+      const seedBars = [
+        {
+          id: "b1",
+          name: "ShyShy",
+          status: "visited",
+          vibe: 8,
+          value: 7,
+          service: 9,
+          food: 6,
+          drinks: 7,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b2",
+          name: "Jungle Bird",
+          status: "visited",
+          vibe: 6,
+          value: 6,
+          service: 7,
+          food: 9,
+          drinks: 7,
+          bathroomBonus: 0,
+          notes: "Spacious but really loud, nice food, options bad",
+          ...base,
+        },
+        {
+          id: "b3",
+          name: "P.S. Kitchen",
+          status: "visited",
+          vibe: 4,
+          value: 5,
+          service: 5,
+          food: 7,
+          drinks: 7,
+          bathroomBonus: 0,
+          notes: "Vegan restaurant, decent food, decent drinks, super loud",
+          ...base,
+        },
+        {
+          id: "b4",
+          name: "Rose Vale",
+          status: "visited",
+          vibe: 10,
+          value: 7,
+          service: 6,
+          food: 6.5,
+          drinks: 7,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b5",
+          name: "Fig 19",
+          status: "visited",
+          vibe: 9,
+          value: 7,
+          service: 8,
+          food: 3,
+          drinks: 9,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b6",
+          name: "Sir Henrys",
+          status: "visited",
+          vibe: 5.5,
+          value: 7,
+          service: 7,
+          food: 7,
+          drinks: 7,
+          bathroomBonus: 2,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b7",
+          name: "The WooWoo",
+          status: "visited",
+          vibe: 9,
+          value: 7.5,
+          service: 6,
+          food: 6,
+          drinks: 6,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b8",
+          name: "Malachy Back Room",
+          status: "visited",
+          vibe: 4,
+          value: 10,
+          service: 10,
+          food: 4.5,
+          drinks: 8,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b9",
+          name: "Pineapple Club",
+          status: "visited",
+          vibe: 7,
+          value: 8,
+          service: 8,
+          food: 5,
+          drinks: 6,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b10",
+          name: "Mr. Paradise",
+          status: "visited",
+          vibe: 6.5,
+          value: 5,
+          service: 6,
+          food: 8,
+          drinks: 6.5,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b11",
+          name: "Banshee",
+          status: "visited",
+          vibe: 8.5,
+          value: 8.5,
+          service: 6,
+          food: 3.5,
+          drinks: 7,
+          bathroomBonus: 0,
+          notes: "really nice atmosphere but the food was very mid",
+          ...base,
+        },
+        {
+          id: "b12",
+          name: "Old Town Bar",
+          status: "visited",
+          vibe: 6.5,
+          value: 3.5,
+          service: 6,
+          food: 6.5,
+          drinks: 7,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b13",
+          name: "Lillie's Victorian Establishment",
+          status: "visited",
+          vibe: 9,
+          value: 6,
+          service: 9,
+          food: 6.5,
+          drinks: 6,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b14",
+          name: "929",
+          status: "visited",
+          vibe: 9,
+          value: 5.5,
+          service: 8,
+          food: 8.5,
+          drinks: 8,
+          bathroomBonus: 0,
+          notes: "20/10, hot guy there",
+          ...base,
+        },
+        {
+          id: "b15",
+          name: "Célon (Bryant Park Hotel Basement)",
+          status: "visited",
+          vibe: 9,
+          value: 4,
+          service: 9,
+          food: 8,
+          drinks: 8,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+        },
+        {
+          id: "b16",
+          name: "Sid Golds Request Room",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/f6FM5FQSTSxA8L8F6",
+        },
+        {
+          id: "b17",
+          name: "Please Don't Tell (Hotdog Speakeasy)",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/Y1ZcLk9hWY8mk5Vv9?g_st=ac",
+        },
+        {
+          id: "b18",
+          name: "A10 Kitchen",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/L16byLwbc1kHYUYr5",
+        },
+        {
+          id: "b19",
+          name: "Ten Degrees",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/mYhdYHCaMBDSKwm6A?g_st=ac",
+        },
+        {
+          id: "b20",
+          name: "Angels Share",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/FPoVDSXT5j3a8qHw9?g_st=ac",
+        },
+        {
+          id: "b21",
+          name: "Katana Kitten",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/8o7mvD7TGBkBHoHGA",
+        },
+        {
+          id: "b22",
+          name: "Izakaya MEW",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/hc3V1X4nY4vrAoBz6?g_st=ac",
+        },
+        {
+          id: "b23",
+          name: "Lucky Cat",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/dU2moYJoBgjvcQ966?g_st=ac",
+        },
+        {
+          id: "b24",
+          name: "Ippudo NY",
+          status: "to-try",
+          vibe: null,
+          value: null,
+          service: null,
+          food: null,
+          drinks: null,
+          bathroomBonus: 0,
+          notes: "",
+          ...base,
+          mapsLink: "https://maps.app.goo.gl/j1p1VbJUSEbTvKZW6?g_st=ac",
+        },
+      ];
 
-const DOC_PATH = { collection: "tourDeAlcoholism", doc: "sharedList" };
+      const DOC_PATH = { collection: "tourDeAlcoholism", doc: "sharedList" };
 
-// ---------- Scoring ----------
-function avgWithFood(b) {
-if (b.disqualified) return null;
-const vals = [b.vibe, b.value, b.service, b.food, b.drinks].filter(v => v !== null && v !== "" && !isNaN(v));
-if (vals.length < 5) return null;
-return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
-}
-function avgWithoutFood(b) {
-if (b.disqualified) return null;
-const vals = [b.vibe, b.value, b.service, b.drinks].filter(v => v !== null && v !== "" && !isNaN(v));
-if (vals.length < 4) return null;
-return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
-}
-function fmt(n) {
-return n === null || n === undefined || isNaN(n) ? "—" : Number(n).toFixed(2);
-}
+      // ---------- Scoring ----------
+      function avgWithFood(b) {
+        if (b.disqualified) return null;
+        const vals = [b.vibe, b.value, b.service, b.food, b.drinks].filter(
+          (v) => v !== null && v !== "" && !isNaN(v),
+        );
+        if (vals.length < 5) return null;
+        return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
+      }
+      function avgWithoutFood(b) {
+        if (b.disqualified) return null;
+        const vals = [b.vibe, b.value, b.service, b.drinks].filter(
+          (v) => v !== null && v !== "" && !isNaN(v),
+        );
+        if (vals.length < 4) return null;
+        return vals.reduce((a, c) => a + Number(c), 0) / vals.length;
+      }
+      function fmt(n) {
+        return n === null || n === undefined || isNaN(n)
+          ? "—"
+          : Number(n).toFixed(2);
+      }
 
-// ---------- Helpers ----------
-function safeParse(text, isArray) {
-const cleaned = (text || "").replace(/```json|```/g, "").trim();
-try { return JSON.parse(cleaned); } catch(e) {}
-const re = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
-const m = cleaned.match(re);
-if (m) { try { return JSON.parse(m[0]); } catch(e) {} }
-return null;
-}
-function displayDescription(value) {
-if (typeof value !== "string") return "";
-const parsed = safeParse(value, false);
-return parsed && !Array.isArray(parsed) && typeof parsed.description === "string"
-? parsed.description.trim()
-: value.trim();
-}
+      // ---------- Helpers ----------
+      function safeParse(text, isArray) {
+        const cleaned = (text || "").replace(/```json|```/g, "").trim();
+        try {
+          return JSON.parse(cleaned);
+        } catch (e) {}
+        const re = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+        const m = cleaned.match(re);
+        if (m) {
+          try {
+            return JSON.parse(m[0]);
+          } catch (e) {}
+        }
+        return null;
+      }
+      function displayDescription(value) {
+        if (typeof value !== "string") return "";
+        const parsed = safeParse(value, false);
+        return parsed &&
+          !Array.isArray(parsed) &&
+          typeof parsed.description === "string"
+          ? parsed.description.trim()
+          : value.trim();
+      }
 
-// ---------- Gemini (used only for write-up flavor text, never for existence) ----------
-const geminiCache = {};
-async function callGemini(prompt, barId, forceRefresh) {
-const key = barId || prompt;
-if (!forceRefresh && geminiCache[key]) return geminiCache[key];
-const controller = new AbortController();
-const timeoutId = setTimeout(() => controller.abort(), 10000);
-let response;
-try {
-response = await fetch("/api/gemini", {
-method: "POST",
-headers: { "Content-Type": "application/json" },
-body: JSON.stringify({ prompt, barId, forceRefresh: !!forceRefresh }),
-signal: controller.signal,
-});
-} catch(e) {
-clearTimeout(timeoutId);
-console.error("[gemini] request failed", e);
-return null;
-}
-clearTimeout(timeoutId);
-if (!response) return null;
-if (!response.ok) {
-const errText = await response.text().catch(() => "");
-console.error(`[gemini] ${response.status} for barId=${barId || "(none)"}`, errText);
-return null;
-}
-let data;
-try {
-data = await response.json();
-} catch(e) {
-console.error("[gemini] response was not valid JSON", e);
-return null;
-}
-if (!data.result) {
-console.warn(`[gemini] no result field for barId=${barId || "(none)"}`, data);
-}
-if (data.result) geminiCache[key] = data.result;
-return data.result || null;
-}
+      // ---------- Gemini (used only for write-up flavor text, never for existence) ----------
+      const geminiCache = {};
+      async function callGemini(prompt, barId, forceRefresh) {
+        const key = barId || prompt;
+        if (!forceRefresh && geminiCache[key]) return geminiCache[key];
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        let response;
+        try {
+          response = await fetch("/api/gemini", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt,
+              barId,
+              forceRefresh: !!forceRefresh,
+            }),
+            signal: controller.signal,
+          });
+        } catch (e) {
+          clearTimeout(timeoutId);
+          console.error("[gemini] request failed", e);
+          return null;
+        }
+        clearTimeout(timeoutId);
+        if (!response) return null;
+        if (!response.ok) {
+          const errText = await response.text().catch(() => "");
+          console.error(
+            `[gemini] ${response.status} for barId=${barId || "(none)"}`,
+            errText,
+          );
+          return null;
+        }
+        let data;
+        try {
+          data = await response.json();
+        } catch (e) {
+          console.error("[gemini] response was not valid JSON", e);
+          return null;
+        }
+        if (!data.result) {
+          console.warn(
+            `[gemini] no result field for barId=${barId || "(none)"}`,
+            data,
+          );
+        }
+        if (data.result) geminiCache[key] = data.result;
+        return data.result || null;
+      }
 
-// ---------- Google Places (source of truth for existence + location) ----------
-const SURPRISE_VIBES = ["cozy neighborhood", "lively cocktail", "classic dive", "speakeasy", "rooftop", "wine", "beer hall", "late night", "live music"];
+      // ---------- Google Places (source of truth for existence + location) ----------
+      const SURPRISE_VIBES = [
+        "cozy neighborhood",
+        "lively cocktail",
+        "classic dive",
+        "speakeasy",
+        "rooftop",
+        "wine",
+        "beer hall",
+        "late night",
+        "live music",
+      ];
 
-// Session-only cache: repeating the same vibe search (or the same manual
-// lookup) within PLACES_CACHE_TTL_MS reuses the prior response instead of
-// re-billing the Places API. Cleared on page reload — bars you've already
-// saved never hit this path again anyway, since verification only happens
-// once, at add-time, and the result is persisted to Firestore.
-const placesCache = new Map();
-const PLACES_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+      // Session-only cache: repeating the same vibe search (or the same manual
+      // lookup) within PLACES_CACHE_TTL_MS reuses the prior response instead of
+      // re-billing the Places API. Cleared on page reload — bars you've already
+      // saved never hit this path again anyway, since verification only happens
+      // once, at add-time, and the result is persisted to Firestore.
+      const placesCache = new Map();
+      const PLACES_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-async function fetchPlaces(query, { neighborhood, address, ballerMode, exploreMode, limit, noCache } = {}) {
-const cacheKey = JSON.stringify({ query, neighborhood, address, ballerMode: !!ballerMode, exploreMode: !!exploreMode, limit: limit || 5 });
-if (!noCache) {
-const cached = placesCache.get(cacheKey);
-if (cached && Date.now() - cached.time < PLACES_CACHE_TTL_MS) return cached.results;
-}
-try {
-const response = await fetch("/api/places", {
-method: "POST",
-headers: { "Content-Type": "application/json" },
-body: JSON.stringify({ query, neighborhood, address, ballerMode: !!ballerMode, exploreMode: !!exploreMode, limit: limit || 5 }),
-});
-const results = await response.json();
-const safe = Array.isArray(results) ? results : [];
-if (!noCache) placesCache.set(cacheKey, { time: Date.now(), results: safe });
-return safe;
-} catch(e) { return []; }
-}
+      async function fetchPlaces(
+        query,
+        { neighborhood, address, ballerMode, exploreMode, limit, noCache } = {},
+      ) {
+        const cacheKey = JSON.stringify({
+          query,
+          neighborhood,
+          address,
+          ballerMode: !!ballerMode,
+          exploreMode: !!exploreMode,
+          limit: limit || 5,
+        });
+        if (!noCache) {
+          const cached = placesCache.get(cacheKey);
+          if (cached && Date.now() - cached.time < PLACES_CACHE_TTL_MS)
+            return cached.results;
+        }
+        try {
+          const response = await fetch("/api/places", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query,
+              neighborhood,
+              address,
+              ballerMode: !!ballerMode,
+              exploreMode: !!exploreMode,
+              limit: limit || 5,
+            }),
+          });
+          const results = await response.json();
+          const safe = Array.isArray(results) ? results : [];
+          if (!noCache)
+            placesCache.set(cacheKey, { time: Date.now(), results: safe });
+          return safe;
+        } catch (e) {
+          return [];
+        }
+      }
 
-async function fetchBarSuggestions(vibeQuery, groupSize, excludeNames, ballerMode, exploreMode) {
-const results = await fetchPlaces(vibeQuery || "great bar", { ballerMode, exploreMode, limit: 8 });
-return results.filter(r => !excludeNames.includes(r.name)).slice(0, 4);
-}
+      async function fetchBarSuggestions(
+        vibeQuery,
+        groupSize,
+        excludeNames,
+        ballerMode,
+        exploreMode,
+      ) {
+        const results = await fetchPlaces(vibeQuery || "great bar", {
+          ballerMode,
+          exploreMode,
+          limit: 8,
+        });
+        return results
+          .filter((r) => !excludeNames.includes(r.name))
+          .slice(0, 4);
+      }
 
-async function fetchRandomBar(groupSize, excludeNames, ballerMode, exploreMode) {
-const vibe = SURPRISE_VIBES[Math.floor(Math.random() * SURPRISE_VIBES.length)];
-// noCache: true — Surprise Us should actually surprise you, not replay a cached batch.
-const results = await fetchPlaces(vibe, { ballerMode, exploreMode, limit: 10, noCache: true });
-const fresh = results.filter(r => !excludeNames.includes(r.name));
-if (fresh.length === 0) return null;
-return fresh[Math.floor(Math.random() * fresh.length)];
-}
+      async function fetchRandomBar(
+        groupSize,
+        excludeNames,
+        ballerMode,
+        exploreMode,
+      ) {
+        const vibe =
+          SURPRISE_VIBES[Math.floor(Math.random() * SURPRISE_VIBES.length)];
+        // noCache: true — Surprise Us should actually surprise you, not replay a cached batch.
+        const results = await fetchPlaces(vibe, {
+          ballerMode,
+          exploreMode,
+          limit: 10,
+          noCache: true,
+        });
+        const fresh = results.filter((r) => !excludeNames.includes(r.name));
+        if (fresh.length === 0) return null;
+        return fresh[Math.floor(Math.random() * fresh.length)];
+      }
 
-// ---------- Form defaults ----------
-const emptyVisitedForm = { id:null, name:"", vibe:"", value:"", service:"", food:"", drinks:"", bathroomBonus:"", notes:"" };
-const emptyWishForm = { id:null, name:"", neighborhood:"", notes:"" };
+      // ---------- Form defaults ----------
+      const emptyVisitedForm = {
+        id: null,
+        name: "",
+        vibe: "",
+        value: "",
+        service: "",
+        food: "",
+        drinks: "",
+        bathroomBonus: "",
+        notes: "",
+      };
+      const emptyWishForm = { id: null, name: "", neighborhood: "", notes: "" };
 
-// ---------- App ----------
-function App() {
-const [bars, setBars] = useState(null);
-const barsRef = useRef(null);
-useEffect(() => { barsRef.current = bars; }, [bars]);
-// Every bar name shown as a search/surprise result this session, whether or
-// not it was saved — kept out of future results so retrying a search or
-// hitting Surprise Us repeatedly doesn't just replay what you already saw.
-const [seenNames, setSeenNames] = useState(() => new Set());
-const [groupSize, setGroupSizeState] = useState(4);
-const [loading, setLoading] = useState(true);
-const [connError, setConnError] = useState(false);
-const [tab, setTab] = useState("leaderboard");
-const [search, setSearch] = useState("");
-const [foodMode, setFoodMode] = useState("with");
-const [showVisitedForm, setShowVisitedForm] = useState(false);
-const [visitedForm, setVisitedForm] = useState(emptyVisitedForm);
-const [showWishForm, setShowWishForm] = useState(false);
-const [wishForm, setWishForm] = useState(emptyWishForm);
-const [saveError, setSaveError] = useState(false);
-const [vibeQuery, setVibeQuery] = useState("");
-const [fitsGroupOnly, setFitsGroupOnly] = useState(false);
-const [ballerMode, setBallerMode] = useState(false);
-const [exploreMode, setExploreMode] = useState(false);
-const [searchResults, setSearchResults] = useState([]);
-const [searching, setSearching] = useState(false);
-const [searchDone, setSearchDone] = useState(false);
-const [fetchingIds, setFetchingIds] = useState(new Set());
-// Bars where the last enrichment attempt this session failed (Gemini error,
-// timeout, or "no usable description"). Skipped by the auto-fetch effect so
-// a permanently-stuck bar doesn't retry on every single bars-state change —
-// it'll get one fresh attempt again on the next full page load.
-const [failedIds, setFailedIds] = useState(() => new Set());
-const [enrichingNames, setEnrichingNames] = useState(() => new Set());
-const [showInfo, setShowInfo] = useState(false);
-const [visitedSuggestion, setVisitedSuggestion] = useState(null);
-const [placesModal, setPlacesModal] = useState(null);
-const [showVisitedNamePrompt, setShowVisitedNamePrompt] = useState(false);
-const [visitedNameInput, setVisitedNameInput] = useState("");
-const [visitedHoodInput, setVisitedHoodInput] = useState("");
+      // ---------- App ----------
+      function App() {
+        const [bars, setBars] = useState(null);
+        const barsRef = useRef(null);
+        useEffect(() => {
+          barsRef.current = bars;
+        }, [bars]);
+        // Every bar name shown as a search/surprise result this session, whether or
+        // not it was saved — kept out of future results so retrying a search or
+        // hitting Surprise Us repeatedly doesn't just replay what you already saw.
+        const [seenNames, setSeenNames] = useState(() => new Set());
+        const [groupSize, setGroupSizeState] = useState(4);
+        const [loading, setLoading] = useState(true);
+        const [connError, setConnError] = useState(false);
+        const [tab, setTab] = useState("leaderboard");
+        const [search, setSearch] = useState("");
+        const [foodMode, setFoodMode] = useState("with");
+        const [showVisitedForm, setShowVisitedForm] = useState(false);
+        const [visitedForm, setVisitedForm] = useState(emptyVisitedForm);
+        const [showWishForm, setShowWishForm] = useState(false);
+        const [wishForm, setWishForm] = useState(emptyWishForm);
+        const [saveError, setSaveError] = useState(false);
+        const [vibeQuery, setVibeQuery] = useState("");
+        const [fitsGroupOnly, setFitsGroupOnly] = useState(false);
+        const [ballerMode, setBallerMode] = useState(false);
+        const [exploreMode, setExploreMode] = useState(false);
+        const [searchResults, setSearchResults] = useState([]);
+        const [searching, setSearching] = useState(false);
+        const [searchDone, setSearchDone] = useState(false);
+        const [fetchingIds, setFetchingIds] = useState(new Set());
+        // Bars where the last enrichment attempt this session failed (Gemini error,
+        // timeout, or "no usable description"). Skipped by the auto-fetch effect so
+        // a permanently-stuck bar doesn't retry on every single bars-state change —
+        // it'll get one fresh attempt again on the next full page load.
+        const [failedIds, setFailedIds] = useState(() => new Set());
+        const [enrichingNames, setEnrichingNames] = useState(() => new Set());
+        const [showInfo, setShowInfo] = useState(false);
+        const [visitedSuggestion, setVisitedSuggestion] = useState(null);
+        const [placesModal, setPlacesModal] = useState(null);
+        const [showVisitedNamePrompt, setShowVisitedNamePrompt] =
+          useState(false);
+        const [visitedNameInput, setVisitedNameInput] = useState("");
+        const [visitedHoodInput, setVisitedHoodInput] = useState("");
 
-const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
+        const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
 
-useEffect(() => {
-const unsub = docRef.onSnapshot((snap) => {
-if (snap.exists) {
-const data = snap.data();
-setBars(data.bars || []);
-if (data.groupSize) setGroupSizeState(data.groupSize);
-} else {
-docRef.set({ bars: seedBars, groupSize: 4 }).catch(() => setConnError(true));
-setBars(seedBars);
-}
-setLoading(false);
-}, (err) => { console.error(err); setConnError(true); setBars(seedBars); setLoading(false); });
-return () => unsub();
-// eslint-disable-next-line
-}, []);
+        useEffect(() => {
+          const unsub = docRef.onSnapshot(
+            (snap) => {
+              if (snap.exists) {
+                const data = snap.data();
+                setBars(data.bars || []);
+                if (data.groupSize) setGroupSizeState(data.groupSize);
+              } else {
+                docRef
+                  .set({ bars: seedBars, groupSize: 4 })
+                  .catch(() => setConnError(true));
+                setBars(seedBars);
+              }
+              setLoading(false);
+            },
+            (err) => {
+              console.error(err);
+              setConnError(true);
+              setBars(seedBars);
+              setLoading(false);
+            },
+          );
+          return () => unsub();
+          // eslint-disable-next-line
+        }, []);
 
-const persist = useCallback((updater) => {
-   const prevBars = barsRef.current || [];
-   const next = typeof updater === "function" ? updater(prevBars) : updater;
-   barsRef.current = next;
-   setBars(next);
-   return docRef.set({ bars: next }, { merge: true })
-     .then(() => setSaveError(false))
-     .catch(() => setSaveError(true));
-   // eslint-disable-next-line
- }, []);
+        const persist = useCallback((updater) => {
+          const prevBars = barsRef.current || [];
+          const next =
+            typeof updater === "function" ? updater(prevBars) : updater;
+          barsRef.current = next;
+          setBars(next);
+          return docRef
+            .set({ bars: next }, { merge: true })
+            .then(() => setSaveError(false))
+            .catch(() => setSaveError(true));
+          // eslint-disable-next-line
+        }, []);
 
-const persistGroup = useCallback((n) => {
-setGroupSizeState(n);
-docRef.set({ groupSize: n }, { merge: true }).catch(() => {});
-// eslint-disable-next-line
-}, []);
+        const persistGroup = useCallback((n) => {
+          setGroupSizeState(n);
+          docRef.set({ groupSize: n }, { merge: true }).catch(() => {});
+          // eslint-disable-next-line
+        }, []);
 
-const updateBar = useCallback((id, patch) => {
-setBars((prev) => {
-const next = prev.map(b => b.id === id ? { ...b, ...patch } : b);
-barsRef.current = next;
-docRef.set({ bars: next }, { merge: true }).catch(() => setSaveError(true));
-return next;
-});
-// eslint-disable-next-line
-}, []);
+        const updateBar = useCallback((id, patch) => {
+          setBars((prev) => {
+            const next = prev.map((b) =>
+              b.id === id ? { ...b, ...patch } : b,
+            );
+            barsRef.current = next;
+            docRef
+              .set({ bars: next }, { merge: true })
+              .catch(() => setSaveError(true));
+            return next;
+          });
+          // eslint-disable-next-line
+        }, []);
 
-const runDetailsFetch = useCallback((bar, forceRefresh) => {
-setFetchingIds(s => new Set(s).add(bar.id));
-const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || bar.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
-callGemini(prompt, bar.id, forceRefresh).then((data) => {
-// No client-side write here on purpose: api/gemini.js now persists this
-// bar's details itself inside a Firestore transaction. Writing it again
-// from here, based on this client's local (possibly a beat stale) copy
-// of `bars`, would risk silently reverting someone else's concurrent
-// edit — the live onSnapshot listener will pick up the server's write.
-if (!data) setFailedIds(s => new Set(s).add(bar.id));
-setFetchingIds(s => { const n = new Set(s); n.delete(bar.id); return n; });
-});
-}, []);
+        const runDetailsFetch = useCallback((bar, forceRefresh) => {
+          setFetchingIds((s) => new Set(s).add(bar.id));
+          const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || bar.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
+          callGemini(prompt, bar.id, forceRefresh).then((data) => {
+            // No client-side write here on purpose: api/gemini.js now persists this
+            // bar's details itself inside a Firestore transaction. Writing it again
+            // from here, based on this client's local (possibly a beat stale) copy
+            // of `bars`, would risk silently reverting someone else's concurrent
+            // edit — the live onSnapshot listener will pick up the server's write.
+            if (!data) setFailedIds((s) => new Set(s).add(bar.id));
+            setFetchingIds((s) => {
+              const n = new Set(s);
+              n.delete(bar.id);
+              return n;
+            });
+          });
+        }, []);
 
-useEffect(() => {
-if (!bars) return;
-bars.forEach(bar => {
-if (!bar.detailsFetched && !fetchingIds.has(bar.id) && !failedIds.has(bar.id)) runDetailsFetch(bar);
-});
-// eslint-disable-next-line
-}, [bars]);
+        useEffect(() => {
+          if (!bars) return;
+          bars.forEach((bar) => {
+            if (
+              !bar.detailsFetched &&
+              !fetchingIds.has(bar.id) &&
+              !failedIds.has(bar.id)
+            )
+              runDetailsFetch(bar);
+          });
+          // eslint-disable-next-line
+        }, [bars]);
 
-function startManualAdd(type) {
-if (type === "visited") {
-setVisitedSuggestion(null);
-setVisitedForm(emptyVisitedForm);
-setShowVisitedNamePrompt(true);
-} else {
-setWishForm(emptyWishForm);
-setShowWishForm(true);
-}
-}
+        function startManualAdd(type) {
+          if (type === "visited") {
+            setVisitedSuggestion(null);
+            setVisitedForm(emptyVisitedForm);
+            setShowVisitedNamePrompt(true);
+          } else {
+            setWishForm(emptyWishForm);
+            setShowWishForm(true);
+          }
+        }
 
-async function startPlacesLookup(suggestion) {
-setPlacesModal({ suggestion, results: [], searching: true });
-try {
-const results = await fetchPlaces(suggestion.name, { neighborhood: suggestion.neighborhood || "", address: suggestion.address || "", limit: 5 });
-setPlacesModal({ suggestion, results, searching: false });
-} catch(e) {
-setPlacesModal({ suggestion, results: [], searching: false });
-}
-}
+        async function startPlacesLookup(suggestion) {
+          setPlacesModal({ suggestion, results: [], searching: true });
+          try {
+            const results = await fetchPlaces(suggestion.name, {
+              neighborhood: suggestion.neighborhood || "",
+              address: suggestion.address || "",
+              limit: 5,
+            });
+            setPlacesModal({ suggestion, results, searching: false });
+          } catch (e) {
+            setPlacesModal({ suggestion, results: [], searching: false });
+          }
+        }
 
-function confirmPlaceSelection(placeResult) {
-const merged = { ...placesModal.suggestion, ...placeResult };
-// Always preserve description/tags/neighborhood from the original suggestion
-// (Places results only have name/address/lat/lng/placeId/mapsLink, so these would be lost otherwise)
-merged.description = placesModal.suggestion.description || "";
-merged.tags = placesModal.suggestion.tags || [];
-merged.neighborhood = placesModal.suggestion.neighborhood || "";
-merged.happyHour = placesModal.suggestion.happyHour || "";
-merged.capacityHint = placesModal.suggestion.capacityHint || null;
+        function confirmPlaceSelection(placeResult) {
+          const merged = { ...placesModal.suggestion, ...placeResult };
+          // Always preserve description/tags/neighborhood from the original suggestion
+          // (Places results only have name/address/lat/lng/placeId/mapsLink, so these would be lost otherwise)
+          merged.description = placesModal.suggestion.description || "";
+          merged.tags = placesModal.suggestion.tags || [];
+          merged.neighborhood = placesModal.suggestion.neighborhood || "";
+          merged.happyHour = placesModal.suggestion.happyHour || "";
+          merged.capacityHint = placesModal.suggestion.capacityHint || null;
 
-if (placesModal.suggestion._placeIntent === "visited") {
-setVisitedSuggestion(merged);
-setVisitedForm({ ...emptyVisitedForm, name: merged.name });
-setPlacesModal(null);
-setShowVisitedForm(true);
-} else {
-addSuggestionToWishlist(merged);
-setWishForm(emptyWishForm);
-setPlacesModal(null);
-}
-}
+          if (placesModal.suggestion._placeIntent === "visited") {
+            setVisitedSuggestion(merged);
+            setVisitedForm({ ...emptyVisitedForm, name: merged.name });
+            setPlacesModal(null);
+            setShowVisitedForm(true);
+          } else {
+            addSuggestionToWishlist(merged);
+            setWishForm(emptyWishForm);
+            setPlacesModal(null);
+          }
+        }
 
-const visited = useMemo(() => (bars || []).filter(b => b.status === "visited"), [bars]);
-const toTry = useMemo(() => (bars || []).filter(b => b.status === "to-try"), [bars]);
+        const visited = useMemo(
+          () => (bars || []).filter((b) => b.status === "visited"),
+          [bars],
+        );
+        const toTry = useMemo(
+          () => (bars || []).filter((b) => b.status === "to-try"),
+          [bars],
+        );
 
-const filteredVisited = useMemo(() => {
-const q = search.trim().toLowerCase();
-let list = visited.filter(b => {
-if (!q) return true;
-return b.name.toLowerCase().includes(q)
-|| (b.neighborhood || "").toLowerCase().includes(q)
-|| (b.notes || "").toLowerCase().includes(q)
-|| (b.tags || []).some(t => t.toLowerCase().includes(q));
-});
-list.sort((a, b) => {
-if (!!a.disqualified !== !!b.disqualified) return a.disqualified ? 1 : -1;
-const av = foodMode === "with" ? avgWithFood(a) : avgWithoutFood(a);
-const bv = foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
-return (bv || 0) - (av || 0);
-});
-return list;
-}, [visited, search, foodMode]);
+        const filteredVisited = useMemo(() => {
+          const q = search.trim().toLowerCase();
+          let list = visited.filter((b) => {
+            if (!q) return true;
+            return (
+              b.name.toLowerCase().includes(q) ||
+              (b.neighborhood || "").toLowerCase().includes(q) ||
+              (b.notes || "").toLowerCase().includes(q) ||
+              (b.tags || []).some((t) => t.toLowerCase().includes(q))
+            );
+          });
+          list.sort((a, b) => {
+            if (!!a.disqualified !== !!b.disqualified)
+              return a.disqualified ? 1 : -1;
+            const av = foodMode === "with" ? avgWithFood(a) : avgWithoutFood(a);
+            const bv = foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
+            return (bv || 0) - (av || 0);
+          });
+          return list;
+        }, [visited, search, foodMode]);
 
-const filteredToTry = useMemo(() => {
-return toTry.filter(b => {
-if (fitsGroupOnly && b.capacity && Number(b.capacity) < groupSize) return false;
-return true;
-});
-}, [toTry, fitsGroupOnly, groupSize]);
+        const filteredToTry = useMemo(() => {
+          return toTry.filter((b) => {
+            if (fitsGroupOnly && b.capacity && Number(b.capacity) < groupSize)
+              return false;
+            return true;
+          });
+        }, [toTry, fitsGroupOnly, groupSize]);
 
-// Fills in a search/surprise result's description, tags, happyHour, and
-// neighborhood in place via Gemini, once its existence is already confirmed
-// by Places. Ephemeral — nothing here is persisted unless the user adds the
-// bar, at which point the same fields carry over via addSuggestionToWishlist.
-//
-// Deliberately called WITHOUT a barId: api/gemini.js only does its Firestore
-// bar lookup/caching when barId is present, and 404s if that id isn't an
-// existing saved bar — which a fresh search result never is. Omitting barId
-// routes it through the plain "generate and return, no Firestore" path.
-const enrichSearchResult = useCallback((result) => {
-setEnrichingNames(s => new Set(s).add(result.name));
-const prompt = `You are a NYC bar description writer.\n\nThe bar "${result.name}" located at "${result.address || result.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY a single JSON object (not an array):\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
-callGemini(prompt, null, false).then((data) => {
-// Defensive: the server returns an array for multi-suggestion calls, so
-// unwrap just in case Gemini ever ignores the "single object" instruction.
-const info = Array.isArray(data) ? data[0] : data;
-if (info) {
-setSearchResults(prev => prev.map(r => r.name === result.name ? {
-...r,
-description: info.description || r.description,
-tags: (info.tags && info.tags.length) ? info.tags : r.tags,
-happyHour: info.happyHour || r.happyHour,
-neighborhood: info.neighborhood || r.neighborhood,
-} : r));
-}
-setEnrichingNames(s => { const n = new Set(s); n.delete(result.name); return n; });
-});
-}, []);
+        // Fills in a search/surprise result's description, tags, happyHour, and
+        // neighborhood in place via Gemini, once its existence is already confirmed
+        // by Places. Ephemeral — nothing here is persisted unless the user adds the
+        // bar, at which point the same fields carry over via addSuggestionToWishlist.
+        //
+        // Deliberately called WITHOUT a barId: api/gemini.js only does its Firestore
+        // bar lookup/caching when barId is present, and 404s if that id isn't an
+        // existing saved bar — which a fresh search result never is. Omitting barId
+        // routes it through the plain "generate and return, no Firestore" path.
+        const enrichSearchResult = useCallback((result) => {
+          setEnrichingNames((s) => new Set(s).add(result.name));
+          const prompt = `You are a NYC bar description writer.\n\nThe bar "${result.name}" located at "${result.address || result.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY a single JSON object (not an array):\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
+          callGemini(prompt, null, false).then((data) => {
+            // Defensive: the server returns an array for multi-suggestion calls, so
+            // unwrap just in case Gemini ever ignores the "single object" instruction.
+            const info = Array.isArray(data) ? data[0] : data;
+            if (info) {
+              setSearchResults((prev) =>
+                prev.map((r) =>
+                  r.name === result.name
+                    ? {
+                        ...r,
+                        description: info.description || r.description,
+                        tags:
+                          info.tags && info.tags.length ? info.tags : r.tags,
+                        happyHour: info.happyHour || r.happyHour,
+                        neighborhood: info.neighborhood || r.neighborhood,
+                      }
+                    : r,
+                ),
+              );
+            }
+            setEnrichingNames((s) => {
+              const n = new Set(s);
+              n.delete(result.name);
+              return n;
+            });
+          });
+        }, []);
 
-async function runSearch() {
-setSearchResults([]); setSearching(true); setSearchDone(false);
-const exclude = [...new Set([...(bars || []).map(b => b.name), ...seenNames])];
-const results = await fetchBarSuggestions(vibeQuery, groupSize, exclude, ballerMode, exploreMode);
-// Google doesn't expose venue capacity, so this only filters bars that already
-// have a capacity set from a prior manual edit; new Places results pass through.
-const fitFiltered = fitsGroupOnly ? results.filter(r => !r.capacityHint || r.capacityHint >= groupSize) : results;
-setSearchResults(fitFiltered); setSearching(false); setSearchDone(true);
-if (fitFiltered.length > 0) {
-setSeenNames(prev => new Set([...prev, ...fitFiltered.map(r => r.name)]));
-fitFiltered.forEach(r => enrichSearchResult(r));
-}
-}
+        async function runSearch() {
+          setSearchResults([]);
+          setSearching(true);
+          setSearchDone(false);
+          const exclude = [
+            ...new Set([...(bars || []).map((b) => b.name), ...seenNames]),
+          ];
+          const results = await fetchBarSuggestions(
+            vibeQuery,
+            groupSize,
+            exclude,
+            ballerMode,
+            exploreMode,
+          );
+          // Google doesn't expose venue capacity, so this only filters bars that already
+          // have a capacity set from a prior manual edit; new Places results pass through.
+          const fitFiltered = fitsGroupOnly
+            ? results.filter(
+                (r) => !r.capacityHint || r.capacityHint >= groupSize,
+              )
+            : results;
+          setSearchResults(fitFiltered);
+          setSearching(false);
+          setSearchDone(true);
+          if (fitFiltered.length > 0) {
+            setSeenNames(
+              (prev) => new Set([...prev, ...fitFiltered.map((r) => r.name)]),
+            );
+            fitFiltered.forEach((r) => enrichSearchResult(r));
+          }
+        }
 
-async function runRandomSearch() {
-setSearchResults([]); setSearching(true); setSearchDone(false);
-const exclude = [...new Set([...(bars || []).map(b => b.name), ...seenNames])];
-const pick = await fetchRandomBar(groupSize, exclude, ballerMode, exploreMode);
-setSearchResults(pick ? [pick] : []);
-setSearching(false); setSearchDone(true);
-if (pick) {
-setSeenNames(prev => new Set([...prev, pick.name]));
-enrichSearchResult(pick);
-}
-}
+        async function runRandomSearch() {
+          setSearchResults([]);
+          setSearching(true);
+          setSearchDone(false);
+          const exclude = [
+            ...new Set([...(bars || []).map((b) => b.name), ...seenNames]),
+          ];
+          const pick = await fetchRandomBar(
+            groupSize,
+            exclude,
+            ballerMode,
+            exploreMode,
+          );
+          setSearchResults(pick ? [pick] : []);
+          setSearching(false);
+          setSearchDone(true);
+          if (pick) {
+            setSeenNames((prev) => new Set([...prev, pick.name]));
+            enrichSearchResult(pick);
+          }
+        }
 
-function addSuggestionToWishlist(s) {
-const mapsLink = s.mapsLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + (s.address ? ", " + s.address : ", New York City"))}`;
-const isEdit = s._wishFormId;
-const id = isEdit ? s._wishFormId : `b${Date.now()}`;
-const hasDescription = typeof s.description === "string" && s.description.trim().length > 10;
-const record = {
-id,
-name: s.name,
-status: "to-try",
-vibe: null, value: null, service: null, food: null, drinks: null, bathroomBonus: 0,
-notes: s.notes || "",
-neighborhood: s.neighborhood || "",
-description: s.description || "",
-tags: s.tags || [],
-happyHour: s.happyHour || "",
-capacity: s.capacityHint || null,
-address: s.address || "",
-latitude: s.latitude || null,
-longitude: s.longitude || null,
-placeId: s.placeId || null,
-mapsLink,
-detailsFetched: hasDescription,
-};
- const persistPromise = persist(prev => isEdit
-   ? prev.map(b => b.id === id ? { ...b, ...record } : b)
-   : [...prev, record]);
-persistPromise.then(() => {
-if (!record.detailsFetched) runDetailsFetch(record);
-});
-setSearchResults(prev => prev.filter(r => r.name !== s.name));
-}
+        function addSuggestionToWishlist(s) {
+          const mapsLink =
+            s.mapsLink ||
+            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + (s.address ? ", " + s.address : ", New York City"))}`;
+          const isEdit = s._wishFormId;
+          const id = isEdit ? s._wishFormId : `b${Date.now()}`;
+          const hasDescription =
+            typeof s.description === "string" &&
+            s.description.trim().length > 10;
+          const record = {
+            id,
+            name: s.name,
+            status: "to-try",
+            vibe: null,
+            value: null,
+            service: null,
+            food: null,
+            drinks: null,
+            bathroomBonus: 0,
+            notes: s.notes || "",
+            neighborhood: s.neighborhood || "",
+            description: s.description || "",
+            tags: s.tags || [],
+            happyHour: s.happyHour || "",
+            capacity: s.capacityHint || null,
+            address: s.address || "",
+            latitude: s.latitude || null,
+            longitude: s.longitude || null,
+            placeId: s.placeId || null,
+            mapsLink,
+            detailsFetched: hasDescription,
+          };
+          const persistPromise = persist((prev) =>
+            isEdit
+              ? prev.map((b) => (b.id === id ? { ...b, ...record } : b))
+              : [...prev, record],
+          );
+          persistPromise.then(() => {
+            if (!record.detailsFetched) runDetailsFetch(record);
+          });
+          setSearchResults((prev) => prev.filter((r) => r.name !== s.name));
+        }
 
-function rankSuggestion(s) {
-setVisitedSuggestion(s);
-setVisitedForm({ ...emptyVisitedForm, name: s.name });
-setShowVisitedForm(true);
-}
+        function rankSuggestion(s) {
+          setVisitedSuggestion(s);
+          setVisitedForm({ ...emptyVisitedForm, name: s.name });
+          setShowVisitedForm(true);
+        }
 
-async function saveVisitedForm(e) {
-e.preventDefault();
-if (!visitedForm.name.trim()) return;
-const cleanNum = v => (v === "" || v === null ? null : Number(v));
-const isNew = !visitedForm.id;
-const id = visitedForm.id || `b${Date.now()}`;
-const patch = {
-name: visitedForm.name.trim(), status: "visited",
-vibe: cleanNum(visitedForm.vibe), value: cleanNum(visitedForm.value),
-service: cleanNum(visitedForm.service), food: cleanNum(visitedForm.food),
-drinks: cleanNum(visitedForm.drinks),
-bathroomBonus: cleanNum(visitedForm.bathroomBonus) || 0,
-notes: visitedForm.notes.trim(),
-};
-   let record;
-   await persist(prev => {
-     let next;
-     if (isNew) {
-       const mapsLink = visitedSuggestion
-         ? (visitedSuggestion.mapsLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visitedSuggestion.name + (visitedSuggestion.address ? ", " + visitedSuggestion.address : ", New York City"))}`)
-         : "";
-       record = visitedSuggestion
-         ? { ...base, ...patch, id,
-             neighborhood: visitedSuggestion.neighborhood || "",
-             description: displayDescription(visitedSuggestion.description),
-             tags: visitedSuggestion.tags || [],
-             happyHour: visitedSuggestion.happyHour || "",
-             capacity: visitedSuggestion.capacityHint || null,
-             address: visitedSuggestion.address || "",
-             latitude: visitedSuggestion.latitude || null,
-             longitude: visitedSuggestion.longitude || null,
-             placeId: visitedSuggestion.placeId || null,
-             mapsLink, detailsFetched: false }
-         : { ...base, ...patch, id, tags: [] };
-       next = [...prev, record];
-     } else {
-       next = prev.map(b => b.id === id ? { ...b, ...patch } : b);
-       record = next.find(b => b.id === id);
-     }
-     return next;
-   });
-setShowVisitedForm(false); setVisitedForm(emptyVisitedForm); setVisitedSuggestion(null);
-if (!record.detailsFetched) runDetailsFetch(record);
-}
+        async function saveVisitedForm(e) {
+          e.preventDefault();
+          if (!visitedForm.name.trim()) return;
+          const cleanNum = (v) => (v === "" || v === null ? null : Number(v));
+          const isNew = !visitedForm.id;
+          const id = visitedForm.id || `b${Date.now()}`;
+          const patch = {
+            name: visitedForm.name.trim(),
+            status: "visited",
+            vibe: cleanNum(visitedForm.vibe),
+            value: cleanNum(visitedForm.value),
+            service: cleanNum(visitedForm.service),
+            food: cleanNum(visitedForm.food),
+            drinks: cleanNum(visitedForm.drinks),
+            bathroomBonus: cleanNum(visitedForm.bathroomBonus) || 0,
+            notes: visitedForm.notes.trim(),
+          };
+          let record;
+          await persist((prev) => {
+            let next;
+            if (isNew) {
+              const mapsLink = visitedSuggestion
+                ? visitedSuggestion.mapsLink ||
+                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visitedSuggestion.name + (visitedSuggestion.address ? ", " + visitedSuggestion.address : ", New York City"))}`
+                : "";
+              record = visitedSuggestion
+                ? {
+                    ...base,
+                    ...patch,
+                    id,
+                    neighborhood: visitedSuggestion.neighborhood || "",
+                    description: displayDescription(
+                      visitedSuggestion.description,
+                    ),
+                    tags: visitedSuggestion.tags || [],
+                    happyHour: visitedSuggestion.happyHour || "",
+                    capacity: visitedSuggestion.capacityHint || null,
+                    address: visitedSuggestion.address || "",
+                    latitude: visitedSuggestion.latitude || null,
+                    longitude: visitedSuggestion.longitude || null,
+                    placeId: visitedSuggestion.placeId || null,
+                    mapsLink,
+                    detailsFetched: false,
+                  }
+                : { ...base, ...patch, id, tags: [] };
+              next = [...prev, record];
+            } else {
+              next = prev.map((b) => (b.id === id ? { ...b, ...patch } : b));
+              record = next.find((b) => b.id === id);
+            }
+            return next;
+          });
+          setShowVisitedForm(false);
+          setVisitedForm(emptyVisitedForm);
+          setVisitedSuggestion(null);
+          if (!record.detailsFetched) runDetailsFetch(record);
+        }
 
-async function saveWishForm(e) {
-e.preventDefault();
-if (!wishForm.name.trim()) return;
-const suggestion = {
-name: wishForm.name.trim(),
-neighborhood: wishForm.neighborhood.trim(),
-notes: wishForm.notes.trim(),
-_wishFormId: wishForm.id,
-_placeIntent: "wishlist",
-};
-setShowWishForm(false);
-await startPlacesLookup(suggestion);
-}
+        async function saveWishForm(e) {
+          e.preventDefault();
+          if (!wishForm.name.trim()) return;
+          const suggestion = {
+            name: wishForm.name.trim(),
+            neighborhood: wishForm.neighborhood.trim(),
+            notes: wishForm.notes.trim(),
+            _wishFormId: wishForm.id,
+            _placeIntent: "wishlist",
+          };
+          setShowWishForm(false);
+          await startPlacesLookup(suggestion);
+        }
 
-function markVisited(b) {
-setVisitedSuggestion(b);
-setVisitedForm({ id: b.id, name: b.name, vibe: "", value: "", service: "", food: "", drinks: "", bathroomBonus: "", notes: b.notes || "" });
-setShowVisitedForm(true);
-}
+        function markVisited(b) {
+          setVisitedSuggestion(b);
+          setVisitedForm({
+            id: b.id,
+            name: b.name,
+            vibe: "",
+            value: "",
+            service: "",
+            food: "",
+            drinks: "",
+            bathroomBonus: "",
+            notes: b.notes || "",
+          });
+          setShowVisitedForm(true);
+        }
 
-function editVisited(b) {
-setVisitedSuggestion(null);
-setVisitedForm({
-id: b.id, name: b.name,
-vibe: b.vibe ?? "", value: b.value ?? "", service: b.service ?? "",
-food: b.food ?? "", drinks: b.drinks ?? "", bathroomBonus: b.bathroomBonus ?? "",
-notes: b.notes || "",
-});
-setShowVisitedForm(true);
-}
+        function editVisited(b) {
+          setVisitedSuggestion(null);
+          setVisitedForm({
+            id: b.id,
+            name: b.name,
+            vibe: b.vibe ?? "",
+            value: b.value ?? "",
+            service: b.service ?? "",
+            food: b.food ?? "",
+            drinks: b.drinks ?? "",
+            bathroomBonus: b.bathroomBonus ?? "",
+            notes: b.notes || "",
+          });
+          setShowVisitedForm(true);
+        }
 
-function removeBar(id) { persist(prev => prev.filter(b => b.id !== id)); }
+        function removeBar(id) {
+          persist((prev) => prev.filter((b) => b.id !== id));
+        }
 
-function toggleDisqualify(b) {
-if (b.disqualified) {
-updateBar(b.id, { disqualified: false, disqualifyReason: "" });
-} else {
-const reason = window.prompt("Why disqualify this one? (optional)", "");
-if (reason === null) return;
-updateBar(b.id, { disqualified: true, disqualifyReason: reason });
-}
-}
+        function toggleDisqualify(b) {
+          if (b.disqualified) {
+            updateBar(b.id, { disqualified: false, disqualifyReason: "" });
+          } else {
+            const reason = window.prompt(
+              "Why disqualify this one? (optional)",
+              "",
+            );
+            if (reason === null) return;
+            updateBar(b.id, { disqualified: true, disqualifyReason: reason });
+          }
+        }
 
-const searchPanel = React.createElement("div", { className: "tda-search-panel" },
-React.createElement("div", { className: "tda-search-row" },
-React.createElement("input", { className: "tda-input", placeholder: "Describe a vibe (optional)", value: vibeQuery, onChange: e => setVibeQuery(e.target.value), style: { flex: "1 1 220px" } }),
-React.createElement("div", { className: "tda-group-stepper" },
-React.createElement("span", { style: { color: "#857C8E" } }, "Group of"),
-React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(Math.max(1, groupSize - 1)) }, "−"),
-React.createElement("b", { style: { color: "#EDE6D9" } }, groupSize),
-React.createElement("button", { className: "tda-group-btn", onClick: () => persistGroup(groupSize + 1) }, "+")),
-React.createElement("button", { className: `tda-chip ${fitsGroupOnly ? "active" : ""}`, onClick: () => setFitsGroupOnly(!fitsGroupOnly) }, "Fits our group"),
-React.createElement("button", { className: `tda-chip tda-chip-baller ${ballerMode ? "active" : ""}`, onClick: () => setBallerMode(!ballerMode) }, "💰 Baller mode"),
-React.createElement("button", { className: `tda-chip tda-chip-explore ${exploreMode ? "active" : ""}`, onClick: () => setExploreMode(!exploreMode) }, "🧭 Explore mode"),
-React.createElement("div", { className: "tda-search-btn-group" },
-React.createElement("div", { className: "tda-search-btn-wrap" },
-React.createElement("button", { className: "tda-find-btn", onClick: runSearch, disabled: searching || !vibeQuery.trim() }, searching ? "Searching…" : "Find Bars"),
-React.createElement("span", { className: "tda-search-btn-hint" }, "Search for a specific bar or location.")),
-React.createElement("div", { className: "tda-search-btn-wrap" },
-React.createElement("button", { className: "tda-find-btn tda-surprise-btn", onClick: runRandomSearch, disabled: searching }, "🎲 Surprise Us"),
-React.createElement("span", { className: "tda-search-btn-hint" }, "Discover random bars based on your filters.")))),
-searching && React.createElement("div", { className: "tda-spinner" }, "scouting the city…"),
-searchDone && !searching && searchResults.length === 0 && React.createElement("div", { className: "tda-empty" }, "No fresh matches came back — try a different vibe."),
-searchResults.length > 0 && React.createElement("div", { className: "tda-suggestion-grid" },
-searchResults.map(s => {
-const isEnriching = enrichingNames.has(s.name);
-const desc = displayDescription(s.description);
-return React.createElement("div", { key: s.name, className: "tda-suggestion-card" },
-React.createElement("div", { className: "tda-suggestion-name" }, s.name),
-s.neighborhood && React.createElement("div", { className: "tda-suggestion-hood" }, s.neighborhood),
-s.tags && s.tags.length > 0
-? React.createElement("div", { className: "tda-tags", style: { marginTop: "0.5rem" } },
-s.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t)))
-: isEnriching && React.createElement("div", { className: "tda-tags", style: { marginTop: "0.5rem" } },
-React.createElement("span", { className: "tda-tag tda-tag-skeleton" }),
-React.createElement("span", { className: "tda-tag tda-tag-skeleton" }),
-React.createElement("span", { className: "tda-tag tda-tag-skeleton" })),
-desc
-? React.createElement("div", { className: "tda-suggestion-desc" }, desc)
-: isEnriching
-? React.createElement("div", { className: "tda-suggestion-desc tda-desc-loading" }, "finding details…")
-: React.createElement("div", { className: "tda-suggestion-desc" }, s.address || ""),
-s.happyHour && React.createElement("div", { className: "tda-suggestion-desc", style: { color: "#C9A876" } }, "🕔 ", s.happyHour),
-s.mapsLink && React.createElement("a", { className: "tda-link-btn", style: { display: "inline-block", marginTop: "0.7rem" }, href: s.mapsLink, target: "_blank", rel: "noreferrer" }, "Map ↗"),
-React.createElement("div", { className: "tda-suggestion-actions" },
-React.createElement("button", { className: "tda-suggestion-add", onClick: () => addSuggestionToWishlist(s) }, "+ Wishlist"),
-React.createElement("button", { className: "tda-visit-btn", onClick: () => rankSuggestion(s) }, "I visited")));
-})));
+        const searchPanel = React.createElement(
+          "div",
+          { className: "tda-search-panel" },
+          React.createElement(
+            "div",
+            { className: "tda-search-row" },
+            React.createElement("input", {
+              className: "tda-input",
+              placeholder: "Describe a vibe (optional)",
+              value: vibeQuery,
+              onChange: (e) => setVibeQuery(e.target.value),
+              style: { flex: "1 1 220px" },
+            }),
+            React.createElement(
+              "div",
+              { className: "tda-group-stepper" },
+              React.createElement(
+                "span",
+                { style: { color: "#857C8E" } },
+                "Group of",
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: "tda-group-btn",
+                  onClick: () => persistGroup(Math.max(1, groupSize - 1)),
+                },
+                "−",
+              ),
+              React.createElement(
+                "b",
+                { style: { color: "#EDE6D9" } },
+                groupSize,
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: "tda-group-btn",
+                  onClick: () => persistGroup(groupSize + 1),
+                },
+                "+",
+              ),
+            ),
+            React.createElement(
+              "button",
+              {
+                className: `tda-chip ${fitsGroupOnly ? "active" : ""}`,
+                onClick: () => setFitsGroupOnly(!fitsGroupOnly),
+              },
+              "Fits our group",
+            ),
+            React.createElement(
+              "button",
+              {
+                className: `tda-chip tda-chip-baller ${ballerMode ? "active" : ""}`,
+                onClick: () => setBallerMode(!ballerMode),
+              },
+              "💰 Baller mode",
+            ),
+            React.createElement(
+              "button",
+              {
+                className: `tda-chip tda-chip-explore ${exploreMode ? "active" : ""}`,
+                onClick: () => setExploreMode(!exploreMode),
+              },
+              "🧭 Explore mode",
+            ),
+            React.createElement(
+              "div",
+              { className: "tda-search-btn-group" },
+              React.createElement(
+                "div",
+                { className: "tda-search-btn-wrap" },
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-find-btn",
+                    onClick: runSearch,
+                    disabled: searching || !vibeQuery.trim(),
+                  },
+                  searching ? "Searching…" : "Find Bars",
+                ),
+                React.createElement(
+                  "span",
+                  { className: "tda-search-btn-hint" },
+                  "Search for a specific bar or location.",
+                ),
+              ),
+              React.createElement(
+                "div",
+                { className: "tda-search-btn-wrap" },
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-find-btn tda-surprise-btn",
+                    onClick: runRandomSearch,
+                    disabled: searching,
+                  },
+                  "🎲 Surprise Us",
+                ),
+                React.createElement(
+                  "span",
+                  { className: "tda-search-btn-hint" },
+                  "Discover random bars based on your filters.",
+                ),
+              ),
+            ),
+          ),
+          searching &&
+            React.createElement(
+              "div",
+              { className: "tda-spinner" },
+              "scouting the city…",
+            ),
+          searchDone &&
+            !searching &&
+            searchResults.length === 0 &&
+            React.createElement(
+              "div",
+              { className: "tda-empty" },
+              "No fresh matches came back — try a different vibe.",
+            ),
+          searchResults.length > 0 &&
+            React.createElement(
+              "div",
+              { className: "tda-suggestion-grid" },
+              searchResults.map((s) => {
+                const isEnriching = enrichingNames.has(s.name);
+                const desc = displayDescription(s.description);
+                return React.createElement(
+                  "div",
+                  { key: s.name, className: "tda-suggestion-card" },
+                  React.createElement(
+                    "div",
+                    { className: "tda-suggestion-name" },
+                    s.name,
+                  ),
+                  s.neighborhood &&
+                    React.createElement(
+                      "div",
+                      { className: "tda-suggestion-hood" },
+                      s.neighborhood,
+                    ),
+                  s.tags && s.tags.length > 0
+                    ? React.createElement(
+                        "div",
+                        {
+                          className: "tda-tags",
+                          style: { marginTop: "0.5rem" },
+                        },
+                        s.tags.map((t) =>
+                          React.createElement(
+                            "span",
+                            { key: t, className: "tda-tag" },
+                            t,
+                          ),
+                        ),
+                      )
+                    : isEnriching &&
+                        React.createElement(
+                          "div",
+                          {
+                            className: "tda-tags",
+                            style: { marginTop: "0.5rem" },
+                          },
+                          React.createElement("span", {
+                            className: "tda-tag tda-tag-skeleton",
+                          }),
+                          React.createElement("span", {
+                            className: "tda-tag tda-tag-skeleton",
+                          }),
+                          React.createElement("span", {
+                            className: "tda-tag tda-tag-skeleton",
+                          }),
+                        ),
+                  desc
+                    ? React.createElement(
+                        "div",
+                        { className: "tda-suggestion-desc" },
+                        desc,
+                      )
+                    : isEnriching
+                      ? React.createElement(
+                          "div",
+                          { className: "tda-suggestion-desc tda-desc-loading" },
+                          "finding details…",
+                        )
+                      : React.createElement(
+                          "div",
+                          { className: "tda-suggestion-desc" },
+                          s.address || "",
+                        ),
+                  s.happyHour &&
+                    React.createElement(
+                      "div",
+                      {
+                        className: "tda-suggestion-desc",
+                        style: { color: "#C9A876" },
+                      },
+                      "🕔 ",
+                      s.happyHour,
+                    ),
+                  s.mapsLink &&
+                    React.createElement(
+                      "a",
+                      {
+                        className: "tda-link-btn",
+                        style: { display: "inline-block", marginTop: "0.7rem" },
+                        href: s.mapsLink,
+                        target: "_blank",
+                        rel: "noreferrer",
+                      },
+                      "Map ↗",
+                    ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-suggestion-actions" },
+                    React.createElement(
+                      "button",
+                      {
+                        className: "tda-suggestion-add",
+                        onClick: () => addSuggestionToWishlist(s),
+                      },
+                      "+ Wishlist",
+                    ),
+                    React.createElement(
+                      "button",
+                      {
+                        className: "tda-visit-btn",
+                        onClick: () => rankSuggestion(s),
+                      },
+                      "I visited",
+                    ),
+                  ),
+                );
+              }),
+            ),
+        );
 
-if (loading) {
-return React.createElement("div", { style: { minHeight: "100vh", background: "#0E0D10", display: "flex", alignItems: "center", justifyContent: "center" } },
-React.createElement("div", { style: { color: "#B8965F", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.85rem", letterSpacing: "0.05em" } },
-connError ? "couldn't connect — check your Firebase config in index.html" : "setting the table…"));
-}
+        if (loading) {
+          return React.createElement(
+            "div",
+            {
+              style: {
+                minHeight: "100vh",
+                background: "#0E0D10",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              },
+            },
+            React.createElement(
+              "div",
+              {
+                style: {
+                  color: "#B8965F",
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: "0.85rem",
+                  letterSpacing: "0.05em",
+                },
+              },
+              connError
+                ? "couldn't connect — check your Firebase config in index.html"
+                : "setting the table…",
+            ),
+          );
+        }
 
-const appContent = React.createElement("div", { className: "tda-root" },
-React.createElement("style", null, `
+        const appContent = React.createElement(
+          "div",
+          { className: "tda-root" },
+          React.createElement(
+            "style",
+            null,
+            `
 .tda-root { min-height:100vh; background:linear-gradient(180deg,#14121A 0%,#0E0D10 55%); color:#EDE6D9; font-family:'Inter',sans-serif; padding-bottom:4rem; }
 .tda-container { max-width:980px; margin:0 auto; padding:0 1.25rem; }
 .tda-header { padding:3rem 0 1.75rem; text-align:center; border-bottom:1px solid #262029; }
@@ -725,324 +1487,1235 @@ React.createElement("style", null, `
 .tda-map-popup-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.02rem; color:#EDE6D9; }
 .tda-map-popup-score { font-family:'IBM Plex Mono',monospace; font-size:0.82rem; color:#C9A876; margin-top:0.3rem; }
 .tda-map-popup-score.tda-muted { color:#A79EB2; }
-`),
-React.createElement("div", { className: "tda-container" },
-React.createElement("div", { className: "tda-header" },
-React.createElement("h1", { className: "tda-title" },
-"Tour de ", React.createElement("span", { className: "accent" }, "Alcoholism"),
-React.createElement("button", { className: "tda-info-btn", type: "button", title: "How Tour de Alcoholism works", "aria-label": "How Tour de Alcoholism works", onClick: () => setShowInfo(true) }, "i")),
-React.createElement("div", { className: "tda-sub" }, "a running record of the bars we've survived")),
-React.createElement("div", { className: "tda-tabs" },
-React.createElement("button", { className: `tda-tab ${tab === "leaderboard" ? "active" : ""}`, onClick: () => setTab("leaderboard") }, "Current Leaderboard"),
-React.createElement("button", { className: `tda-tab ${tab === "find" ? "active" : ""}`, onClick: () => setTab("find") }, "Find a New Bar")),
-React.createElement("button", { className: `tda-tab ${tab === "heatmap" ? "active" : ""}`, onClick: () => setTab("heatmap") }, "Tour Map"),
-tab === "find" && React.createElement(React.Fragment, null,
-searchPanel,
-React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("wishlist") }, "+ Add to wishlist by name"),
-React.createElement("div", { className: "tda-section-heading" },
-React.createElement("h2", null, "Our Wishlist"),
-React.createElement("div", { className: "tda-rule" }),
-React.createElement("span", { className: "tda-section-count" }, filteredToTry.length, " bar", filteredToTry.length === 1 ? "" : "s")),
-React.createElement("div", { className: "tda-list" },
-filteredToTry.length === 0 && React.createElement("div", { className: "tda-empty" }, "Nothing on the list yet — use the button above to add one."),
-filteredToTry.map(b => React.createElement(BarCard, {
-key: b.id, b: b, isFetching: fetchingIds.has(b.id),
-onNameClick: () => { if (b.mapsLink) window.open(b.mapsLink, "_blank"); },
-onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id),
-})))),
-tab === "heatmap" && React.createElement(HeatMapView, { bars: bars || [] }),
-tab === "leaderboard" && React.createElement(React.Fragment, null,
-React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("visited") }, "+ Add a bar you visited & rank it"),
-filteredVisited.length > 0 && (() => {
-const champ = filteredVisited[0];
-const score = foodMode === "with" ? avgWithFood(champ) : avgWithoutFood(champ);
-return React.createElement("div", { className: "tda-champion" },
-React.createElement("div", null,
-React.createElement("div", { className: "tda-champion-eyebrow" }, "🏆 Reigning Champion"),
-React.createElement("div", { className: "tda-champion-name" }, champ.name)),
-React.createElement("div", { className: "tda-champion-score" }, fmt(score)));
-})(),
-React.createElement("div", { className: "tda-controls" },
-React.createElement("input", { className: "tda-input", placeholder: "Search name, neighborhood, notes…", value: search, onChange: e => setSearch(e.target.value), style: { flex: "1 1 200px" } }),
-React.createElement("div", { className: "tda-toggle" },
-React.createElement("button", { className: foodMode === "with" ? "active" : "", onClick: () => setFoodMode("with") }, "With food"),
-React.createElement("button", { className: foodMode === "without" ? "active" : "", onClick: () => setFoodMode("without") }, "Without food"))),
-React.createElement("div", { className: "tda-list" },
-filteredVisited.length === 0 && React.createElement("div", { className: "tda-empty" }, "No stages match that search yet."),
-(() => {
-let rankCounter = 0;
-return filteredVisited.map(b => {
-const ranked = !b.disqualified;
-if (ranked) rankCounter++;
-return React.createElement(BarCard, {
-key: b.id, b: b,
-rank: ranked ? rankCounter : null,
-score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b),
-scoreLabel: foodMode === "with" ? "with food" : "no food",
-isFetching: fetchingIds.has(b.id),
-onNameClick: () => { if (b.mapsLink) window.open(b.mapsLink, "_blank"); },
-onEdit: () => editVisited(b), onDelete: () => removeBar(b.id), onDisqualify: () => toggleDisqualify(b),
-});
-});
-})())),
-saveError && React.createElement("div", { className: "tda-footnote", style: { color: "#C77676" } }, "Couldn't save that change — check your connection and try again."),
-React.createElement("div", { className: "tda-footnote" }, "Shared list — anyone with this page can add stages, rank bars, and edit entries.")),
+`,
+          ),
+          React.createElement(
+            "div",
+            { className: "tda-container" },
+            React.createElement(
+              "div",
+              { className: "tda-header" },
+              React.createElement(
+                "h1",
+                { className: "tda-title" },
+                "Tour de ",
+                React.createElement(
+                  "span",
+                  { className: "accent" },
+                  "Alcoholism",
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-info-btn",
+                    type: "button",
+                    title: "How Tour de Alcoholism works",
+                    "aria-label": "How Tour de Alcoholism works",
+                    onClick: () => setShowInfo(true),
+                  },
+                  "i",
+                ),
+              ),
+              React.createElement(
+                "div",
+                { className: "tda-sub" },
+                "a running record of the bars we've survived",
+              ),
+            ),
+            React.createElement(
+              "div",
+              { className: "tda-tabs" },
+              React.createElement(
+                "button",
+                {
+                  className: `tda-tab ${tab === "leaderboard" ? "active" : ""}`,
+                  onClick: () => setTab("leaderboard"),
+                },
+                "Current Leaderboard",
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: `tda-tab ${tab === "find" ? "active" : ""}`,
+                  onClick: () => setTab("find"),
+                },
+                "Find a New Bar",
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: `tda-tab ${tab === "heatmap" ? "active" : ""}`,
+                  onClick: () => setTab("heatmap"),
+                },
+                "Tour Map",
+              ),
+            ),
+            tab === "find" &&
+              React.createElement(
+                React.Fragment,
+                null,
+                searchPanel,
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-add-btn",
+                    onClick: () => startManualAdd("wishlist"),
+                  },
+                  "+ Add to wishlist by name",
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-section-heading" },
+                  React.createElement("h2", null, "Our Wishlist"),
+                  React.createElement("div", { className: "tda-rule" }),
+                  React.createElement(
+                    "span",
+                    { className: "tda-section-count" },
+                    filteredToTry.length,
+                    " bar",
+                    filteredToTry.length === 1 ? "" : "s",
+                  ),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-list" },
+                  filteredToTry.length === 0 &&
+                    React.createElement(
+                      "div",
+                      { className: "tda-empty" },
+                      "Nothing on the list yet — use the button above to add one.",
+                    ),
+                  filteredToTry.map((b) =>
+                    React.createElement(BarCard, {
+                      key: b.id,
+                      b: b,
+                      isFetching: fetchingIds.has(b.id),
+                      onNameClick: () => {
+                        if (b.mapsLink) window.open(b.mapsLink, "_blank");
+                      },
+                      onEdit: () => markVisited(b),
+                      editLabel: "I visited",
+                      onDelete: () => removeBar(b.id),
+                    }),
+                  ),
+                ),
+              ),
+            tab === "heatmap" &&
+              React.createElement(TourMapView, { bars: bars || [] }),
+            tab === "leaderboard" &&
+              React.createElement(
+                React.Fragment,
+                null,
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-add-btn",
+                    onClick: () => startManualAdd("visited"),
+                  },
+                  "+ Add a bar you visited & rank it",
+                ),
+                filteredVisited.length > 0 &&
+                  (() => {
+                    const champ = filteredVisited[0];
+                    const score =
+                      foodMode === "with"
+                        ? avgWithFood(champ)
+                        : avgWithoutFood(champ);
+                    return React.createElement(
+                      "div",
+                      { className: "tda-champion" },
+                      React.createElement(
+                        "div",
+                        null,
+                        React.createElement(
+                          "div",
+                          { className: "tda-champion-eyebrow" },
+                          "🏆 Reigning Champion",
+                        ),
+                        React.createElement(
+                          "div",
+                          { className: "tda-champion-name" },
+                          champ.name,
+                        ),
+                      ),
+                      React.createElement(
+                        "div",
+                        { className: "tda-champion-score" },
+                        fmt(score),
+                      ),
+                    );
+                  })(),
+                React.createElement(
+                  "div",
+                  { className: "tda-controls" },
+                  React.createElement("input", {
+                    className: "tda-input",
+                    placeholder: "Search name, neighborhood, notes…",
+                    value: search,
+                    onChange: (e) => setSearch(e.target.value),
+                    style: { flex: "1 1 200px" },
+                  }),
+                  React.createElement(
+                    "div",
+                    { className: "tda-toggle" },
+                    React.createElement(
+                      "button",
+                      {
+                        className: foodMode === "with" ? "active" : "",
+                        onClick: () => setFoodMode("with"),
+                      },
+                      "With food",
+                    ),
+                    React.createElement(
+                      "button",
+                      {
+                        className: foodMode === "without" ? "active" : "",
+                        onClick: () => setFoodMode("without"),
+                      },
+                      "Without food",
+                    ),
+                  ),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-list" },
+                  filteredVisited.length === 0 &&
+                    React.createElement(
+                      "div",
+                      { className: "tda-empty" },
+                      "No stages match that search yet.",
+                    ),
+                  (() => {
+                    let rankCounter = 0;
+                    return filteredVisited.map((b) => {
+                      const ranked = !b.disqualified;
+                      if (ranked) rankCounter++;
+                      return React.createElement(BarCard, {
+                        key: b.id,
+                        b: b,
+                        rank: ranked ? rankCounter : null,
+                        score:
+                          foodMode === "with"
+                            ? avgWithFood(b)
+                            : avgWithoutFood(b),
+                        scoreLabel:
+                          foodMode === "with" ? "with food" : "no food",
+                        isFetching: fetchingIds.has(b.id),
+                        onNameClick: () => {
+                          if (b.mapsLink) window.open(b.mapsLink, "_blank");
+                        },
+                        onEdit: () => editVisited(b),
+                        onDelete: () => removeBar(b.id),
+                        onDisqualify: () => toggleDisqualify(b),
+                      });
+                    });
+                  })(),
+                ),
+              ),
+            saveError &&
+              React.createElement(
+                "div",
+                { className: "tda-footnote", style: { color: "#C77676" } },
+                "Couldn't save that change — check your connection and try again.",
+              ),
+            React.createElement(
+              "div",
+              { className: "tda-footnote" },
+              "Shared list — anyone with this page can add stages, rank bars, and edit entries.",
+            ),
+          ),
 
-showVisitedForm && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowVisitedForm(false) },
-React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
-React.createElement("h3", null, visitedForm.id ? "Rank this bar" : "Rank a bar you visited"),
-React.createElement("form", { onSubmit: saveVisitedForm },
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Name"),
-React.createElement("input", { className: "tda-input", required: true, value: visitedForm.name, onChange: e => setVisitedForm({ ...visitedForm, name: e.target.value }) })),
-React.createElement("div", { className: "tda-field-row" },
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Vibe (0-10)"),
-React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.vibe, onChange: e => setVisitedForm({ ...visitedForm, vibe: e.target.value }) })),
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Value (0-10)"),
-React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.value, onChange: e => setVisitedForm({ ...visitedForm, value: e.target.value }) }))),
-React.createElement("div", { className: "tda-field-row" },
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Service (0-10)"),
-React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.service, onChange: e => setVisitedForm({ ...visitedForm, service: e.target.value }) })),
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Food (0-10)"),
-React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.food, onChange: e => setVisitedForm({ ...visitedForm, food: e.target.value }) }))),
-React.createElement("div", { className: "tda-field-row" },
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Drinks (0-10)"),
-React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.drinks, onChange: e => setVisitedForm({ ...visitedForm, drinks: e.target.value }) })),
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Bathroom bonus"),
-React.createElement("input", { className: "tda-input", type: "number", step: "0.5", min: "0", max: "10", value: visitedForm.bathroomBonus, onChange: e => setVisitedForm({ ...visitedForm, bathroomBonus: e.target.value }) }))),
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Notes"),
-React.createElement("input", { className: "tda-input", value: visitedForm.notes, onChange: e => setVisitedForm({ ...visitedForm, notes: e.target.value }) })),
-React.createElement("div", { className: "tda-modal-actions" },
-React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowVisitedForm(false) }, "Cancel"),
-React.createElement("button", { type: "submit", className: "tda-primary-btn" }, visitedForm.id ? "Save ranking" : "Add to leaderboard"))))),
+          showVisitedForm &&
+            React.createElement(
+              "div",
+              {
+                className: "tda-modal-backdrop",
+                onClick: () => setShowVisitedForm(false),
+              },
+              React.createElement(
+                "div",
+                { className: "tda-modal", onClick: (e) => e.stopPropagation() },
+                React.createElement(
+                  "h3",
+                  null,
+                  visitedForm.id ? "Rank this bar" : "Rank a bar you visited",
+                ),
+                React.createElement(
+                  "form",
+                  { onSubmit: saveVisitedForm },
+                  React.createElement(
+                    "div",
+                    { className: "tda-field" },
+                    React.createElement("label", null, "Name"),
+                    React.createElement("input", {
+                      className: "tda-input",
+                      required: true,
+                      value: visitedForm.name,
+                      onChange: (e) =>
+                        setVisitedForm({
+                          ...visitedForm,
+                          name: e.target.value,
+                        }),
+                    }),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-field-row" },
+                    React.createElement(
+                      "div",
+                      { className: "tda-field" },
+                      React.createElement("label", null, "Vibe (0-10)"),
+                      React.createElement("input", {
+                        className: "tda-input",
+                        type: "number",
+                        step: "0.5",
+                        min: "0",
+                        max: "10",
+                        value: visitedForm.vibe,
+                        onChange: (e) =>
+                          setVisitedForm({
+                            ...visitedForm,
+                            vibe: e.target.value,
+                          }),
+                      }),
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "tda-field" },
+                      React.createElement("label", null, "Value (0-10)"),
+                      React.createElement("input", {
+                        className: "tda-input",
+                        type: "number",
+                        step: "0.5",
+                        min: "0",
+                        max: "10",
+                        value: visitedForm.value,
+                        onChange: (e) =>
+                          setVisitedForm({
+                            ...visitedForm,
+                            value: e.target.value,
+                          }),
+                      }),
+                    ),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-field-row" },
+                    React.createElement(
+                      "div",
+                      { className: "tda-field" },
+                      React.createElement("label", null, "Service (0-10)"),
+                      React.createElement("input", {
+                        className: "tda-input",
+                        type: "number",
+                        step: "0.5",
+                        min: "0",
+                        max: "10",
+                        value: visitedForm.service,
+                        onChange: (e) =>
+                          setVisitedForm({
+                            ...visitedForm,
+                            service: e.target.value,
+                          }),
+                      }),
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "tda-field" },
+                      React.createElement("label", null, "Food (0-10)"),
+                      React.createElement("input", {
+                        className: "tda-input",
+                        type: "number",
+                        step: "0.5",
+                        min: "0",
+                        max: "10",
+                        value: visitedForm.food,
+                        onChange: (e) =>
+                          setVisitedForm({
+                            ...visitedForm,
+                            food: e.target.value,
+                          }),
+                      }),
+                    ),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-field-row" },
+                    React.createElement(
+                      "div",
+                      { className: "tda-field" },
+                      React.createElement("label", null, "Drinks (0-10)"),
+                      React.createElement("input", {
+                        className: "tda-input",
+                        type: "number",
+                        step: "0.5",
+                        min: "0",
+                        max: "10",
+                        value: visitedForm.drinks,
+                        onChange: (e) =>
+                          setVisitedForm({
+                            ...visitedForm,
+                            drinks: e.target.value,
+                          }),
+                      }),
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "tda-field" },
+                      React.createElement("label", null, "Bathroom bonus"),
+                      React.createElement("input", {
+                        className: "tda-input",
+                        type: "number",
+                        step: "0.5",
+                        min: "0",
+                        max: "10",
+                        value: visitedForm.bathroomBonus,
+                        onChange: (e) =>
+                          setVisitedForm({
+                            ...visitedForm,
+                            bathroomBonus: e.target.value,
+                          }),
+                      }),
+                    ),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-field" },
+                    React.createElement("label", null, "Notes"),
+                    React.createElement("input", {
+                      className: "tda-input",
+                      value: visitedForm.notes,
+                      onChange: (e) =>
+                        setVisitedForm({
+                          ...visitedForm,
+                          notes: e.target.value,
+                        }),
+                    }),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-modal-actions" },
+                    React.createElement(
+                      "button",
+                      {
+                        type: "button",
+                        className: "tda-secondary-btn",
+                        onClick: () => setShowVisitedForm(false),
+                      },
+                      "Cancel",
+                    ),
+                    React.createElement(
+                      "button",
+                      { type: "submit", className: "tda-primary-btn" },
+                      visitedForm.id ? "Save ranking" : "Add to leaderboard",
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
-showVisitedNamePrompt && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowVisitedNamePrompt(false) },
-React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
-React.createElement("h3", null, "Which bar did you visit?"),
-React.createElement("form", { onSubmit: e => {
-e.preventDefault();
-if (!visitedNameInput.trim()) return;
-setShowVisitedNamePrompt(false);
-startPlacesLookup({ name: visitedNameInput.trim(), neighborhood: visitedHoodInput.trim(), _placeIntent: "visited" });
-setVisitedNameInput("");
-setVisitedHoodInput("");
-}},
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Bar name"),
-React.createElement("input", { className: "tda-input", required: true, autoFocus: true, placeholder: "e.g. The Dead Rabbit", value: visitedNameInput, onChange: e => setVisitedNameInput(e.target.value) })),
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Neighborhood (optional)"),
-React.createElement("input", { className: "tda-input", placeholder: "e.g. East Village", value: visitedHoodInput, onChange: e => setVisitedHoodInput(e.target.value) })),
-React.createElement("div", { className: "tda-modal-actions" },
-React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowVisitedNamePrompt(false) }, "Cancel"),
-React.createElement("button", { type: "submit", className: "tda-primary-btn" }, "Look up"))))),
+          showVisitedNamePrompt &&
+            React.createElement(
+              "div",
+              {
+                className: "tda-modal-backdrop",
+                onClick: () => setShowVisitedNamePrompt(false),
+              },
+              React.createElement(
+                "div",
+                { className: "tda-modal", onClick: (e) => e.stopPropagation() },
+                React.createElement("h3", null, "Which bar did you visit?"),
+                React.createElement(
+                  "form",
+                  {
+                    onSubmit: (e) => {
+                      e.preventDefault();
+                      if (!visitedNameInput.trim()) return;
+                      setShowVisitedNamePrompt(false);
+                      startPlacesLookup({
+                        name: visitedNameInput.trim(),
+                        neighborhood: visitedHoodInput.trim(),
+                        _placeIntent: "visited",
+                      });
+                      setVisitedNameInput("");
+                      setVisitedHoodInput("");
+                    },
+                  },
+                  React.createElement(
+                    "div",
+                    { className: "tda-field" },
+                    React.createElement("label", null, "Bar name"),
+                    React.createElement("input", {
+                      className: "tda-input",
+                      required: true,
+                      autoFocus: true,
+                      placeholder: "e.g. The Dead Rabbit",
+                      value: visitedNameInput,
+                      onChange: (e) => setVisitedNameInput(e.target.value),
+                    }),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-field" },
+                    React.createElement(
+                      "label",
+                      null,
+                      "Neighborhood (optional)",
+                    ),
+                    React.createElement("input", {
+                      className: "tda-input",
+                      placeholder: "e.g. East Village",
+                      value: visitedHoodInput,
+                      onChange: (e) => setVisitedHoodInput(e.target.value),
+                    }),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-modal-actions" },
+                    React.createElement(
+                      "button",
+                      {
+                        type: "button",
+                        className: "tda-secondary-btn",
+                        onClick: () => setShowVisitedNamePrompt(false),
+                      },
+                      "Cancel",
+                    ),
+                    React.createElement(
+                      "button",
+                      { type: "submit", className: "tda-primary-btn" },
+                      "Look up",
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
-showWishForm && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowWishForm(false) }, React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
-React.createElement("h3", null, "Add to wishlist"),
-React.createElement("form", { onSubmit: saveWishForm },
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Name"),
-React.createElement("input", { className: "tda-input", required: true, value: wishForm.name, onChange: e => setWishForm({ ...wishForm, name: e.target.value }) })),
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Neighborhood (optional)"),
-React.createElement("input", { className: "tda-input", value: wishForm.neighborhood, onChange: e => setWishForm({ ...wishForm, neighborhood: e.target.value }) })),
-React.createElement("div", { className: "tda-field" },
-React.createElement("label", null, "Notes"),
-React.createElement("input", { className: "tda-input", value: wishForm.notes, onChange: e => setWishForm({ ...wishForm, notes: e.target.value }) })),
-React.createElement("div", { className: "tda-modal-actions" },
-React.createElement("button", { type: "button", className: "tda-secondary-btn", onClick: () => setShowWishForm(false) }, "Cancel"),
-React.createElement("button", { type: "submit", className: "tda-primary-btn" }, "Add to wishlist"))))),
+          showWishForm &&
+            React.createElement(
+              "div",
+              {
+                className: "tda-modal-backdrop",
+                onClick: () => setShowWishForm(false),
+              },
+              React.createElement(
+                "div",
+                { className: "tda-modal", onClick: (e) => e.stopPropagation() },
+                React.createElement("h3", null, "Add to wishlist"),
+                React.createElement(
+                  "form",
+                  { onSubmit: saveWishForm },
+                  React.createElement(
+                    "div",
+                    { className: "tda-field" },
+                    React.createElement("label", null, "Name"),
+                    React.createElement("input", {
+                      className: "tda-input",
+                      required: true,
+                      value: wishForm.name,
+                      onChange: (e) =>
+                        setWishForm({ ...wishForm, name: e.target.value }),
+                    }),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-field" },
+                    React.createElement(
+                      "label",
+                      null,
+                      "Neighborhood (optional)",
+                    ),
+                    React.createElement("input", {
+                      className: "tda-input",
+                      value: wishForm.neighborhood,
+                      onChange: (e) =>
+                        setWishForm({
+                          ...wishForm,
+                          neighborhood: e.target.value,
+                        }),
+                    }),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-field" },
+                    React.createElement("label", null, "Notes"),
+                    React.createElement("input", {
+                      className: "tda-input",
+                      value: wishForm.notes,
+                      onChange: (e) =>
+                        setWishForm({ ...wishForm, notes: e.target.value }),
+                    }),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-modal-actions" },
+                    React.createElement(
+                      "button",
+                      {
+                        type: "button",
+                        className: "tda-secondary-btn",
+                        onClick: () => setShowWishForm(false),
+                      },
+                      "Cancel",
+                    ),
+                    React.createElement(
+                      "button",
+                      { type: "submit", className: "tda-primary-btn" },
+                      "Add to wishlist",
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
-showInfo && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setShowInfo(false) },
-React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
-React.createElement("h3", null, "How it works"),
-React.createElement("div", { className: "tda-details-desc" }, "Find bars by vibe, then add promising ones to the wishlist. When you visit a bar, tap \u201cI visited\u201d and score the experience — it moves to the leaderboard automatically. Every bar shown comes straight from Google Places, so it's real and currently open."),
-React.createElement("div", { className: "tda-details-row" },
-React.createElement("div", null,
-React.createElement("b", { style: { color: "#C9A876" } }, "Baller Mode 💰💰💰💰"),
-React.createElement("div", { style: { marginTop: "0.3rem", fontFamily: "'Inter', sans-serif", fontSize: "0.92rem", lineHeight: "1.55", color: "#D8D1C4" } }, "Allows recommendations from more expensive bars. Useful for special occasions, rooftops, and premium experiences.")),
-React.createElement("div", { style: { marginTop: "0.75rem" } },
-React.createElement("b", { style: { color: "#C9A876" } }, "Explore Mode 🌎"),
-React.createElement("div", { style: { marginTop: "0.3rem", fontFamily: "'Inter', sans-serif", fontSize: "0.92rem", lineHeight: "1.55", color: "#D8D1C4" } }, "Expands the search distance beyond the normal limit. Useful when discovering bars outside your usual area."))),
-React.createElement("div", { className: "tda-modal-actions" },
-React.createElement("button", { className: "tda-primary-btn", onClick: () => setShowInfo(false) }, "Got it")))));
+          showInfo &&
+            React.createElement(
+              "div",
+              {
+                className: "tda-modal-backdrop",
+                onClick: () => setShowInfo(false),
+              },
+              React.createElement(
+                "div",
+                { className: "tda-modal", onClick: (e) => e.stopPropagation() },
+                React.createElement("h3", null, "How it works"),
+                React.createElement(
+                  "div",
+                  { className: "tda-details-desc" },
+                  "Find bars by vibe, then add promising ones to the wishlist. When you visit a bar, tap \u201cI visited\u201d and score the experience — it moves to the leaderboard automatically. Every bar shown comes straight from Google Places, so it's real and currently open.",
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-details-row" },
+                  React.createElement(
+                    "div",
+                    null,
+                    React.createElement(
+                      "b",
+                      { style: { color: "#C9A876" } },
+                      "Baller Mode 💰💰💰💰",
+                    ),
+                    React.createElement(
+                      "div",
+                      {
+                        style: {
+                          marginTop: "0.3rem",
+                          fontFamily: "'Inter', sans-serif",
+                          fontSize: "0.92rem",
+                          lineHeight: "1.55",
+                          color: "#D8D1C4",
+                        },
+                      },
+                      "Allows recommendations from more expensive bars. Useful for special occasions, rooftops, and premium experiences.",
+                    ),
+                  ),
+                  React.createElement(
+                    "div",
+                    { style: { marginTop: "0.75rem" } },
+                    React.createElement(
+                      "b",
+                      { style: { color: "#C9A876" } },
+                      "Explore Mode 🌎",
+                    ),
+                    React.createElement(
+                      "div",
+                      {
+                        style: {
+                          marginTop: "0.3rem",
+                          fontFamily: "'Inter', sans-serif",
+                          fontSize: "0.92rem",
+                          lineHeight: "1.55",
+                          color: "#D8D1C4",
+                        },
+                      },
+                      "Expands the search distance beyond the normal limit. Useful when discovering bars outside your usual area.",
+                    ),
+                  ),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-modal-actions" },
+                  React.createElement(
+                    "button",
+                    {
+                      className: "tda-primary-btn",
+                      onClick: () => setShowInfo(false),
+                    },
+                    "Got it",
+                  ),
+                ),
+              ),
+            ),
+        );
 
-const placesModalEl = placesModal && React.createElement("div", { className: "tda-modal-backdrop", onClick: () => setPlacesModal(null) },
-React.createElement("div", { className: "tda-modal", onClick: e => e.stopPropagation() },
-React.createElement("h3", null, "Confirm the location"),
-React.createElement("p", { style: { fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.8rem", color: "#C9A876", margin: "0 0 0.15rem" } },
-"\u201c", placesModal.suggestion.name, "\u201d"),
-placesModal.suggestion.address && React.createElement("p", { style: { fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7rem", color: "#857C8E", margin: "0 0 1rem" } },
-"📍 ", placesModal.suggestion.address),
-placesModal.searching
-? React.createElement("div", { className: "tda-spinner" }, "Looking up on Google Places…")
-: placesModal.results.length === 0
-? React.createElement(React.Fragment, null,
-React.createElement("p", { className: "tda-place-none" }, "No matching open bar found on Google Places."),
-React.createElement("p", { className: "tda-place-none" }, "Double check the spelling, or it may be permanently closed."),
-React.createElement("div", { className: "tda-modal-actions" },
-React.createElement("button", { className: "tda-secondary-btn", onClick: () => setPlacesModal(null) }, "Cancel"),
-React.createElement("button", { className: "tda-primary-btn", onClick: () => { confirmPlaceSelection({}); } }, "Add anyway")))
-: React.createElement(React.Fragment, null,
-React.createElement("div", { className: "tda-place-eyebrow" }, "Select the correct location"),
-placesModal.results.map((r, i) => React.createElement("div", {
-key: i,
-className: "tda-place-result",
-onClick: () => confirmPlaceSelection(r),
-},
-React.createElement("div", { className: "tda-place-result-name" }, r.name),
-React.createElement("div", { className: "tda-place-result-addr" }, r.address))),
-React.createElement("div", { className: "tda-modal-actions", style: { marginTop: "1.25rem" } },
-React.createElement("button", { className: "tda-secondary-btn", onClick: () => setPlacesModal(null) }, "Cancel"),
-React.createElement("button", { className: "tda-secondary-btn", onClick: () => { confirmPlaceSelection({}); } }, "None of these — add anyway")))));
+        const placesModalEl =
+          placesModal &&
+          React.createElement(
+            "div",
+            {
+              className: "tda-modal-backdrop",
+              onClick: () => setPlacesModal(null),
+            },
+            React.createElement(
+              "div",
+              { className: "tda-modal", onClick: (e) => e.stopPropagation() },
+              React.createElement("h3", null, "Confirm the location"),
+              React.createElement(
+                "p",
+                {
+                  style: {
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: "0.8rem",
+                    color: "#C9A876",
+                    margin: "0 0 0.15rem",
+                  },
+                },
+                "\u201c",
+                placesModal.suggestion.name,
+                "\u201d",
+              ),
+              placesModal.suggestion.address &&
+                React.createElement(
+                  "p",
+                  {
+                    style: {
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: "0.7rem",
+                      color: "#857C8E",
+                      margin: "0 0 1rem",
+                    },
+                  },
+                  "📍 ",
+                  placesModal.suggestion.address,
+                ),
+              placesModal.searching
+                ? React.createElement(
+                    "div",
+                    { className: "tda-spinner" },
+                    "Looking up on Google Places…",
+                  )
+                : placesModal.results.length === 0
+                  ? React.createElement(
+                      React.Fragment,
+                      null,
+                      React.createElement(
+                        "p",
+                        { className: "tda-place-none" },
+                        "No matching open bar found on Google Places.",
+                      ),
+                      React.createElement(
+                        "p",
+                        { className: "tda-place-none" },
+                        "Double check the spelling, or it may be permanently closed.",
+                      ),
+                      React.createElement(
+                        "div",
+                        { className: "tda-modal-actions" },
+                        React.createElement(
+                          "button",
+                          {
+                            className: "tda-secondary-btn",
+                            onClick: () => setPlacesModal(null),
+                          },
+                          "Cancel",
+                        ),
+                        React.createElement(
+                          "button",
+                          {
+                            className: "tda-primary-btn",
+                            onClick: () => {
+                              confirmPlaceSelection({});
+                            },
+                          },
+                          "Add anyway",
+                        ),
+                      ),
+                    )
+                  : React.createElement(
+                      React.Fragment,
+                      null,
+                      React.createElement(
+                        "div",
+                        { className: "tda-place-eyebrow" },
+                        "Select the correct location",
+                      ),
+                      placesModal.results.map((r, i) =>
+                        React.createElement(
+                          "div",
+                          {
+                            key: i,
+                            className: "tda-place-result",
+                            onClick: () => confirmPlaceSelection(r),
+                          },
+                          React.createElement(
+                            "div",
+                            { className: "tda-place-result-name" },
+                            r.name,
+                          ),
+                          React.createElement(
+                            "div",
+                            { className: "tda-place-result-addr" },
+                            r.address,
+                          ),
+                        ),
+                      ),
+                      React.createElement(
+                        "div",
+                        {
+                          className: "tda-modal-actions",
+                          style: { marginTop: "1.25rem" },
+                        },
+                        React.createElement(
+                          "button",
+                          {
+                            className: "tda-secondary-btn",
+                            onClick: () => setPlacesModal(null),
+                          },
+                          "Cancel",
+                        ),
+                        React.createElement(
+                          "button",
+                          {
+                            className: "tda-secondary-btn",
+                            onClick: () => {
+                              confirmPlaceSelection({});
+                            },
+                          },
+                          "None of these — add anyway",
+                        ),
+                      ),
+                    ),
+            ),
+          );
 
-return React.createElement(React.Fragment, null, appContent, placesModalEl);
-}
-
-// ---------- Tour Map ----------
-const HEAT_GRADIENTS = {
-  visited: { 0.2: "#302938", 0.4: "#3A4F66", 0.6: "#8A6D2F", 0.8: "#C9A876", 1.0: "#E5B93F" },
-  wishlist: { 0.2: "#1F2E28", 0.4: "#2E4438", 0.6: "#3F5D4E", 0.8: "#5C8D74", 1.0: "#7FA88E" },
-};
-const HEAT_DOT_COLOR = { visited: "#C9A876", wishlist: "#7FA88E" };
-
-function TourMapView({ bars }) {
-  const mapNodeRef = useRef(null);
-  const [mode, setMode] = useState("visited");
-
-  const visitedGeo = useMemo(
-    () => bars.filter(b => b.status === "visited" && !b.disqualified && Number.isFinite(b.latitude) && Number.isFinite(b.longitude)),
-    [bars]
-  );
-  const wishlistGeo = useMemo(
-    () => bars.filter(b => b.status === "to-try" && Number.isFinite(b.latitude) && Number.isFinite(b.longitude)),
-    [bars]
-  );
-  const geoBars = mode === "visited" ? visitedGeo : wishlistGeo;
-
-  useEffect(() => {
-    if (!mapNodeRef.current || geoBars.length === 0) return;
-
-    const map = L.map(mapNodeRef.current, { scrollWheelZoom: true }).setView([40.7128, -74.006], 12);
-
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      maxZoom: 19,
-    }).addTo(map);
-
-    const points = geoBars.map(b => {
-      if (mode === "visited") {
-        const score = avgWithFood(b) ?? avgWithoutFood(b) ?? 5;
-        return [b.latitude, b.longitude, Math.max(0.25, score / 10)];
+        return React.createElement(
+          React.Fragment,
+          null,
+          appContent,
+          placesModalEl,
+        );
       }
-      return [b.latitude, b.longitude, 0.6]; // no score to weight by on the wishlist
-    });
 
-    L.heatLayer(points, {
-      radius: 32,
-      blur: 24,
-      maxZoom: 17,
-      gradient: HEAT_GRADIENTS[mode],
-    }).addTo(map);
+      // ---------- Tour Map ----------
+      const HEAT_GRADIENTS = {
+        visited: {
+          0.2: "#302938",
+          0.4: "#3A4F66",
+          0.6: "#8A6D2F",
+          0.8: "#C9A876",
+          1.0: "#E5B93F",
+        },
+        wishlist: {
+          0.2: "#1F2E28",
+          0.4: "#2E4438",
+          0.6: "#3F5D4E",
+          0.8: "#5C8D74",
+          1.0: "#7FA88E",
+        },
+      };
+      const HEAT_DOT_COLOR = { visited: "#C9A876", wishlist: "#7FA88E" };
 
-    const dotColor = HEAT_DOT_COLOR[mode];
-    geoBars.forEach(b => {
-      const score = avgWithFood(b) ?? avgWithoutFood(b);
-      const scoreLine = mode === "visited"
-        ? `<div class="tda-map-popup-score">${fmt(score)} avg</div>`
-        : '<div class="tda-map-popup-score tda-muted">Wishlist</div>';
-      L.circleMarker([b.latitude, b.longitude], {
-        radius: 6, color: dotColor, weight: 1, fillColor: dotColor, fillOpacity: 0.85,
-      })
-        .addTo(map)
-        .bindPopup(`<div class="tda-map-popup-name">${b.name}</div>${scoreLine}`);
-    });
+      function TourMapView({ bars }) {
+        const mapNodeRef = useRef(null);
+        const [mode, setMode] = useState("visited");
 
-    const bounds = L.latLngBounds(geoBars.map(b => [b.latitude, b.longitude]));
-    map.fitBounds(bounds, { padding: [40, 40] });
+        const visitedGeo = useMemo(
+          () =>
+            bars.filter(
+              (b) =>
+                b.status === "visited" &&
+                !b.disqualified &&
+                Number.isFinite(b.latitude) &&
+                Number.isFinite(b.longitude),
+            ),
+          [bars],
+        );
+        const wishlistGeo = useMemo(
+          () =>
+            bars.filter(
+              (b) =>
+                b.status === "to-try" &&
+                Number.isFinite(b.latitude) &&
+                Number.isFinite(b.longitude),
+            ),
+          [bars],
+        );
+        const geoBars = mode === "visited" ? visitedGeo : wishlistGeo;
 
-    setTimeout(() => map.invalidateSize(), 100);
+        useEffect(() => {
+          if (!mapNodeRef.current || geoBars.length === 0) return;
 
-    return () => map.remove();
-  }, [geoBars, mode]);
+          const map = L.map(mapNodeRef.current, {
+            scrollWheelZoom: true,
+          }).setView([40.7128, -74.006], 12);
 
-  return React.createElement("div", null,
-    React.createElement("div", { className: "tda-toggle", style: { marginBottom: "1rem" } },
-      React.createElement("button", { className: mode === "visited" ? "active" : "", onClick: () => setMode("visited") }, "Visited"),
-      React.createElement("button", { className: mode === "wishlist" ? "active" : "", onClick: () => setMode("wishlist") }, "Wishlist")),
-    geoBars.length === 0
-      ? React.createElement("div", { className: "tda-empty" },
-          mode === "visited"
-            ? "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."
-            : "No wishlist bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup.")
-      : React.createElement(React.Fragment, null,
-          React.createElement("div", { ref: mapNodeRef, className: "tda-heatmap-container" }),
-          React.createElement("div", { className: "tda-heatmap-note" }, geoBars.length, " bar", geoBars.length === 1 ? "" : "s", " plotted."),
-          React.createElement("div", { className: "tda-heatmap-legend" },
-            "cooler",
-            React.createElement("span", { className: "tda-heatmap-gradient", style: { background: `linear-gradient(90deg, ${Object.values(HEAT_GRADIENTS[mode]).join(",")})` } }),
-            mode === "visited" ? "top rated" : "denser cluster")));
-}
+          L.tileLayer(
+            "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            {
+              attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+              maxZoom: 19,
+            },
+          ).addTo(map);
 
-// ---------- BarCard ----------
-function BarCard({ b, rank, score, scoreLabel, isFetching, onNameClick, onEdit, editLabel, onDelete, onDisqualify }) {
-const rankClass = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
-const isWishlist = b.status === "to-try";
-const cardClass = `tda-card ${isWishlist ? "wishlist" : ""} ${b.disqualified ? "disqualified" : ""}`;
-const cleanDesc = displayDescription(b.description);
-const isLong = cleanDesc && cleanDesc.length > 140;
-const [expanded, setExpanded] = React.useState(false);
-const descText = isLong && !expanded ? cleanDesc.slice(0, 140) + "…" : cleanDesc;
-return React.createElement("div", { className: cardClass },
-React.createElement("div", { className: "tda-card-top" },
-React.createElement("div", { className: "tda-name-row" },
-rank
-? React.createElement("span", { className: `tda-rank ${rankClass}` }, rank)
-: b.disqualified && React.createElement("span", { className: "tda-rank tda-rank-na" }, "N/A"),
-React.createElement("div", { className: "tda-card-name", onClick: onNameClick },
-b.mapsLink
-? React.createElement("a", { href: b.mapsLink, target: "_blank", rel: "noreferrer", style: { textDecoration: "underline", color: "inherit" } }, b.name)
-: b.name),
-isWishlist && React.createElement("span", { className: "tda-wishlist-badge" }, "☆ wishlist")),
-score !== undefined && score !== null && React.createElement("div", null,
-React.createElement("div", { className: "tda-avg" }, b.disqualified ? "N/A" : fmt(score)),
-React.createElement("div", { className: "tda-avg-label" }, b.disqualified ? "disqualified" : scoreLabel))),
-b.disqualified && b.disqualifyReason && React.createElement("div", { className: "tda-comment" }, "Disqualified — ", b.disqualifyReason),
-b.tags && b.tags.length > 0 && React.createElement("div", { className: "tda-card-badges" },
-React.createElement("div", { className: "tda-tags" }, b.tags.map(t => React.createElement("span", { key: t, className: "tda-tag" }, t)))),
-b.neighborhood && React.createElement("div", { className: "tda-wishlist-hood" }, b.neighborhood),
-descText && React.createElement("div", null,
-React.createElement("div", { className: "tda-wishlist-desc" }, descText),
-isLong && React.createElement("button", {
-onClick: () => setExpanded(!expanded),
-style: { background: "none", border: "none", color: "#C9A876", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7rem", cursor: "pointer", padding: "0.15rem 0 0", textDecoration: "underline", textUnderlineOffset: "2px" }
-}, expanded ? "Show less" : "Read more")),
-b.status === "visited" && React.createElement("div", { className: "tda-stats" },
-React.createElement("span", null, "🎭 Vibe ", React.createElement("b", null, fmt(b.vibe))),
-React.createElement("span", null, "💰 Value ", React.createElement("b", null, fmt(b.value))),
-React.createElement("span", null, "🤝 Service ", React.createElement("b", null, fmt(b.service))),
-React.createElement("span", null, "🍽️ Food ", React.createElement("b", null, fmt(b.food))),
-React.createElement("span", null, "🍸 Drinks ", React.createElement("b", null, fmt(b.drinks))),
-b.bathroomBonus > 0 && React.createElement("span", null, "🚻 bonus ", React.createElement("b", null, fmt(b.bathroomBonus)))),
-b.happyHour && React.createElement("div", { className: "tda-comment" }, "🕔 ", b.happyHour),
-b.notes && React.createElement("div", { className: "tda-comment" }, "\"", b.notes, "\""),
-isFetching && React.createElement("div", { className: "tda-fetching" }, "finding details…"),
-React.createElement("div", { className: "tda-card-actions" },
-b.mapsLink && React.createElement("a", { className: "tda-link-btn", href: b.mapsLink, target: "_blank", rel: "noreferrer" }, "Map ↗"),
-React.createElement("button", { className: "tda-visit-btn", onClick: onEdit }, editLabel || "Edit"),
-b.status === "visited" && onDisqualify && React.createElement("button", { className: "tda-visit-btn", onClick: onDisqualify }, b.disqualified ? "Un-disqualify" : "Disqualify"),
-React.createElement("button", { className: "tda-del-btn", onClick: onDelete }, "Remove")));
-}
+          const points = geoBars.map((b) => {
+            if (mode === "visited") {
+              const score = avgWithFood(b) ?? avgWithoutFood(b) ?? 5;
+              return [b.latitude, b.longitude, Math.max(0.25, score / 10)];
+            }
+            return [b.latitude, b.longitude, 0.6]; // no score to weight by on the wishlist
+          });
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(App, null));
-</script>
-</body>
+          L.heatLayer(points, {
+            radius: 32,
+            blur: 24,
+            maxZoom: 17,
+            gradient: HEAT_GRADIENTS[mode],
+          }).addTo(map);
+
+          const dotColor = HEAT_DOT_COLOR[mode];
+          geoBars.forEach((b) => {
+            const score = avgWithFood(b) ?? avgWithoutFood(b);
+            const scoreLine =
+              mode === "visited"
+                ? `<div class="tda-map-popup-score">${fmt(score)} avg</div>`
+                : '<div class="tda-map-popup-score tda-muted">Wishlist</div>';
+            L.circleMarker([b.latitude, b.longitude], {
+              radius: 6,
+              color: dotColor,
+              weight: 1,
+              fillColor: dotColor,
+              fillOpacity: 0.85,
+            })
+              .addTo(map)
+              .bindPopup(
+                `<div class="tda-map-popup-name">${b.name}</div>${scoreLine}`,
+              );
+          });
+
+          const bounds = L.latLngBounds(
+            geoBars.map((b) => [b.latitude, b.longitude]),
+          );
+          map.fitBounds(bounds, { padding: [40, 40] });
+
+          setTimeout(() => map.invalidateSize(), 100);
+
+          return () => map.remove();
+        }, [geoBars, mode]);
+
+        return React.createElement(
+          "div",
+          null,
+          React.createElement(
+            "div",
+            { className: "tda-toggle", style: { marginBottom: "1rem" } },
+            React.createElement(
+              "button",
+              {
+                className: mode === "visited" ? "active" : "",
+                onClick: () => setMode("visited"),
+              },
+              "Visited",
+            ),
+            React.createElement(
+              "button",
+              {
+                className: mode === "wishlist" ? "active" : "",
+                onClick: () => setMode("wishlist"),
+              },
+              "Wishlist",
+            ),
+          ),
+          geoBars.length === 0
+            ? React.createElement(
+                "div",
+                { className: "tda-empty" },
+                mode === "visited"
+                  ? "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."
+                  : "No wishlist bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup.",
+              )
+            : React.createElement(
+                React.Fragment,
+                null,
+                React.createElement("div", {
+                  ref: mapNodeRef,
+                  className: "tda-heatmap-container",
+                }),
+                React.createElement(
+                  "div",
+                  { className: "tda-heatmap-note" },
+                  geoBars.length,
+                  " bar",
+                  geoBars.length === 1 ? "" : "s",
+                  " plotted.",
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-heatmap-legend" },
+                  "cooler",
+                  React.createElement("span", {
+                    className: "tda-heatmap-gradient",
+                    style: {
+                      background: `linear-gradient(90deg, ${Object.values(HEAT_GRADIENTS[mode]).join(",")})`,
+                    },
+                  }),
+                  mode === "visited" ? "top rated" : "denser cluster",
+                ),
+              ),
+        );
+      }
+
+      // ---------- BarCard ----------
+      function BarCard({
+        b,
+        rank,
+        score,
+        scoreLabel,
+        isFetching,
+        onNameClick,
+        onEdit,
+        editLabel,
+        onDelete,
+        onDisqualify,
+      }) {
+        const rankClass =
+          rank === 1
+            ? "gold"
+            : rank === 2
+              ? "silver"
+              : rank === 3
+                ? "bronze"
+                : "";
+        const isWishlist = b.status === "to-try";
+        const cardClass = `tda-card ${isWishlist ? "wishlist" : ""} ${b.disqualified ? "disqualified" : ""}`;
+        const cleanDesc = displayDescription(b.description);
+        const isLong = cleanDesc && cleanDesc.length > 140;
+        const [expanded, setExpanded] = React.useState(false);
+        const descText =
+          isLong && !expanded ? cleanDesc.slice(0, 140) + "…" : cleanDesc;
+        return React.createElement(
+          "div",
+          { className: cardClass },
+          React.createElement(
+            "div",
+            { className: "tda-card-top" },
+            React.createElement(
+              "div",
+              { className: "tda-name-row" },
+              rank
+                ? React.createElement(
+                    "span",
+                    { className: `tda-rank ${rankClass}` },
+                    rank,
+                  )
+                : b.disqualified &&
+                    React.createElement(
+                      "span",
+                      { className: "tda-rank tda-rank-na" },
+                      "N/A",
+                    ),
+              React.createElement(
+                "div",
+                { className: "tda-card-name", onClick: onNameClick },
+                b.mapsLink
+                  ? React.createElement(
+                      "a",
+                      {
+                        href: b.mapsLink,
+                        target: "_blank",
+                        rel: "noreferrer",
+                        style: {
+                          textDecoration: "underline",
+                          color: "inherit",
+                        },
+                      },
+                      b.name,
+                    )
+                  : b.name,
+              ),
+              isWishlist &&
+                React.createElement(
+                  "span",
+                  { className: "tda-wishlist-badge" },
+                  "☆ wishlist",
+                ),
+            ),
+            score !== undefined &&
+              score !== null &&
+              React.createElement(
+                "div",
+                null,
+                React.createElement(
+                  "div",
+                  { className: "tda-avg" },
+                  b.disqualified ? "N/A" : fmt(score),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-avg-label" },
+                  b.disqualified ? "disqualified" : scoreLabel,
+                ),
+              ),
+          ),
+          b.disqualified &&
+            b.disqualifyReason &&
+            React.createElement(
+              "div",
+              { className: "tda-comment" },
+              "Disqualified — ",
+              b.disqualifyReason,
+            ),
+          b.tags &&
+            b.tags.length > 0 &&
+            React.createElement(
+              "div",
+              { className: "tda-card-badges" },
+              React.createElement(
+                "div",
+                { className: "tda-tags" },
+                b.tags.map((t) =>
+                  React.createElement(
+                    "span",
+                    { key: t, className: "tda-tag" },
+                    t,
+                  ),
+                ),
+              ),
+            ),
+          b.neighborhood &&
+            React.createElement(
+              "div",
+              { className: "tda-wishlist-hood" },
+              b.neighborhood,
+            ),
+          descText &&
+            React.createElement(
+              "div",
+              null,
+              React.createElement(
+                "div",
+                { className: "tda-wishlist-desc" },
+                descText,
+              ),
+              isLong &&
+                React.createElement(
+                  "button",
+                  {
+                    onClick: () => setExpanded(!expanded),
+                    style: {
+                      background: "none",
+                      border: "none",
+                      color: "#C9A876",
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: "0.7rem",
+                      cursor: "pointer",
+                      padding: "0.15rem 0 0",
+                      textDecoration: "underline",
+                      textUnderlineOffset: "2px",
+                    },
+                  },
+                  expanded ? "Show less" : "Read more",
+                ),
+            ),
+          b.status === "visited" &&
+            React.createElement(
+              "div",
+              { className: "tda-stats" },
+              React.createElement(
+                "span",
+                null,
+                "🎭 Vibe ",
+                React.createElement("b", null, fmt(b.vibe)),
+              ),
+              React.createElement(
+                "span",
+                null,
+                "💰 Value ",
+                React.createElement("b", null, fmt(b.value)),
+              ),
+              React.createElement(
+                "span",
+                null,
+                "🤝 Service ",
+                React.createElement("b", null, fmt(b.service)),
+              ),
+              React.createElement(
+                "span",
+                null,
+                "🍽️ Food ",
+                React.createElement("b", null, fmt(b.food)),
+              ),
+              React.createElement(
+                "span",
+                null,
+                "🍸 Drinks ",
+                React.createElement("b", null, fmt(b.drinks)),
+              ),
+              b.bathroomBonus > 0 &&
+                React.createElement(
+                  "span",
+                  null,
+                  "🚻 bonus ",
+                  React.createElement("b", null, fmt(b.bathroomBonus)),
+                ),
+            ),
+          b.happyHour &&
+            React.createElement(
+              "div",
+              { className: "tda-comment" },
+              "🕔 ",
+              b.happyHour,
+            ),
+          b.notes &&
+            React.createElement(
+              "div",
+              { className: "tda-comment" },
+              '"',
+              b.notes,
+              '"',
+            ),
+          isFetching &&
+            React.createElement(
+              "div",
+              { className: "tda-fetching" },
+              "finding details…",
+            ),
+          React.createElement(
+            "div",
+            { className: "tda-card-actions" },
+            b.mapsLink &&
+              React.createElement(
+                "a",
+                {
+                  className: "tda-link-btn",
+                  href: b.mapsLink,
+                  target: "_blank",
+                  rel: "noreferrer",
+                },
+                "Map ↗",
+              ),
+            React.createElement(
+              "button",
+              { className: "tda-visit-btn", onClick: onEdit },
+              editLabel || "Edit",
+            ),
+            b.status === "visited" &&
+              onDisqualify &&
+              React.createElement(
+                "button",
+                { className: "tda-visit-btn", onClick: onDisqualify },
+                b.disqualified ? "Un-disqualify" : "Disqualify",
+              ),
+            React.createElement(
+              "button",
+              { className: "tda-del-btn", onClick: onDelete },
+              "Remove",
+            ),
+          ),
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(React.createElement(App, null));
+    </script>
+  </body>
 </html>
