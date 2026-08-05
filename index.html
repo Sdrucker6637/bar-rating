@@ -11,6 +11,9 @@
 <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>body { margin: 0; }</style>
 </head>
 <body>
@@ -708,6 +711,10 @@ React.createElement("style", null, `
 .tda-place-result-name { font-family:'Fraunces',serif; font-weight:500; font-size:1rem; color:#EDE6D9; }
 .tda-place-result-addr { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#A79EB2; margin-top:0.25rem; line-height:1.4; }
 .tda-place-none { font-size:0.85rem; color:#EDE6D9; line-height:1.5; margin-bottom:0.25rem; }
+.tda-heatmap-container { height:560px; width:100%; border-radius:8px; border:1px solid #262029; margin-top:1rem; overflow:hidden; }
+.tda-heatmap-note { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:1rem; }
+.tda-heatmap-legend { display:flex; align-items:center; gap:0.6rem; margin-top:0.6rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; }
+.tda-heatmap-swatch { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:0.3rem; }
 `),
 React.createElement("div", { className: "tda-container" },
 React.createElement("div", { className: "tda-header" },
@@ -718,6 +725,7 @@ React.createElement("div", { className: "tda-sub" }, "a running record of the ba
 React.createElement("div", { className: "tda-tabs" },
 React.createElement("button", { className: `tda-tab ${tab === "leaderboard" ? "active" : ""}`, onClick: () => setTab("leaderboard") }, "Current Leaderboard"),
 React.createElement("button", { className: `tda-tab ${tab === "find" ? "active" : ""}`, onClick: () => setTab("find") }, "Find a New Bar")),
+React.createElement("button", { className: `tda-tab ${tab === "heatmap" ? "active" : ""}`, onClick: () => setTab("heatmap") }, "Heat Map"),
 tab === "find" && React.createElement(React.Fragment, null,
 searchPanel,
 React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("wishlist") }, "+ Add to wishlist by name"),
@@ -732,6 +740,7 @@ key: b.id, b: b, isFetching: fetchingIds.has(b.id),
 onNameClick: () => { if (b.mapsLink) window.open(b.mapsLink, "_blank"); },
 onEdit: () => markVisited(b), editLabel: "I visited", onDelete: () => removeBar(b.id),
 })))),
+tab === "heatmap" && React.createElement(HeatMapView, { bars: bars || [] }),
 tab === "leaderboard" && React.createElement(React.Fragment, null,
 React.createElement("button", { className: "tda-add-btn", onClick: () => startManualAdd("visited") }, "+ Add a bar you visited & rank it"),
 filteredVisited.length > 0 && (() => {
@@ -885,6 +894,68 @@ React.createElement("button", { className: "tda-secondary-btn", onClick: () => s
 React.createElement("button", { className: "tda-secondary-btn", onClick: () => { confirmPlaceSelection({}); } }, "None of these — add anyway")))));
 
 return React.createElement(React.Fragment, null, appContent, placesModalEl);
+}
+
+// ---------- HeatMapView ----------
+function HeatMapView({ bars }) {
+  const mapNodeRef = useRef(null);
+
+  const geoBars = useMemo(
+    () => bars.filter(b => b.status === "visited" && Number.isFinite(b.latitude) && Number.isFinite(b.longitude)),
+    [bars]
+  );
+
+  useEffect(() => {
+    if (!mapNodeRef.current || geoBars.length === 0) return;
+
+    const map = L.map(mapNodeRef.current, { scrollWheelZoom: true }).setView([40.7128, -74.006], 12);
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      maxZoom: 19,
+    }).addTo(map);
+
+    const points = geoBars.map(b => {
+      const score = avgWithFood(b) ?? avgWithoutFood(b) ?? 5;
+      return [b.latitude, b.longitude, Math.max(0.25, score / 10)];
+    });
+
+    L.heatLayer(points, {
+      radius: 32,
+      blur: 24,
+      maxZoom: 17,
+      gradient: { 0.2: "#302938", 0.4: "#3A4F66", 0.6: "#8A6D2F", 0.8: "#C9A876", 1.0: "#E5B93F" },
+    }).addTo(map);
+
+    geoBars.forEach(b => {
+      const score = avgWithFood(b) ?? avgWithoutFood(b);
+      L.circleMarker([b.latitude, b.longitude], {
+        radius: 6, color: "#C9A876", weight: 1, fillColor: "#C9A876", fillOpacity: 0.85,
+      })
+        .addTo(map)
+        .bindPopup(`<b>${b.name}</b><br/>${b.disqualified ? "disqualified" : fmt(score) + " avg"}`);
+    });
+
+    const bounds = L.latLngBounds(geoBars.map(b => [b.latitude, b.longitude]));
+    map.fitBounds(bounds, { padding: [40, 40] });
+
+    // Container size isn't always settled the instant the tab mounts
+    setTimeout(() => map.invalidateSize(), 100);
+
+    return () => map.remove();
+  }, [geoBars]);
+
+  if (geoBars.length === 0) {
+    return React.createElement("div", { className: "tda-empty" },
+      "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup.");
+  }
+
+  return React.createElement("div", null,
+    React.createElement("div", { ref: mapNodeRef, className: "tda-heatmap-container" }),
+    React.createElement("div", { className: "tda-heatmap-note" }, geoBars.length, " visited bar", geoBars.length === 1 ? "" : "s", " plotted."),
+    React.createElement("div", { className: "tda-heatmap-legend" },
+      React.createElement("span", { className: "tda-heatmap-swatch", style: { background: "#3A4F66" } }), "lower rated",
+      React.createElement("span", { className: "tda-heatmap-swatch", style: { background: "#E5B93F", marginLeft: "0.8rem" } }), "top rated"));
 }
 
 // ---------- BarCard ----------
