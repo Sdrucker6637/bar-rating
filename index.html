@@ -399,14 +399,6 @@
       const DOC_PATH = { collection: "tourDeAlcoholism", doc: "sharedList" };
 
       // ---------- Crawl planning (straight-line walking-time approximation) ----------
-      function closeCrawlModal() {
-        closeCrawlModal();
-        setCrawlStops([]);
-        setCrawlError(null);
-        setCrawlStartInput("");
-        setCrawlEnrichingNames(new Set());
-      }
-
       const WALK_SPEED_MPS = 1.34; // ~4.8 km/h average walking pace
       const WALK_DETOUR_FACTOR = 1.3; // streets aren't straight lines
       const MAX_BEELINE_METERS = 600; // straight-line cutoff approximating a 10-min walk
@@ -709,6 +701,14 @@
         const [crawlEnrichingNames, setCrawlEnrichingNames] = useState(
           () => new Set(),
         );
+
+        function closeCrawlModal() {
+          setShowCrawlModal(false);
+          setCrawlStops([]);
+          setCrawlError(null);
+          setCrawlStartInput("");
+          setCrawlEnrichingNames(new Set());
+        }
         const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
 
         useEffect(() => {
@@ -908,10 +908,10 @@
               setCrawlError(
                 "Couldn't pin down that bar's location — try a different search, or leave it blank to pick automatically.",
               );
-              setShowCrawlPanel(true);
+              setShowCrawlModal(true);
               return;
             }
-            setShowCrawlPanel(true); // re-open crawl modal before planning starts
+            setShowCrawlModal(true); // re-open crawl modal before planning starts
             runCrawlPlan(merged);
           } else {
             addSuggestionToWishlist(merged);
@@ -1115,7 +1115,7 @@
           setCrawlError(null);
           setCrawlStops([]);
           if (crawlStartInput.trim()) {
-            setShowCrawlPanel(false); // close crawl modal so places picker has a clean surface
+            setShowCrawlModal(false); // close crawl modal so places picker has a clean surface
             await startPlacesLookup({
               name: crawlStartInput.trim(),
               _placeIntent: "crawlStart",
@@ -1372,7 +1372,7 @@
             "div",
             {
               className: "tda-modal-backdrop",
-              onClick: () => setShowCrawlModal(false),
+              onClick: closeCrawlModal,
             },
             React.createElement(
               "div",
@@ -1600,7 +1600,7 @@
                   "button",
                   {
                     className: "tda-secondary-btn",
-                    onClick: () => setShowCrawlModal(false),
+                    onClick: closeCrawlModal,
                   },
                   "Close",
                 ),
@@ -1981,7 +1981,7 @@
       @keyframes tda-pulse { 0%,100% { opacity:0.35; } 50% { opacity:0.9; } }
       .tda-suggestion-add { margin-top:0.7rem; font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.8rem; border-radius:5px; border:1px solid #3F5D4E; background:transparent; color:#7FA88E; cursor:pointer; width:100%; }
       .tda-suggestion-add:hover { background:#3F5D4E; color:#EDE6D9; }
-      .tda-suggestion-actions { display:flex; gap:0.5rem; margin-top:0.7rem; }
+      .tda-suggestion-actions { display:flex; gap:0.5rem; margin-top:0.7rem; flex-wrap:wrap; }
       .tda-suggestion-actions .tda-suggestion-add { margin-top:0; flex:1; }
       .tda-empty { text-align:center; padding:2.5rem 1rem; color:#857C8E; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; }
       .tda-section-heading { display:flex; align-items:center; gap:0.8rem; margin:2.25rem 0 0.25rem; }
