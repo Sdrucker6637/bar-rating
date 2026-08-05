@@ -398,6 +398,26 @@
 
       const DOC_PATH = { collection: "tourDeAlcoholism", doc: "sharedList" };
 
+      // ---------- Crawl planning (straight-line walking-time approximation) ----------
+      const WALK_SPEED_MPS = 1.34; // ~4.8 km/h average walking pace
+      const WALK_DETOUR_FACTOR = 1.3; // streets aren't straight lines
+      const MAX_BEELINE_METERS = 600; // straight-line cutoff approximating a 10-min walk
+      function haversineMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = (d) => (d * Math.PI) / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat1)) *
+            Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+      function estimateWalkMinutes(meters) {
+        return (meters * WALK_DETOUR_FACTOR) / WALK_SPEED_MPS / 60;
+      }
+
       // ---------- Scoring ----------
       function avgWithFood(b) {
         if (b.disqualified) return null;
@@ -528,6 +548,9 @@
           limit,
           noCache,
           exactLookup,
+          centerLat,
+          centerLng,
+          radiusMeters,
         } = {},
       ) {
         const cacheKey = JSON.stringify({
@@ -538,6 +561,9 @@
           exploreMode: !!exploreMode,
           limit: limit || 5,
           exactLookup: !!exactLookup,
+          centerLat,
+          centerLng,
+          radiusMeters,
         });
         if (!noCache) {
           const cached = placesCache.get(cacheKey);
@@ -556,6 +582,9 @@
               exploreMode: !!exploreMode,
               limit: limit || 5,
               exactLookup: !!exactLookup,
+              centerLat,
+              centerLng,
+              radiusMeters,
             }),
           });
           const results = await response.json();
@@ -662,7 +691,15 @@
           useState(false);
         const [visitedNameInput, setVisitedNameInput] = useState("");
         const [visitedHoodInput, setVisitedHoodInput] = useState("");
-
+        const [showCrawlPanel, setShowCrawlPanel] = useState(false);
+        const [crawlStartInput, setCrawlStartInput] = useState("");
+        const [crawlCount, setCrawlCount] = useState(3);
+        const [crawlPlanning, setCrawlPlanning] = useState(false);
+        const [crawlStops, setCrawlStops] = useState([]);
+        const [crawlError, setCrawlError] = useState(null);
+        const [crawlEnrichingNames, setCrawlEnrichingNames] = useState(
+          () => new Set(),
+        );
         const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
 
         useEffect(() => {
@@ -796,6 +833,18 @@
             setVisitedForm({ ...emptyVisitedForm, name: merged.name });
             setPlacesModal(null);
             setShowVisitedForm(true);
+          } else if (placesModal.suggestion._placeIntent === "crawlStart") {
+            setPlacesModal(null);
+            if (
+              !Number.isFinite(merged.latitude) ||
+              !Number.isFinite(merged.longitude)
+            ) {
+              setCrawlError(
+                "Couldn't pin down that bar's location — try a different search, or leave it blank to pick automatically.",
+              );
+              return;
+            }
+            runCrawlPlan(merged);
           } else {
             addSuggestionToWishlist(merged);
             setWishForm(emptyWishForm);
@@ -880,6 +929,148 @@
             });
           });
         }, []);
+
+        const enrichCrawlStop = useCallback((stop) => {
+          setCrawlEnrichingNames((s) => new Set(s).add(stop.name));
+          const prompt = `You are a NYC bar description writer.\n\nThe bar "${stop.name}" located at "${stop.address || stop.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY a single JSON object (not an array):\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
+          callGemini(prompt, null, false).then((data) => {
+            const info = Array.isArray(data) ? data[0] : data;
+            if (info) {
+              setCrawlStops((prev) =>
+                prev.map((r) =>
+                  r.name === stop.name
+                    ? {
+                        ...r,
+                        description: info.description || r.description,
+                        tags:
+                          info.tags && info.tags.length ? info.tags : r.tags,
+                        happyHour: info.happyHour || r.happyHour,
+                        neighborhood: info.neighborhood || r.neighborhood,
+                      }
+                    : r,
+                ),
+              );
+            }
+            setCrawlEnrichingNames((s) => {
+              const n = new Set(s);
+              n.delete(stop.name);
+              return n;
+            });
+          });
+        }, []);
+
+        async function runCrawlPlan(startBar) {
+          const requestedCount = crawlCount;
+          setCrawlPlanning(true);
+          const normalizedStart = {
+            name: startBar.name,
+            address: startBar.address || "",
+            latitude: startBar.latitude,
+            longitude: startBar.longitude,
+            placeId: startBar.placeId || null,
+            mapsLink: startBar.mapsLink || "",
+            neighborhood: startBar.neighborhood || "",
+            description: startBar.description || "",
+            tags: startBar.tags || [],
+            happyHour: startBar.happyHour || "",
+          };
+          if (
+            !Number.isFinite(normalizedStart.latitude) ||
+            !Number.isFinite(normalizedStart.longitude)
+          ) {
+            setCrawlPlanning(false);
+            setCrawlError(
+              "Couldn't pin down that bar's location — try a different search.",
+            );
+            return;
+          }
+
+          const stops = [normalizedStart];
+          const usedNames = new Set([
+            ...(bars || []).map((b) => b.name),
+            ...seenNames,
+            normalizedStart.name,
+          ]);
+          let truncated = false;
+
+          for (let i = 1; i < requestedCount; i++) {
+            const prev = stops[stops.length - 1];
+            const results = await fetchPlaces("great bar", {
+              limit: 10,
+              noCache: true,
+              centerLat: prev.latitude,
+              centerLng: prev.longitude,
+              radiusMeters: 900,
+            });
+            const candidates = results
+              .filter(
+                (r) =>
+                  !usedNames.has(r.name) &&
+                  Number.isFinite(r.latitude) &&
+                  Number.isFinite(r.longitude),
+              )
+              .map((r) => ({
+                ...r,
+                distanceMeters: haversineMeters(
+                  prev.latitude,
+                  prev.longitude,
+                  r.latitude,
+                  r.longitude,
+                ),
+              }))
+              .filter((r) => r.distanceMeters <= MAX_BEELINE_METERS);
+
+            if (candidates.length === 0) {
+              truncated = true;
+              break;
+            }
+            const next =
+              candidates[Math.floor(Math.random() * candidates.length)];
+            usedNames.add(next.name);
+            stops.push(next);
+          }
+
+          setSeenNames(
+            (prevSeen) => new Set([...prevSeen, ...stops.map((s) => s.name)]),
+          );
+          setCrawlStops(stops);
+          setCrawlPlanning(false);
+          setCrawlError(
+            truncated && stops.length < requestedCount
+              ? `Could only find ${stops.length} bar${stops.length === 1 ? "" : "s"} within a comfortable walk — try again for a different route.`
+              : null,
+          );
+          stops.forEach((s) => enrichCrawlStop(s));
+        }
+
+        async function startCrawlPlanning() {
+          setCrawlError(null);
+          setCrawlStops([]);
+          if (crawlStartInput.trim()) {
+            await startPlacesLookup({
+              name: crawlStartInput.trim(),
+              _placeIntent: "crawlStart",
+            });
+            return;
+          }
+          setCrawlPlanning(true);
+          const exclude = [
+            ...new Set([...(bars || []).map((b) => b.name), ...seenNames]),
+          ];
+          const vibe =
+            SURPRISE_VIBES[Math.floor(Math.random() * SURPRISE_VIBES.length)];
+          const results = await fetchPlaces(vibe, { limit: 10, noCache: true });
+          const fresh = results.filter((r) => !exclude.includes(r.name));
+          if (fresh.length === 0) {
+            setCrawlPlanning(false);
+            setCrawlError(
+              "Couldn't find a starting bar — try again, or name one yourself.",
+            );
+            return;
+          }
+          const start = fresh[Math.floor(Math.random() * fresh.length)];
+          await runCrawlPlan(start);
+        }
 
         async function runSearch() {
           setSearchResults([]);
@@ -1105,6 +1296,204 @@
           }
         }
 
+        const crawlPanel =
+          showCrawlPanel &&
+          React.createElement(
+            "div",
+            { className: "tda-search-panel" },
+            React.createElement(
+              "div",
+              { className: "tda-search-row" },
+              React.createElement("input", {
+                className: "tda-input",
+                placeholder: "Starting bar (optional)",
+                value: crawlStartInput,
+                onChange: (e) => setCrawlStartInput(e.target.value),
+                style: { flex: "1 1 220px" },
+              }),
+              React.createElement(
+                "div",
+                { className: "tda-group-stepper" },
+                React.createElement(
+                  "span",
+                  { style: { color: "#857C8E" } },
+                  "Bars",
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-group-btn",
+                    onClick: () => setCrawlCount(Math.max(2, crawlCount - 1)),
+                  },
+                  "−",
+                ),
+                React.createElement(
+                  "b",
+                  { style: { color: "#EDE6D9" } },
+                  crawlCount,
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-group-btn",
+                    onClick: () => setCrawlCount(Math.min(8, crawlCount + 1)),
+                  },
+                  "+",
+                ),
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: "tda-find-btn",
+                  onClick: startCrawlPlanning,
+                  disabled: crawlPlanning,
+                },
+                crawlPlanning ? "Planning…" : "Plan Crawl",
+              ),
+            ),
+            crawlPlanning &&
+              React.createElement(
+                "div",
+                { className: "tda-spinner" },
+                "mapping out a route…",
+              ),
+            crawlError &&
+              React.createElement(
+                "div",
+                { className: "tda-empty" },
+                crawlError,
+              ),
+            crawlStops.length > 0 &&
+              React.createElement(
+                "div",
+                { className: "tda-crawl-list" },
+                crawlStops.map((s, i) => {
+                  const isEnriching = crawlEnrichingNames.has(s.name);
+                  const desc = displayDescription(s.description);
+                  const next = crawlStops[i + 1];
+                  return React.createElement(
+                    React.Fragment,
+                    { key: s.name },
+                    React.createElement(
+                      "div",
+                      { className: "tda-crawl-stop" },
+                      React.createElement(
+                        "div",
+                        { className: "tda-crawl-stop-number" },
+                        i + 1,
+                      ),
+                      React.createElement(
+                        "div",
+                        { className: "tda-crawl-stop-content" },
+                        React.createElement(
+                          "div",
+                          { className: "tda-suggestion-name" },
+                          s.name,
+                        ),
+                        s.neighborhood &&
+                          React.createElement(
+                            "div",
+                            { className: "tda-suggestion-hood" },
+                            s.neighborhood,
+                          ),
+                        s.tags && s.tags.length > 0
+                          ? React.createElement(
+                              "div",
+                              { className: "tda-tags" },
+                              s.tags.map((t) =>
+                                React.createElement(
+                                  "span",
+                                  { key: t, className: "tda-tag" },
+                                  t,
+                                ),
+                              ),
+                            )
+                          : isEnriching &&
+                              React.createElement(
+                                "div",
+                                { className: "tda-tags" },
+                                React.createElement("span", {
+                                  className: "tda-tag tda-tag-skeleton",
+                                }),
+                                React.createElement("span", {
+                                  className: "tda-tag tda-tag-skeleton",
+                                }),
+                              ),
+                        desc
+                          ? React.createElement(
+                              "div",
+                              { className: "tda-suggestion-desc" },
+                              desc,
+                            )
+                          : isEnriching
+                            ? React.createElement(
+                                "div",
+                                {
+                                  className:
+                                    "tda-suggestion-desc tda-desc-loading",
+                                },
+                                "finding details…",
+                              )
+                            : React.createElement(
+                                "div",
+                                { className: "tda-suggestion-desc" },
+                                s.address || "",
+                              ),
+                        React.createElement(
+                          "div",
+                          { className: "tda-suggestion-actions" },
+                          s.mapsLink &&
+                            React.createElement(
+                              "a",
+                              {
+                                className: "tda-link-btn",
+                                href: s.mapsLink,
+                                target: "_blank",
+                                rel: "noreferrer",
+                              },
+                              "Map ↗",
+                            ),
+                          React.createElement(
+                            "button",
+                            {
+                              className: "tda-suggestion-add",
+                              onClick: () => {
+                                addSuggestionToWishlist(s);
+                                setCrawlStops((prev) =>
+                                  prev.filter((x) => x.name !== s.name),
+                                );
+                              },
+                            },
+                            "+ Wishlist",
+                          ),
+                        ),
+                      ),
+                    ),
+                    next &&
+                      React.createElement(
+                        "div",
+                        { className: "tda-crawl-connector" },
+                        "↓ ~",
+                        Math.max(
+                          1,
+                          Math.round(
+                            estimateWalkMinutes(
+                              haversineMeters(
+                                s.latitude,
+                                s.longitude,
+                                next.latitude,
+                                next.longitude,
+                              ),
+                            ),
+                          ),
+                        ),
+                        " min walk",
+                      ),
+                  );
+                }),
+              ),
+          );
+
         const searchPanel = React.createElement(
           "div",
           { className: "tda-search-panel" },
@@ -1209,6 +1598,63 @@
                   "span",
                   { className: "tda-search-btn-hint" },
                   "Discover random bars based on your filters.",
+                ),
+              ),
+              React.createElement(
+                "div",
+                { className: "tda-search-btn-group" },
+                React.createElement(
+                  "div",
+                  { className: "tda-search-btn-wrap" },
+                  React.createElement(
+                    "button",
+                    {
+                      className: "tda-find-btn",
+                      onClick: runSearch,
+                      disabled: searching || !vibeQuery.trim(),
+                    },
+                    searching ? "Searching…" : "Find Bars",
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "tda-search-btn-hint" },
+                    "Search for a specific bar or location.",
+                  ),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-search-btn-wrap" },
+                  React.createElement(
+                    "button",
+                    {
+                      className: "tda-find-btn tda-surprise-btn",
+                      onClick: runRandomSearch,
+                      disabled: searching,
+                    },
+                    "🎲 Surprise Us",
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "tda-search-btn-hint" },
+                    "Discover random bars based on your filters.",
+                  ),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-search-btn-wrap" },
+                  React.createElement(
+                    "button",
+                    {
+                      className: `tda-find-btn tda-crawl-btn ${showCrawlPanel ? "active" : ""}`,
+                      onClick: () => setShowCrawlPanel(!showCrawlPanel),
+                    },
+                    "🚶 Plan a Crawl",
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "tda-search-btn-hint" },
+                    "Chain nearby bars into a walking route.",
+                  ),
                 ),
               ),
             ),
@@ -1380,127 +1826,144 @@
             "style",
             null,
             `
-.tda-root { min-height:100vh; background:linear-gradient(180deg,#14121A 0%,#0E0D10 55%); color:#EDE6D9; font-family:'Inter',sans-serif; padding-bottom:4rem; }
-.tda-container { max-width:980px; margin:0 auto; padding:0 1.25rem; }
-.tda-header { padding:3rem 0 1.75rem; text-align:center; border-bottom:1px solid #262029; }
-.tda-title { font-family:'Fraunces',serif; font-weight:500; font-size:clamp(1.9rem,5.5vw,2.9rem); letter-spacing:-0.01em; color:#EDE6D9; margin:0; }
-.tda-title .accent { color:#C9A876; font-style:italic; font-weight:500; }
-.tda-info-btn { margin-left:0.4rem; width:22px; height:22px; border-radius:50%; border:1px solid #857C8E; background:transparent; color:#C9A876; font:600 0.72rem 'IBM Plex Mono',monospace; cursor:pointer; vertical-align:middle; }
-.tda-sub { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#857C8E; margin-top:0.7rem; }
-.tda-tabs { display:flex; gap:0.5rem; margin:1.75rem 0; }
-.tda-tab { flex:1 1 0; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase; padding:0.65rem 0.8rem; border-radius:3px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; transition:all 0.15s ease; }
-.tda-tab:hover { border-color:#B8965F; color:#EDE6D9; }
-.tda-tab.active { background:#B8965F; color:#16130F; border-color:#B8965F; font-weight:600; }
-.tda-champion { border:1px solid #B8965F; border-radius:4px; padding:1.1rem 1.4rem; margin:1.75rem 0 1.25rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; background:linear-gradient(135deg,rgba(184,150,95,0.08),transparent); flex-wrap:wrap; }
-.tda-champion-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase; color:#C9A876; }
-.tda-champion-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.6rem; margin-top:0.25rem; }
-.tda-champion-score { font-family:'IBM Plex Mono',monospace; font-size:2rem; color:#C9A876; font-weight:600; }
-.tda-controls { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; margin:1rem 0; background:#17141B; border:1px solid #262029; border-radius:8px; padding:0.9rem 1rem; }
-.tda-input,.tda-select { background:#0E0D10; border:1px solid #302938; color:#EDE6D9; border-radius:5px; padding:0.5rem 0.7rem; font-family:'Inter',sans-serif; font-size:0.85rem; }
-.tda-input:focus,.tda-select:focus { outline:none; border-color:#B8965F; }
-.tda-map-wrap { position:relative; }
-.tda-map-toggle-overlay { position:absolute; top:12px; right:12px; z-index:1000; background:rgba(23,20,27,0.9); backdrop-filter:blur(4px); border-radius:999px; box-shadow:0 2px 10px rgba(0,0,0,0.35); }
-.tda-toggle { display:inline-flex; border:1px solid #302938; border-radius:999px; overflow:hidden; }
-.tda-toggle button { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.85rem; background:transparent; color:#A79EB2; border:none; cursor:pointer; }
-.tda-toggle button.active { background:#B8965F; color:#16130F; font-weight:600; }
-.tda-chip { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.38rem 0.75rem; border-radius:999px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; }
-.tda-chip.active { background:#3F5D4E; border-color:#3F5D4E; color:#EDE6D9; }
-.tda-chip-baller.active { background:#8A6D2F; border-color:#8A6D2F; }
-.tda-chip-explore.active { background:#3A4F66; border-color:#3A4F66; }
-.tda-group-stepper { display:flex; align-items:center; gap:0.4rem; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; }
-.tda-group-btn { width:26px; height:26px; border-radius:5px; border:1px solid #302938; background:#0E0D10; color:#B8965F; cursor:pointer; font-size:1rem; line-height:1; }
-.tda-list { display:flex; flex-direction:column; gap:0.7rem; margin-top:1rem; }
-.tda-card { background:#17141B; border:1px solid #262029; border-radius:8px; padding:1rem 1.2rem; }
-.tda-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap; }
-.tda-rank { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; font-weight:600; border:1.5px solid #302938; color:#A79EB2; margin-right:0.6rem; flex-shrink:0; }
-.tda-rank.gold { border-color:#C9A876; color:#C9A876; }
-.tda-rank.silver { border-color:#B9B6BC; color:#C9C6CE; }
-.tda-rank.bronze { border-color:#A9784F; color:#C08E5F; }
-.tda-rank-na { border-color:#5D5666; color:#857C8E; font-size:0.62rem; }
-.tda-name-row { display:flex; align-items:center; gap:0.5rem; }
-.tda-card-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.1rem; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
-.tda-card-name:hover { color:#C9A876; opacity:0.8; }
-.tda-wishlist-badge { font-family:'IBM Plex Mono',monospace; font-size:0.62rem; letter-spacing:0.04em; color:#7FA88E; text-transform:uppercase; }
-.tda-wishlist-hood { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#C9A876; margin:0.3rem 0 0; }
-.tda-wishlist-desc { font-size:0.85rem; color:#A79EB2; line-height:1.45; margin-top:0.35rem; }
-.tda-card.wishlist { border-left:3px solid #3F5D4E; }
-.tda-card.disqualified { opacity:0.7; border-style:dashed; }
-.tda-card-badges { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.3rem; }
-.tda-avg { font-family:'IBM Plex Mono',monospace; font-size:1.3rem; font-weight:600; color:#C9A876; text-align:right; }
-.tda-avg-label { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.06em; color:#857C8E; text-align:right; }
-.tda-stats { display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.7rem; font-family:'IBM Plex Mono',monospace; font-size:0.76rem; color:#A79EB2; }
-.tda-stats span b { color:#EDE6D9; }
-.tda-comment { margin-top:0.5rem; font-size:0.85rem; color:#A79EB2; font-style:italic; }
-.tda-tags { display:flex; gap:0.35rem; flex-wrap:wrap; }
-.tda-tag { font-family:'IBM Plex Mono',monospace; font-size:0.66rem; padding:0.14rem 0.55rem; border-radius:999px; background:#262029; color:#A79EB2; }
-.tda-card-actions { display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap; }
-.tda-link-btn,.tda-edit-btn,.tda-del-btn,.tda-visit-btn { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; padding:0.35rem 0.7rem; border-radius:5px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; text-decoration:none; }
-.tda-link-btn:hover,.tda-edit-btn:hover,.tda-visit-btn:hover { border-color:#B8965F; color:#EDE6D9; }
-.tda-del-btn:hover { border-color:#9A4B4B; color:#C77676; }
-.tda-fetching { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-top:0.4rem; }
-.tda-add-btn { font-family:'IBM Plex Mono',monospace; font-size:0.78rem; padding:0.6rem 1.1rem; border-radius:5px; border:1px dashed #302938; background:transparent; color:#B8965F; cursor:pointer; width:100%; margin-top:0.75rem; }
-.tda-add-btn:hover { border-color:#B8965F; background:rgba(184,150,95,0.05); }
-.tda-search-panel { background:#17141B; border:1px solid #262029; border-radius:8px; padding:1.1rem; margin:1rem 0; }
-.tda-search-row { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; }
-.tda-find-btn { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; padding:0.6rem 1.2rem; border-radius:999px; border:none; background:#B8965F; color:#16130F; font-weight:600; cursor:pointer; }
-.tda-find-btn:hover { background:#C9A876; }
-.tda-find-btn:disabled { opacity:0.5; cursor:default; }
-.tda-surprise-btn { background:transparent; border:1px solid #B8965F; color:#C9A876; }
-.tda-surprise-btn:hover { background:rgba(184,150,95,0.12); }
-.tda-search-btn-group { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:flex-start; }
-.tda-search-btn-wrap { display:flex; flex-direction:column; gap:0.2rem; }
-.tda-search-btn-hint { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#5D5666; white-space:nowrap; }
-.tda-suggestion-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:0.75rem; margin-top:1.1rem; }
-.tda-suggestion-card { border:1px solid #302938; border-radius:8px; padding:0.9rem; background:#0E0D10; }
-.tda-suggestion-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.05rem; }
-.tda-suggestion-hood { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-top:0.1rem; }
-.tda-suggestion-desc { font-size:0.82rem; color:#A79EB2; margin-top:0.5rem; line-height:1.4; }
-.tda-desc-loading { color:#5D5666; font-style:italic; animation:tda-pulse 1.4s ease-in-out infinite; }
-.tda-tag-skeleton { background:#1E1A24; color:transparent; width:3.2rem; display:inline-block; animation:tda-pulse 1.4s ease-in-out infinite; }
-@keyframes tda-pulse { 0%,100% { opacity:0.35; } 50% { opacity:0.9; } }
-.tda-suggestion-add { margin-top:0.7rem; font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.8rem; border-radius:5px; border:1px solid #3F5D4E; background:transparent; color:#7FA88E; cursor:pointer; width:100%; }
-.tda-suggestion-add:hover { background:#3F5D4E; color:#EDE6D9; }
-.tda-suggestion-actions { display:flex; gap:0.5rem; margin-top:0.7rem; }
-.tda-suggestion-actions .tda-suggestion-add { margin-top:0; flex:1; }
-.tda-empty { text-align:center; padding:2.5rem 1rem; color:#857C8E; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; }
-.tda-section-heading { display:flex; align-items:center; gap:0.8rem; margin:2.25rem 0 0.25rem; }
-.tda-section-heading h2 { font-family:'Fraunces',serif; font-weight:500; font-size:1.15rem; margin:0; color:#EDE6D9; white-space:nowrap; }
-.tda-section-heading .tda-rule { flex:1; height:1px; background:#262029; }
-.tda-section-count { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; }
-.tda-modal-backdrop { position:fixed; inset:0; background:rgba(6,5,7,0.8); display:flex; align-items:center; justify-content:center; padding:1rem; z-index:50; }
-.tda-modal { background:#17141B; border:1px solid #302938; border-radius:10px; padding:1.5rem; max-width:460px; width:100%; max-height:85vh; overflow-y:auto; }
-.tda-modal h3 { font-family:'Fraunces',serif; font-weight:500; margin-top:0; color:#EDE6D9; }
-.tda-field { display:flex; flex-direction:column; gap:0.3rem; margin-bottom:0.7rem; }
-.tda-field label { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:#857C8E; }
-.tda-field-row { display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; }
-.tda-modal-actions { display:flex; gap:0.6rem; margin-top:1rem; }
-.tda-primary-btn { flex:1; font-family:'IBM Plex Mono',monospace; font-weight:600; padding:0.65rem; border-radius:5px; border:none; background:#B8965F; color:#16130F; cursor:pointer; }
-.tda-secondary-btn { flex:1; font-family:'IBM Plex Mono',monospace; padding:0.65rem; border-radius:5px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; }
-.tda-details-desc { margin-top:0.7rem; line-height:1.55; color:#D8D1C4; font-size:0.92rem; }
-.tda-details-row { margin-top:0.9rem; font-family:'IBM Plex Mono',monospace; font-size:0.78rem; color:#A79EB2; display:flex; flex-direction:column; gap:0.35rem; }
-.tda-spinner { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; color:#857C8E; padding:1.5rem 0; text-align:center; }
-.tda-footnote { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#5D5666; margin-top:2.5rem; }
-.tda-place-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase; color:#EDE6D9; margin-bottom:0.9rem; }
-.tda-place-result { border:1px solid #302938; border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.5rem; cursor:pointer; background:#0E0D10; transition:border-color 0.15s, background 0.15s; }
-.tda-place-result:hover { border-color:#B8965F; background:#141118; }
-.tda-place-result-name { font-family:'Fraunces',serif; font-weight:500; font-size:1rem; color:#EDE6D9; }
-.tda-place-result-addr { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#A79EB2; margin-top:0.25rem; line-height:1.4; }
-.tda-place-none { font-size:0.85rem; color:#EDE6D9; line-height:1.5; margin-bottom:0.25rem; }
-.tda-heatmap-container { height:560px; width:100%; border-radius:8px; border:1px solid #262029; margin-top:1rem; overflow:hidden; }
-.tda-heatmap-note { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:1rem; }
-.tda-heatmap-legend { display:flex; align-items:center; gap:0.6rem; margin-top:0.6rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; }
-.tda-heatmap-swatch { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:0.3rem; }
-.tda-heatmap-container { height:560px; width:100%; border-radius:8px; border:1px solid #262029; margin-top:1rem; overflow:hidden; }
-.tda-heatmap-note { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:1rem; }
-.tda-heatmap-legend { display:flex; align-items:center; gap:0.6rem; margin-top:0.6rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; }
-.tda-heatmap-gradient { width:120px; height:8px; border-radius:4px; }
-.tda-heatmap-container .leaflet-popup-content-wrapper { background:#17141B; color:#EDE6D9; border-radius:8px; border:1px solid #302938; box-shadow:0 4px 16px rgba(0,0,0,0.4); }
-.tda-heatmap-container .leaflet-popup-tip { background:#17141B; border:1px solid #302938; }
-.tda-heatmap-container .leaflet-popup-close-button { color:#857C8E !important; }
-.tda-map-popup-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.02rem; color:#EDE6D9; }
-.tda-map-popup-score { font-family:'IBM Plex Mono',monospace; font-size:0.82rem; color:#C9A876; margin-top:0.3rem; }
-.tda-map-popup-score.tda-muted { color:#A79EB2; }
-`,
+      .tda-root { min-height:100vh; background:linear-gradient(180deg,#14121A 0%,#0E0D10 55%); color:#EDE6D9; font-family:'Inter',sans-serif; padding-bottom:4rem; }
+      .tda-container { max-width:980px; margin:0 auto; padding:0 1.25rem; }
+      .tda-header { padding:3rem 0 1.75rem; text-align:center; border-bottom:1px solid #262029; }
+      .tda-title { font-family:'Fraunces',serif; font-weight:500; font-size:clamp(1.9rem,5.5vw,2.9rem); letter-spacing:-0.01em; color:#EDE6D9; margin:0; }
+      .tda-title .accent { color:#C9A876; font-style:italic; font-weight:500; }
+      .tda-info-btn { margin-left:0.4rem; width:22px; height:22px; border-radius:50%; border:1px solid #857C8E; background:transparent; color:#C9A876; font:600 0.72rem 'IBM Plex Mono',monospace; cursor:pointer; vertical-align:middle; }
+      .tda-sub { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#857C8E; margin-top:0.7rem; }
+      .tda-tabs { display:flex; gap:0.5rem; margin:1.75rem 0; }
+      .tda-tab { flex:1 1 0; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase; padding:0.65rem 0.8rem; border-radius:3px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; transition:all 0.15s ease; }
+      .tda-tab:hover { border-color:#B8965F; color:#EDE6D9; }
+      .tda-tab.active { background:#B8965F; color:#16130F; border-color:#B8965F; font-weight:600; }
+      .tda-champion { border:1px solid #B8965F; border-radius:4px; padding:1.1rem 1.4rem; margin:1.75rem 0 1.25rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; background:linear-gradient(135deg,rgba(184,150,95,0.08),transparent); flex-wrap:wrap; }
+      .tda-champion-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase; color:#C9A876; }
+      .tda-champion-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.6rem; margin-top:0.25rem; }
+      .tda-champion-score { font-family:'IBM Plex Mono',monospace; font-size:2rem; color:#C9A876; font-weight:600; }
+      .tda-controls { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; margin:1rem 0; background:#17141B; border:1px solid #262029; border-radius:8px; padding:0.9rem 1rem; }
+      .tda-input,.tda-select { background:#0E0D10; border:1px solid #302938; color:#EDE6D9; border-radius:5px; padding:0.5rem 0.7rem; font-family:'Inter',sans-serif; font-size:0.85rem; }
+      .tda-input:focus,.tda-select:focus { outline:none; border-color:#B8965F; }
+      .tda-map-wrap { position:relative; }
+      .tda-map-toggle-overlay { position:absolute; top:12px; right:12px; z-index:1000; background:rgba(23,20,27,0.9); backdrop-filter:blur(4px); border-radius:999px; box-shadow:0 2px 10px rgba(0,0,0,0.35); }
+      .tda-toggle { display:inline-flex; border:1px solid #302938; border-radius:999px; overflow:hidden; }
+      .tda-toggle button { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.85rem; background:transparent; color:#A79EB2; border:none; cursor:pointer; }
+      .tda-toggle button.active { background:#B8965F; color:#16130F; font-weight:600; }
+      .tda-chip { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.38rem 0.75rem; border-radius:999px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; }
+      .tda-chip.active { background:#3F5D4E; border-color:#3F5D4E; color:#EDE6D9; }
+      .tda-chip-baller.active { background:#8A6D2F; border-color:#8A6D2F; }
+      .tda-chip-explore.active { background:#3A4F66; border-color:#3A4F66; }
+      .tda-group-stepper { display:flex; align-items:center; gap:0.4rem; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; }
+      .tda-group-btn { width:26px; height:26px; border-radius:5px; border:1px solid #302938; background:#0E0D10; color:#B8965F; cursor:pointer; font-size:1rem; line-height:1; }
+      .tda-list { display:flex; flex-direction:column; gap:0.7rem; margin-top:1rem; }
+      .tda-card { background:#17141B; border:1px solid #262029; border-radius:8px; padding:1rem 1.2rem; }
+      .tda-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap; }
+      .tda-rank { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; font-weight:600; border:1.5px solid #302938; color:#A79EB2; margin-right:0.6rem; flex-shrink:0; }
+      .tda-rank.gold { border-color:#C9A876; color:#C9A876; }
+      .tda-rank.silver { border-color:#B9B6BC; color:#C9C6CE; }
+      .tda-rank.bronze { border-color:#A9784F; color:#C08E5F; }
+      .tda-rank-na { border-color:#5D5666; color:#857C8E; font-size:0.62rem; }
+      .tda-name-row { display:flex; align-items:center; gap:0.5rem; }
+      .tda-card-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.1rem; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+      .tda-card-name:hover { color:#C9A876; opacity:0.8; }
+      .tda-wishlist-badge { font-family:'IBM Plex Mono',monospace; font-size:0.62rem; letter-spacing:0.04em; color:#7FA88E; text-transform:uppercase; }
+      .tda-wishlist-hood { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#C9A876; margin:0.3rem 0 0; }
+      .tda-wishlist-desc { font-size:0.85rem; color:#A79EB2; line-height:1.45; margin-top:0.35rem; }
+      .tda-card.wishlist { border-left:3px solid #3F5D4E; }
+      .tda-card.disqualified { opacity:0.7; border-style:dashed; }
+      .tda-card-badges { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.3rem; }
+      .tda-avg { font-family:'IBM Plex Mono',monospace; font-size:1.3rem; font-weight:600; color:#C9A876; text-align:right; }
+      .tda-avg-label { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.06em; color:#857C8E; text-align:right; }
+      .tda-stats { display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.7rem; font-family:'IBM Plex Mono',monospace; font-size:0.76rem; color:#A79EB2; }
+      .tda-stats span b { color:#EDE6D9; }
+      .tda-comment { margin-top:0.5rem; font-size:0.85rem; color:#A79EB2; font-style:italic; }
+      .tda-tags { display:flex; gap:0.35rem; flex-wrap:wrap; }
+      .tda-tag { font-family:'IBM Plex Mono',monospace; font-size:0.66rem; padding:0.14rem 0.55rem; border-radius:999px; background:#262029; color:#A79EB2; }
+      .tda-card-actions { display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap; }
+      .tda-link-btn,.tda-edit-btn,.tda-del-btn,.tda-visit-btn { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; padding:0.35rem 0.7rem; border-radius:5px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; text-decoration:none; }
+      .tda-link-btn:hover,.tda-edit-btn:hover,.tda-visit-btn:hover { border-color:#B8965F; color:#EDE6D9; }
+      .tda-del-btn:hover { border-color:#9A4B4B; color:#C77676; }
+      .tda-fetching { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-top:0.4rem; }
+      .tda-add-btn { font-family:'IBM Plex Mono',monospace; font-size:0.78rem; padding:0.6rem 1.1rem; border-radius:5px; border:1px dashed #302938; background:transparent; color:#B8965F; cursor:pointer; width:100%; margin-top:0.75rem; }
+      .tda-add-btn:hover { border-color:#B8965F; background:rgba(184,150,95,0.05); }
+      .tda-search-panel { background:#17141B; border:1px solid #262029; border-radius:8px; padding:1.1rem; margin:1rem 0; }
+      .tda-search-row { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; }
+      .tda-find-btn { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; padding:0.6rem 1.2rem; border-radius:999px; border:none; background:#B8965F; color:#16130F; font-weight:600; cursor:pointer; }
+      .tda-find-btn:hover { background:#C9A876; }
+      .tda-find-btn:disabled { opacity:0.5; cursor:default; }
+      .tda-surprise-btn { background:transparent; border:1px solid #B8965F; color:#C9A876; }
+      .tda-surprise-btn:hover { background:rgba(184,150,95,0.12); }
+      .tda-search-btn-group { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:flex-start; }
+      .tda-search-btn-wrap { display:flex; flex-direction:column; gap:0.2rem; }
+      .tda-search-btn-hint { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#5D5666; white-space:nowrap; }
+      .tda-suggestion-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:0.75rem; margin-top:1.1rem; }
+      .tda-suggestion-card { border:1px solid #302938; border-radius:8px; padding:0.9rem; background:#0E0D10; }
+      .tda-suggestion-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.05rem; }
+      .tda-suggestion-hood { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; margin-top:0.1rem; }
+      .tda-suggestion-desc { font-size:0.82rem; color:#A79EB2; margin-top:0.5rem; line-height:1.4; }
+      .tda-desc-loading { color:#5D5666; font-style:italic; animation:tda-pulse 1.4s ease-in-out infinite; }
+      .tda-tag-skeleton { background:#1E1A24; color:transparent; width:3.2rem; display:inline-block; animation:tda-pulse 1.4s ease-in-out infinite; }
+      @keyframes tda-pulse { 0%,100% { opacity:0.35; } 50% { opacity:0.9; } }
+      .tda-suggestion-add { margin-top:0.7rem; font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.8rem; border-radius:5px; border:1px solid #3F5D4E; background:transparent; color:#7FA88E; cursor:pointer; width:100%; }
+      .tda-suggestion-add:hover { background:#3F5D4E; color:#EDE6D9; }
+      .tda-suggestion-actions { display:flex; gap:0.5rem; margin-top:0.7rem; }
+      .tda-suggestion-actions .tda-suggestion-add { margin-top:0; flex:1; }
+      .tda-empty { text-align:center; padding:2.5rem 1rem; color:#857C8E; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; }
+      .tda-section-heading { display:flex; align-items:center; gap:0.8rem; margin:2.25rem 0 0.25rem; }
+      .tda-section-heading h2 { font-family:'Fraunces',serif; font-weight:500; font-size:1.15rem; margin:0; color:#EDE6D9; white-space:nowrap; }
+      .tda-section-heading .tda-rule { flex:1; height:1px; background:#262029; }
+      .tda-section-count { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; }
+      .tda-modal-backdrop { position:fixed; inset:0; background:rgba(6,5,7,0.8); display:flex; align-items:center; justify-content:center; padding:1rem; z-index:50; }
+      .tda-modal { background:#17141B; border:1px solid #302938; border-radius:10px; padding:1.5rem; max-width:460px; width:100%; max-height:85vh; overflow-y:auto; }
+      .tda-modal h3 { font-family:'Fraunces',serif; font-weight:500; margin-top:0; color:#EDE6D9; }
+      .tda-field { display:flex; flex-direction:column; gap:0.3rem; margin-bottom:0.7rem; }
+      .tda-field label { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:#857C8E; }
+      .tda-field-row { display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; }
+      .tda-modal-actions { display:flex; gap:0.6rem; margin-top:1rem; }
+      .tda-primary-btn { flex:1; font-family:'IBM Plex Mono',monospace; font-weight:600; padding:0.65rem; border-radius:5px; border:none; background:#B8965F; color:#16130F; cursor:pointer; }
+      .tda-secondary-btn { flex:1; font-family:'IBM Plex Mono',monospace; padding:0.65rem; border-radius:5px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; }
+      .tda-details-desc { margin-top:0.7rem; line-height:1.55; color:#D8D1C4; font-size:0.92rem; }
+      .tda-details-row { margin-top:0.9rem; font-family:'IBM Plex Mono',monospace; font-size:0.78rem; color:#A79EB2; display:flex; flex-direction:column; gap:0.35rem; }
+      .tda-spinner { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; color:#857C8E; padding:1.5rem 0; text-align:center; }
+      .tda-footnote { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#5D5666; margin-top:2.5rem; }
+      .tda-place-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase; color:#EDE6D9; margin-bottom:0.9rem; }
+      .tda-place-result { border:1px solid #302938; border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.5rem; cursor:pointer; background:#0E0D10; transition:border-color 0.15s, background 0.15s; }
+      .tda-place-result:hover { border-color:#B8965F; background:#141118; }
+      .tda-place-result-name { font-family:'Fraunces',serif; font-weight:500; font-size:1rem; color:#EDE6D9; }
+      .tda-place-result-addr { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#A79EB2; margin-top:0.25rem; line-height:1.4; }
+      .tda-place-none { font-size:0.85rem; color:#EDE6D9; line-height:1.5; margin-bottom:0.25rem; }
+      .tda-heatmap-container { height:560px; width:100%; border-radius:8px; border:1px solid #262029; margin-top:1rem; overflow:hidden; }
+      .tda-heatmap-note { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:1rem; }
+      .tda-heatmap-legend { display:flex; align-items:center; gap:0.6rem; margin-top:0.6rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; }
+      .tda-heatmap-swatch { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:0.3rem; }
+      .tda-heatmap-container { height:560px; width:100%; border-radius:8px; border:1px solid #262029; margin-top:1rem; overflow:hidden; }
+      .tda-heatmap-note { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; margin-top:1rem; }
+      .tda-heatmap-legend { display:flex; align-items:center; gap:0.6rem; margin-top:0.6rem; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#857C8E; }
+      .tda-heatmap-gradient { width:120px; height:8px; border-radius:4px; }
+      .tda-heatmap-container .leaflet-popup-content-wrapper { background:#17141B; color:#EDE6D9; border-radius:8px; border:1px solid #302938; box-shadow:0 4px 16px rgba(0,0,0,0.4); }
+      .tda-heatmap-container .leaflet-popup-tip { background:#17141B; border:1px solid #302938; }
+      .tda-heatmap-container .leaflet-popup-close-button { color:#857C8E !important; }
+      .tda-map-popup-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.02rem; color:#EDE6D9; }
+      .tda-map-popup-score { font-family:'IBM Plex Mono',monospace; font-size:0.82rem; color:#C9A876; margin-top:0.3rem; }
+      .tda-map-popup-score.tda-muted { color:#A79EB2; }
+      .tda-crawl-list { display:flex; flex-direction:column; gap:0; margin-top:1.1rem; }
+      .tda-crawl-stop { display:flex; gap:0.8rem; align-items:flex-start; }
+      .tda-crawl-stop-number { flex-shrink:0; width:28px; height:28px; border-radius:50%; background:#B8965F; color:#16130F; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.85rem; display:flex; align-items:center; justify-content:center; }
+      .tda-crawl-connector { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; padding:0.4rem 0; }
+      .tda-crawl-btn { background:transparent; border:1px solid #7FA88E; color:#7FA88E; }
+      .tda-crawl-btn:hover { background:rgba(127,168,142,0.12); }
+      .tda-crawl-btn.active { background:#3F5D4E; border-color:#3F5D4E; color:#EDE6D9; }
+      .tda-crawl-list { display:flex; flex-direction:column; gap:0; margin-top:1.1rem; }
+      .tda-crawl-stop { display:flex; gap:1rem; align-items:flex-start; padding:1.1rem 1.3rem; border:1px solid #302938; border-radius:8px; background:#0E0D10; border-left:3px solid #B8965F; }
+      .tda-crawl-stop-content { flex:1; min-width:0; }
+      .tda-crawl-stop-number { flex-shrink:0; width:30px; height:30px; border-radius:50%; background:#B8965F; color:#16130F; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.85rem; display:flex; align-items:center; justify-content:center; margin-top:0.1rem; }
+      .tda-crawl-stop .tda-suggestion-name { font-size:1.08rem; }
+      .tda-crawl-stop .tda-suggestion-hood { margin-top:0.25rem; }
+      .tda-crawl-stop .tda-tags { margin-top:0.65rem; }
+      .tda-crawl-stop .tda-suggestion-desc { margin-top:0.65rem; line-height:1.55; }
+      .tda-crawl-stop .tda-suggestion-actions { margin-top:1rem; }
+      .tda-crawl-connector { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; padding:0.6rem 0; }
+      `,
           ),
           React.createElement(
             "div",
@@ -1568,6 +2031,7 @@
                 React.Fragment,
                 null,
                 searchPanel,
+                crawlPanel,
                 React.createElement(
                   "button",
                   {

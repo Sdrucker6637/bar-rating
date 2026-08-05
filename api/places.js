@@ -49,13 +49,13 @@ function hashString(str) {
   }
   return hash.toString(16);
 }
-function cacheKeyFor(textQuery, exploreMode) {
+function cacheKeyFor(textQuery, exploreMode, centerKey) {
   const normalized = textQuery.trim().toLowerCase().replace(/\s+/g, " ");
   const slug = normalized
     .replace(/[^a-z0-9]+/g, "-")
     .slice(0, 60)
     .replace(/^-+|-+$/g, "");
-  return `${slug || "q"}-${exploreMode ? "explore" : "normal"}-${hashString(normalized + "|" + exploreMode)}`;
+  return `${slug || "q"}-${exploreMode ? "explore" : "normal"}-${centerKey || "nyc"}-${hashString(normalized + "|" + exploreMode + "|" + (centerKey || ""))}`;
 }
 
 // ---------- Firestore REST <-> JS value conversion ----------
@@ -200,6 +200,9 @@ module.exports = async function handler(req, res) {
     exploreMode = false,
     limit = 5,
     exactLookup = false,
+    centerLat,
+    centerLng,
+    radiusMeters,
   } = req.body || {};
 
   if (!query || !String(query).trim()) {
@@ -211,7 +214,27 @@ module.exports = async function handler(req, res) {
     ? [query, neighborhood, address].filter(Boolean).join(", ")
     : [query, neighborhood, address].filter(Boolean).join(", ") + " bar";
   const maxResultCount = Math.min(Math.max(Number(limit) || 5, 1), 10);
-  const cacheDocId = projectId ? cacheKeyFor(textQuery, exploreMode) : null;
+
+  // Crawl-planning calls search near a specific stop's coordinates instead of
+  // the fixed NYC center — when that's provided, fold it into the cache key
+  // too, or a generic "bar" search near two different stops would collide.
+  const hasCustomCenter =
+    Number.isFinite(Number(centerLat)) && Number.isFinite(Number(centerLng));
+  const effectiveCenter = hasCustomCenter
+    ? { latitude: Number(centerLat), longitude: Number(centerLng) }
+    : NYC_CENTER;
+  const effectiveRadius = Number.isFinite(Number(radiusMeters))
+    ? Number(radiusMeters)
+    : exploreMode
+      ? EXPLORE_RADIUS_METERS
+      : NORMAL_RADIUS_METERS;
+  const centerKey = hasCustomCenter
+    ? `${effectiveCenter.latitude.toFixed(3)},${effectiveCenter.longitude.toFixed(3)}`
+    : null;
+
+  const cacheDocId = projectId
+    ? cacheKeyFor(textQuery, exploreMode, centerKey)
+    : null;
 
   // ---- 1. Try the shared cache first ----
   if (cacheDocId) {
@@ -240,8 +263,8 @@ module.exports = async function handler(req, res) {
     maxResultCount,
     locationBias: {
       circle: {
-        center: NYC_CENTER,
-        radius: exploreMode ? EXPLORE_RADIUS_METERS : NORMAL_RADIUS_METERS,
+        center: effectiveCenter,
+        radius: effectiveRadius,
       },
     },
   };
