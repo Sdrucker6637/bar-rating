@@ -22,7 +22,7 @@
 //   GOOGLE_PLACES_API_KEY
 //   FIREBASE_PROJECT_ID   (e.g. "bar-rating" — same project as index.html)
 
-const NYC_CENTER = { latitude: 40.7128, longitude: -74.006 };
+const NYC_CENTER = { latitude: 40.7525, longitude: -74.001 }; // Hudson Yards
 const NORMAL_RADIUS_METERS = 12000; // roughly a 30-40 min transit ride from Manhattan
 const EXPLORE_RADIUS_METERS = 40000;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -207,8 +207,9 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const textQuery =
-    [query, neighborhood, address].filter(Boolean).join(", ") + " bar";
+  const textQuery = exactLookup
+    ? [query, neighborhood, address].filter(Boolean).join(", ")
+    : [query, neighborhood, address].filter(Boolean).join(", ") + " bar";
   const maxResultCount = Math.min(Math.max(Number(limit) || 5, 1), 10);
   const cacheDocId = projectId ? cacheKeyFor(textQuery, exploreMode) : null;
 
@@ -236,7 +237,6 @@ module.exports = async function handler(req, res) {
   // ---- 2. Cache miss (or no Firestore project configured) — call Google ----
   const requestBody = {
     textQuery,
-    includedType: "bar",
     maxResultCount,
     locationBias: {
       circle: {
@@ -245,6 +245,9 @@ module.exports = async function handler(req, res) {
       },
     },
   };
+  if (!exactLookup) {
+    requestBody.includedType = "bar";
+  }
 
   try {
     const response = await fetch(
