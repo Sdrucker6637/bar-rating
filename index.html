@@ -1196,6 +1196,50 @@
           }
         }
 
+        async function runNearbySearch() {
+          if (!navigator.geolocation) {
+            alert("Your browser doesn't support location.");
+            return;
+          }
+
+          navigator.geolocation.getCurrentPosition(
+            async ({ coords }) => {
+              setSearchResults([]);
+              setSearching(true);
+              setSearchDone(false);
+
+              const exclude = [
+                ...new Set([...(bars || []).map((b) => b.name), ...seenNames]),
+              ];
+
+              const results = await fetchPlaces("bar", {
+                limit: 10,
+                noCache: true,
+                centerLat: coords.latitude,
+                centerLng: coords.longitude,
+                radiusMeters: 800,
+              });
+
+              const fresh = results.filter((r) => !exclude.includes(r.name));
+
+              const pick = fresh[Math.floor(Math.random() * fresh.length)];
+
+              setSearchResults(pick ? [pick] : []);
+              setSearching(false);
+              setSearchDone(true);
+
+              if (pick) {
+                setSeenNames((prev) => new Set([...prev, pick.name]));
+
+                enrichSearchResult(pick);
+              }
+            },
+            () => {
+              alert("Couldn't get your location.");
+            },
+          );
+        }
+
         function addSuggestionToWishlist(s) {
           const mapsLink =
             s.mapsLink ||
@@ -1616,7 +1660,7 @@
             { className: "tda-search-row" },
             React.createElement("input", {
               className: "tda-input",
-              placeholder: "Describe a vibe (optional)",
+              placeholder: "Search by vibe or neighborhood (optional)",
               value: vibeQuery,
               onChange: (e) => setVibeQuery(e.target.value),
               style: { flex: "1 1 220px" },
@@ -1689,7 +1733,7 @@
                     onClick: runSearch,
                     disabled: searching || !vibeQuery.trim(),
                   },
-                  searching ? "Searching…" : "Find Bars",
+                  searching ? "Searching…" : "🔍 Find Bars",
                 ),
                 React.createElement(
                   "span",
@@ -1730,6 +1774,26 @@
                   "span",
                   { className: "tda-search-btn-hint" },
                   "Chain nearby bars into a walking route.",
+                ),
+              ),
+              React.createElement(
+                "div",
+                { className: "tda-search-btn-wrap" },
+
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-find-btn tda-nearby-btn",
+                    onClick: runNearbySearch,
+                    disabled: searching,
+                  },
+                  "📍 Nearby",
+                ),
+
+                React.createElement(
+                  "span",
+                  { className: "tda-search-btn-hint" },
+                  "Find one great bar within about a 10 minute walk.",
                 ),
               ),
             ),
@@ -2039,6 +2103,9 @@
       .tda-crawl-connector { text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#857C8E; padding:0.6rem 0; }
       .tda-crawl-modal { max-width:640px; }
       .tda-search-btn-group { display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start; }
+      .tda-nearby-btn{
+    background:#5c7cff;
+}
 .tda-search-btn-wrap { display:flex; flex-direction:column; align-items:center; gap:0.35rem; flex:1 1 200px; text-align:center; }
 .tda-search-btn-hint { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#5D5666; white-space:normal; line-height:1.4; }
       `,
@@ -2683,6 +2750,57 @@
                         },
                       },
                       "Expands the search distance beyond the normal limit. Useful when discovering bars outside your usual area.",
+                    ),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-details-row" },
+
+                    React.createElement(
+                      "div",
+                      null,
+
+                      React.createElement("b", null, "🚶 Plan a Crawl"),
+
+                      React.createElement(
+                        "div",
+                        null,
+                        "Without a starting bar, Tour de Alcoholism picks a random starting point and builds a walkable crawl.",
+                      ),
+
+                      React.createElement(
+                        "div",
+                        {
+                          style: { marginTop: "0.5rem" },
+                        },
+                        "If you enter a starting bar, the crawl is built around that location.",
+                      ),
+                    ),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "tda-details-row" },
+
+                    React.createElement(
+                      "div",
+                      null,
+
+                      React.createElement("b", null, "🍻 OG Rules"),
+
+                      React.createElement(
+                        "ul",
+                        null,
+
+                        React.createElement("li", null, "No American Whiskey."),
+
+                        React.createElement("li", null, "No uncool people."),
+
+                        React.createElement(
+                          "li",
+                          null,
+                          "If you know you know.",
+                        ),
+                      ),
                     ),
                   ),
                 ),
