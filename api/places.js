@@ -51,7 +51,10 @@ function hashString(str) {
 }
 function cacheKeyFor(textQuery, exploreMode) {
   const normalized = textQuery.trim().toLowerCase().replace(/\s+/g, " ");
-  const slug = normalized.replace(/[^a-z0-9]+/g, "-").slice(0, 60).replace(/^-+|-+$/g, "");
+  const slug = normalized
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 60)
+    .replace(/^-+|-+$/g, "");
   return `${slug || "q"}-${exploreMode ? "explore" : "normal"}-${hashString(normalized + "|" + exploreMode)}`;
 }
 
@@ -61,7 +64,9 @@ function toFirestoreValue(value) {
   if (typeof value === "string") return { stringValue: value };
   if (typeof value === "boolean") return { booleanValue: value };
   if (typeof value === "number") {
-    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+    return Number.isInteger(value)
+      ? { integerValue: String(value) }
+      : { doubleValue: value };
   }
   if (Array.isArray(value)) {
     return { arrayValue: { values: value.map(toFirestoreValue) } };
@@ -80,7 +85,8 @@ function fromFirestoreValue(v) {
   if ("booleanValue" in v) return v.booleanValue;
   if ("integerValue" in v) return parseInt(v.integerValue, 10);
   if ("doubleValue" in v) return v.doubleValue;
-  if ("arrayValue" in v) return (v.arrayValue.values || []).map(fromFirestoreValue);
+  if ("arrayValue" in v)
+    return (v.arrayValue.values || []).map(fromFirestoreValue);
   if ("mapValue" in v) {
     const out = {};
     const fields = v.mapValue.fields || {};
@@ -105,7 +111,11 @@ async function readCache(projectId, docId) {
     const response = await fetch(firestoreDocUrl(projectId, docId));
     if (response.status === 404) return null;
     if (!response.ok) {
-      console.error("Firestore cache read failed", response.status, await response.text());
+      console.error(
+        "Firestore cache read failed",
+        response.status,
+        await response.text(),
+      );
       return null;
     }
     const doc = await response.json();
@@ -126,7 +136,11 @@ async function writeCache(projectId, docId, data) {
       body: JSON.stringify({ fields }),
     });
     if (!response.ok) {
-      console.error("Firestore cache write failed", response.status, await response.text());
+      console.error(
+        "Firestore cache write failed",
+        response.status,
+        await response.text(),
+      );
     }
   } catch (e) {
     // Caching is a pure optimization — never fail the request over this.
@@ -135,16 +149,18 @@ async function writeCache(projectId, docId, data) {
 }
 
 // ---------- filter + shape a raw Places result set for the client ----------
-function filterAndShape(rawPlaces, { ballerMode, query, maxResultCount }) {
+function filterAndShape(
+  rawPlaces,
+  { ballerMode, query, maxResultCount, exactLookup },
+) {
   return rawPlaces
-    // Hard requirement: never surface permanently (or temporarily) closed spots.
     .filter((p) => p.businessStatus === "OPERATIONAL")
-    .filter((p) => (p.types || []).some((t) => BAR_TYPES.includes(t)))
+    .filter(
+      (p) => exactLookup || (p.types || []).some((t) => BAR_TYPES.includes(t)),
+    )
     .filter((p) => {
       if (ballerMode) return true;
       const rank = PRICE_LEVEL_RANK[p.priceLevel];
-      // Unknown price level -> let it through rather than losing a real bar
-      // just because Google hasn't classified its price yet.
       return rank === undefined || rank <= 2;
     })
     .slice(0, maxResultCount)
@@ -154,7 +170,11 @@ function filterAndShape(rawPlaces, { ballerMode, query, maxResultCount }) {
       latitude: p.latitude ?? null,
       longitude: p.longitude ?? null,
       placeId: p.placeId || null,
-      mapsLink: p.mapsLink || (p.placeId ? `https://www.google.com/maps/place/?q=place_id:${p.placeId}` : ""),
+      mapsLink:
+        p.mapsLink ||
+        (p.placeId
+          ? `https://www.google.com/maps/place/?q=place_id:${p.placeId}`
+          : ""),
       rating: typeof p.rating === "number" ? p.rating : null,
     }));
 }
@@ -179,6 +199,7 @@ module.exports = async function handler(req, res) {
     ballerMode = false,
     exploreMode = false,
     limit = 5,
+    exactLookup = false,
   } = req.body || {};
 
   if (!query || !String(query).trim()) {
@@ -186,16 +207,26 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const textQuery = [query, neighborhood, address].filter(Boolean).join(", ") + " bar";
+  const textQuery =
+    [query, neighborhood, address].filter(Boolean).join(", ") + " bar";
   const maxResultCount = Math.min(Math.max(Number(limit) || 5, 1), 10);
   const cacheDocId = projectId ? cacheKeyFor(textQuery, exploreMode) : null;
 
   // ---- 1. Try the shared cache first ----
   if (cacheDocId) {
     const cached = await readCache(projectId, cacheDocId);
-    if (cached && Array.isArray(cached.places) && typeof cached.timestamp === "number") {
+    if (
+      cached &&
+      Array.isArray(cached.places) &&
+      typeof cached.timestamp === "number"
+    ) {
       if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
-        const shaped = filterAndShape(cached.places, { ballerMode, query, maxResultCount });
+        const shaped = filterAndShape(cached.places, {
+          ballerMode,
+          query,
+          maxResultCount,
+          exactLookup,
+        });
         res.status(200).json(shaped);
         return;
       }
@@ -216,25 +247,28 @@ module.exports = async function handler(req, res) {
   };
 
   try {
-    const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": [
-          "places.id",
-          "places.displayName",
-          "places.formattedAddress",
-          "places.location",
-          "places.businessStatus",
-          "places.priceLevel",
-          "places.types",
-          "places.googleMapsUri",
-          "places.rating",
-        ].join(","),
+    const response = await fetch(
+      "https://places.googleapis.com/v1/places:searchText",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": [
+            "places.id",
+            "places.displayName",
+            "places.formattedAddress",
+            "places.location",
+            "places.businessStatus",
+            "places.priceLevel",
+            "places.types",
+            "places.googleMapsUri",
+            "places.rating",
+          ].join(","),
+        },
+        body: JSON.stringify(requestBody),
       },
-      body: JSON.stringify(requestBody),
-    });
+    );
 
     if (!response.ok) {
       const errText = await response.text();
@@ -263,10 +297,19 @@ module.exports = async function handler(req, res) {
 
     // ---- 3. Cache the successful (even if empty) result for next time ----
     if (cacheDocId) {
-      await writeCache(projectId, cacheDocId, { places: rawPlaces, timestamp: Date.now(), query: textQuery });
+      await writeCache(projectId, cacheDocId, {
+        places: rawPlaces,
+        timestamp: Date.now(),
+        query: textQuery,
+      });
     }
 
-    const shaped = filterAndShape(rawPlaces, { ballerMode, query, maxResultCount });
+    const shaped = filterAndShape(cached.places, {
+      ballerMode,
+      query,
+      maxResultCount,
+      exactLookup,
+    });
     res.status(200).json(shaped);
   } catch (e) {
     console.error("Places lookup failed", e);

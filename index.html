@@ -520,7 +520,15 @@
 
       async function fetchPlaces(
         query,
-        { neighborhood, address, ballerMode, exploreMode, limit, noCache } = {},
+        {
+          neighborhood,
+          address,
+          ballerMode,
+          exploreMode,
+          limit,
+          noCache,
+          exactLookup,
+        } = {},
       ) {
         const cacheKey = JSON.stringify({
           query,
@@ -529,6 +537,7 @@
           ballerMode: !!ballerMode,
           exploreMode: !!exploreMode,
           limit: limit || 5,
+          exactLookup: !!exactLookup,
         });
         if (!noCache) {
           const cached = placesCache.get(cacheKey);
@@ -546,6 +555,7 @@
               ballerMode: !!ballerMode,
               exploreMode: !!exploreMode,
               limit: limit || 5,
+              exactLookup: !!exactLookup,
             }),
           });
           const results = await response.json();
@@ -763,6 +773,7 @@
               neighborhood: suggestion.neighborhood || "",
               address: suggestion.address || "",
               limit: 5,
+              exactLookup: true,
             });
             setPlacesModal({ suggestion, results, searching: false });
           } catch (e) {
