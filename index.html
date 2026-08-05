@@ -1398,6 +1398,8 @@
 .tda-controls { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; margin:1rem 0; background:#17141B; border:1px solid #262029; border-radius:8px; padding:0.9rem 1rem; }
 .tda-input,.tda-select { background:#0E0D10; border:1px solid #302938; color:#EDE6D9; border-radius:5px; padding:0.5rem 0.7rem; font-family:'Inter',sans-serif; font-size:0.85rem; }
 .tda-input:focus,.tda-select:focus { outline:none; border-color:#B8965F; }
+.tda-map-wrap { position:relative; }
+.tda-map-toggle-overlay { position:absolute; top:12px; right:12px; z-index:1000; background:rgba(23,20,27,0.9); backdrop-filter:blur(4px); border-radius:999px; box-shadow:0 2px 10px rgba(0,0,0,0.35); }
 .tda-toggle { display:inline-flex; border:1px solid #302938; border-radius:999px; overflow:hidden; }
 .tda-toggle button { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.85rem; background:transparent; color:#A79EB2; border:none; cursor:pointer; }
 .tda-toggle button.active { background:#B8965F; color:#16130F; font-weight:600; }
@@ -2416,41 +2418,69 @@
         return React.createElement(
           "div",
           null,
-          React.createElement(
-            "div",
-            { className: "tda-toggle", style: { marginBottom: "1rem" } },
-            React.createElement(
-              "button",
-              {
-                className: mode === "visited" ? "active" : "",
-                onClick: () => setMode("visited"),
-              },
-              "Visited",
-            ),
-            React.createElement(
-              "button",
-              {
-                className: mode === "wishlist" ? "active" : "",
-                onClick: () => setMode("wishlist"),
-              },
-              "Wishlist",
-            ),
-          ),
           geoBars.length === 0
             ? React.createElement(
-                "div",
-                { className: "tda-empty" },
-                mode === "visited"
-                  ? "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."
-                  : "No wishlist bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup.",
+                React.Fragment,
+                null,
+                React.createElement(
+                  "div",
+                  { className: "tda-toggle", style: { marginBottom: "1rem" } },
+                  React.createElement(
+                    "button",
+                    {
+                      className: mode === "visited" ? "active" : "",
+                      onClick: () => setMode("visited"),
+                    },
+                    "Visited",
+                  ),
+                  React.createElement(
+                    "button",
+                    {
+                      className: mode === "wishlist" ? "active" : "",
+                      onClick: () => setMode("wishlist"),
+                    },
+                    "Wishlist",
+                  ),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "tda-empty" },
+                  mode === "visited"
+                    ? "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."
+                    : "No wishlist bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup.",
+                ),
               )
             : React.createElement(
                 React.Fragment,
                 null,
-                React.createElement("div", {
-                  ref: mapNodeRef,
-                  className: "tda-heatmap-container",
-                }),
+                React.createElement(
+                  "div",
+                  { className: "tda-map-wrap" },
+                  React.createElement("div", {
+                    ref: mapNodeRef,
+                    className: "tda-heatmap-container",
+                  }),
+                  React.createElement(
+                    "div",
+                    { className: "tda-toggle tda-map-toggle-overlay" },
+                    React.createElement(
+                      "button",
+                      {
+                        className: mode === "visited" ? "active" : "",
+                        onClick: () => setMode("visited"),
+                      },
+                      "Visited",
+                    ),
+                    React.createElement(
+                      "button",
+                      {
+                        className: mode === "wishlist" ? "active" : "",
+                        onClick: () => setMode("wishlist"),
+                      },
+                      "Wishlist",
+                    ),
+                  ),
+                ),
                 React.createElement(
                   "div",
                   { className: "tda-heatmap-note" },
@@ -2462,7 +2492,7 @@
                 React.createElement(
                   "div",
                   { className: "tda-heatmap-legend" },
-                  "cooler",
+                  "bottom tier",
                   React.createElement("span", {
                     className: "tda-heatmap-gradient",
                     style: {
