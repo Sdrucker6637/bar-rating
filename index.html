@@ -691,7 +691,7 @@
           useState(false);
         const [visitedNameInput, setVisitedNameInput] = useState("");
         const [visitedHoodInput, setVisitedHoodInput] = useState("");
-        const [showcrawlModal, setShowcrawlModal] = useState(false);
+        const [showCrawlModal, setShowCrawlModal] = useState(false);
         const [crawlStartInput, setCrawlStartInput] = useState("");
         const [crawlCount, setCrawlCount] = useState(3);
         const [crawlPlanning, setCrawlPlanning] = useState(false);
@@ -1297,7 +1297,7 @@
         }
 
         const crawlModal =
-          showcrawlModal &&
+          showCrawlModal &&
           React.createElement(
             "div",
             {
