@@ -1297,12 +1297,12 @@
         }
 
         const crawlModal =
-          showCrawlPanel &&
+          showcrawlModal &&
           React.createElement(
             "div",
             {
               className: "tda-modal-backdrop",
-              onClick: () => setShowCrawlPanel(false),
+              onClick: () => setShowCrawlModal(false),
             },
             React.createElement(
               "div",
@@ -1521,7 +1521,7 @@
                   "button",
                   {
                     className: "tda-secondary-btn",
-                    onClick: () => setShowCrawlPanel(false),
+                    onClick: () => setShowCrawlModal(false),
                   },
                   "Close",
                 ),
@@ -1643,7 +1643,7 @@
                   "button",
                   {
                     className: "tda-find-btn tda-crawl-btn",
-                    onClick: () => setShowCrawlPanel(true),
+                    onClick: () => setShowCrawlModal(true),
                   },
                   "🚶 Plan a Crawl",
                 ),
