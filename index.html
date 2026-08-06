@@ -805,48 +805,26 @@
         }
 
         function addManualSplitItem() {
+          const name = window.prompt("Item name?", "");
+          if (!name || !name.trim()) return;
+          const priceInput = window.prompt(
+            `Total price for "${name.trim()}"?`,
+            "",
+          );
+          const price = Number(priceInput);
+          if (!Number.isFinite(price) || price < 0) return;
+          const qtyInput = window.prompt("Quantity? (leave blank for 1)", "1");
+          const quantity = Math.max(1, Number(qtyInput) || 1);
           setSplitItems((prev) => [
             ...prev,
             {
               id: `item${Date.now()}`,
-              name: "",
-              price: 0,
-              quantity: 1,
+              name: name.trim(),
+              price,
+              quantity,
               assignedTo: {},
             },
           ]);
-        }
-
-        function updateSplitItem(id, patch) {
-          setSplitItems((prev) =>
-            prev.map((it) => {
-              if (it.id !== id) return it;
-              const next = { ...it, ...patch };
-              // If quantity shrank, clamp any per-person assignments down so
-              // the total assigned units never exceeds the new quantity.
-              if (patch.quantity !== undefined) {
-                const q = Math.max(1, Number(patch.quantity) || 1);
-                let assignedSum = Object.values(next.assignedTo).reduce(
-                  (a, c) => a + c,
-                  0,
-                );
-                if (assignedSum > q) {
-                  const trimmed = { ...next.assignedTo };
-                  let excess = assignedSum - q;
-                  for (const pid of Object.keys(trimmed)) {
-                    if (excess <= 0) break;
-                    const cut = Math.min(trimmed[pid], excess);
-                    trimmed[pid] -= cut;
-                    excess -= cut;
-                    if (trimmed[pid] <= 0) delete trimmed[pid];
-                  }
-                  next.assignedTo = trimmed;
-                }
-                next.quantity = q;
-              }
-              return next;
-            }),
-          );
         }
 
         function removeSplitItem(id) {
@@ -881,7 +859,42 @@
           );
         }
 
-        // Each item's per-unit price is charged to whoever holds that unit.
+        // Divides an item's full quantity evenly across exactly the given
+        // set of person IDs, overwriting any prior assignment for this item.
+        function splitItemEvenly(itemId, personIds) {
+          setSplitItems((prev) =>
+            prev.map((it) => {
+              if (it.id !== itemId) return it;
+              if (personIds.length === 0) return { ...it, assignedTo: {} };
+              const share = it.quantity / personIds.length;
+              const nextAssigned = {};
+              personIds.forEach((pid) => {
+                nextAssigned[pid] = share;
+              });
+              return { ...it, assignedTo: nextAssigned };
+            }),
+          );
+        }
+
+        // Toggles whether a person is included in an item at all. Turning
+        // someone off removes their share; turning someone on gives them a
+        // share equal to 1 unit (or the whole item, for quantity-1 items) —
+        // "Split evenly" can then be used to rebalance after toggling.
+        function toggleItemPersonIncluded(itemId, personId) {
+          setSplitItems((prev) =>
+            prev.map((it) => {
+              if (it.id !== itemId) return it;
+              const nextAssigned = { ...it.assignedTo };
+              if (nextAssigned[personId]) {
+                delete nextAssigned[personId];
+              } else {
+                nextAssigned[personId] = Math.min(1, it.quantity);
+              }
+              return { ...it, assignedTo: nextAssigned };
+            }),
+          );
+        }
+
         // Tax and tip are then allocated to each person proportional to their
         // share of the pre-tax subtotal.
         const splitTotals = useMemo(() => {
@@ -2488,9 +2501,10 @@
                 parseError: splitParseError,
                 items: splitItems,
                 onAddItem: addManualSplitItem,
-                onUpdateItem: updateSplitItem,
                 onRemoveItem: removeSplitItem,
                 onAdjustUnits: adjustItemPersonUnits,
+                onSplitEvenly: splitItemEvenly,
+                onToggleIncluded: toggleItemPersonIncluded,
                 tax: splitTax,
                 setTax: setSplitTax,
                 tip: splitTip,
@@ -3491,9 +3505,10 @@
           parseError,
           items,
           onAddItem,
-          onUpdateItem,
           onRemoveItem,
           onAdjustUnits,
+          onSplitEvenly,
+          onToggleIncluded,
           tax,
           setTax,
           tip,
@@ -3693,6 +3708,9 @@
               { className: "tda-list" },
               items.map((it) => {
                 const q = it.quantity || 1;
+                const includedIds = props.people
+                  .filter((p) => (it.assignedTo[p.id] || 0) > 0)
+                  .map((p) => p.id);
                 const assignedSum = Object.values(it.assignedTo).reduce(
                   (a, c) => a + c,
                   0,
@@ -3703,41 +3721,32 @@
                   { key: it.id, className: "tda-card" },
                   React.createElement(
                     "div",
-                    { className: "tda-search-row" },
-                    React.createElement("input", {
-                      className: "tda-input",
-                      placeholder: "Item name",
-                      value: it.name,
-                      onChange: (e) =>
-                        onUpdateItem(it.id, { name: e.target.value }),
-                      style: { flex: "2 1 160px" },
-                    }),
-                    React.createElement("input", {
-                      className: "tda-input",
-                      type: "number",
-                      step: "0.01",
-                      placeholder: "Total price",
-                      value: it.price,
-                      onChange: (e) =>
-                        onUpdateItem(it.id, {
-                          price: Number(e.target.value) || 0,
-                        }),
-                      style: { width: "90px" },
-                    }),
-                    React.createElement("input", {
-                      className: "tda-input",
-                      type: "number",
-                      min: "1",
-                      step: "1",
-                      placeholder: "Qty",
-                      value: q,
-                      onChange: (e) =>
-                        onUpdateItem(it.id, {
-                          quantity: Math.max(1, Number(e.target.value) || 1),
-                        }),
-                      style: { width: "60px" },
-                      title: "Quantity",
-                    }),
+                    {
+                      style: {
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        gap: "0.6rem",
+                        flexWrap: "wrap",
+                      },
+                    },
+                    React.createElement(
+                      "div",
+                      { className: "tda-card-name" },
+                      it.name || "(unnamed item)",
+                    ),
+                    React.createElement(
+                      "div",
+                      {
+                        style: {
+                          fontFamily: "'IBM Plex Mono', monospace",
+                          fontSize: "0.8rem",
+                          color: "#A79EB2",
+                        },
+                      },
+                      `$${it.price.toFixed(2)}`,
+                      q > 1 ? ` · Qty ${q}` : "",
+                    ),
                     React.createElement(
                       "button",
                       {
@@ -3752,90 +3761,107 @@
                       "div",
                       {
                         className: "tda-fetching",
-                        style: { marginTop: "0.4rem" },
+                        style: { marginTop: "0.2rem" },
                       },
                       `$${(it.price / q).toFixed(2)} each · ${remaining} of ${q} unassigned`,
                     ),
                   React.createElement(
                     "div",
-                    {
-                      style: {
-                        marginTop: "0.6rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.4rem",
-                      },
-                    },
+                    { className: "tda-tags", style: { marginTop: "0.6rem" } },
                     props.people.map((p) => {
-                      const units = it.assignedTo[p.id] || 0;
+                      const included = includedIds.includes(p.id);
                       return React.createElement(
-                        "div",
+                        "button",
                         {
                           key: p.id,
-                          style: {
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.6rem",
-                          },
+                          className: `tda-chip ${included ? "active" : ""}`,
+                          onClick: () => onToggleIncluded(it.id, p.id),
                         },
-                        React.createElement(
-                          "span",
-                          {
-                            className: `tda-chip ${units > 0 ? "active" : ""}`,
-                            style: { minWidth: "90px", textAlign: "center" },
-                          },
-                          p.name,
-                        ),
-                        q === 1
-                          ? React.createElement(
-                              "button",
-                              {
-                                className: `tda-chip ${units > 0 ? "active" : ""}`,
-                                onClick: () =>
-                                  onAdjustUnits(
-                                    it.id,
-                                    p.id,
-                                    units > 0 ? -1 : 1,
-                                  ),
-                              },
-                              units > 0 ? "Assigned ✓" : "Assign",
-                            )
-                          : React.createElement(
-                              React.Fragment,
-                              null,
-                              React.createElement(
-                                "button",
-                                {
-                                  className: "tda-group-btn",
-                                  disabled: units === 0,
-                                  onClick: () => onAdjustUnits(it.id, p.id, -1),
-                                },
-                                "−",
-                              ),
-                              React.createElement(
-                                "b",
-                                {
-                                  style: {
-                                    minWidth: "1.2rem",
-                                    textAlign: "center",
-                                    color: "#EDE6D9",
-                                  },
-                                },
-                                units,
-                              ),
-                              React.createElement(
-                                "button",
-                                {
-                                  className: "tda-group-btn",
-                                  disabled: remaining <= 0,
-                                  onClick: () => onAdjustUnits(it.id, p.id, 1),
-                                },
-                                "+",
-                              ),
-                            ),
+                        p.name,
                       );
                     }),
+                    React.createElement(
+                      "button",
+                      {
+                        className: "tda-chip tda-chip-baller",
+                        disabled: includedIds.length === 0,
+                        onClick: () => onSplitEvenly(it.id, includedIds),
+                        title:
+                          "Divide this item evenly among the people selected above",
+                      },
+                      "⚖ Split evenly",
+                    ),
                   ),
+                  q > 1 &&
+                    includedIds.length > 0 &&
+                    React.createElement(
+                      "div",
+                      {
+                        style: {
+                          marginTop: "0.6rem",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.4rem",
+                        },
+                      },
+                      props.people
+                        .filter((p) => includedIds.includes(p.id))
+                        .map((p) => {
+                          const units = it.assignedTo[p.id] || 0;
+                          return React.createElement(
+                            "div",
+                            {
+                              key: p.id,
+                              style: {
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.6rem",
+                              },
+                            },
+                            React.createElement(
+                              "span",
+                              {
+                                style: {
+                                  minWidth: "90px",
+                                  fontSize: "0.8rem",
+                                  color: "#A79EB2",
+                                },
+                              },
+                              p.name,
+                            ),
+                            React.createElement(
+                              "button",
+                              {
+                                className: "tda-group-btn",
+                                onClick: () => onAdjustUnits(it.id, p.id, -1),
+                              },
+                              "−",
+                            ),
+                            React.createElement(
+                              "b",
+                              {
+                                style: {
+                                  minWidth: "1.6rem",
+                                  textAlign: "center",
+                                  color: "#EDE6D9",
+                                },
+                              },
+                              Number.isInteger(units)
+                                ? units
+                                : units.toFixed(2),
+                            ),
+                            React.createElement(
+                              "button",
+                              {
+                                className: "tda-group-btn",
+                                disabled: remaining <= 0,
+                                onClick: () => onAdjustUnits(it.id, p.id, 1),
+                              },
+                              "+",
+                            ),
+                          );
+                        }),
+                    ),
                 );
               }),
             ),
