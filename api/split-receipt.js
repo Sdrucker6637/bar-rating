@@ -1,0 +1,141 @@
+// api/split-receipt.js
+// Takes a base64-encoded receipt screenshot and asks Gemini to extract
+// itemized line items, tax, and tip. Used only by the "Split the Bill" tab.
+// No Firestore involved — this is a stateless parse, same pattern as the
+// no-barId branch of api/gemini.js.
+
+function safeParse(text) {
+  const cleaned = (text || "")
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    // fall through
+  }
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (objMatch) {
+    try {
+      return JSON.parse(objMatch[0]);
+    } catch (e) {
+      /* fall through */
+    }
+  }
+  return null;
+}
+
+function normalizeReceipt(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    return null;
+  const items = Array.isArray(parsed.items)
+    ? parsed.items
+        .map((it) => ({
+          name: typeof it.name === "string" ? it.name.trim() : "",
+          price: Number.isFinite(Number(it.price)) ? Number(it.price) : null,
+          quantity:
+            Number.isFinite(Number(it.quantity)) && Number(it.quantity) > 0
+              ? Number(it.quantity)
+              : 1,
+        }))
+        .filter((it) => it.name && it.price !== null)
+    : [];
+  return {
+    items,
+    tax: Number.isFinite(Number(parsed.tax)) ? Number(parsed.tax) : 0,
+    tip: Number.isFinite(Number(parsed.tip)) ? Number(parsed.tip) : 0,
+  };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    const { imageBase64, mimeType = "image/jpeg" } = req.body || {};
+    if (!imageBase64) {
+      return res.status(400).json({ error: "Missing imageBase64" });
+    }
+
+    const prompt = `You are reading a screenshot of an itemized restaurant/bar receipt.
+
+Return ONLY JSON in this exact shape, nothing else:
+
+{"items":[{"name":"string","price":0.00,"quantity":1}],"tax":0.00,"tip":0.00}
+
+Rules:
+- "price" is the line's total price (already multiplied by quantity if the receipt shows it that way) — do not double-count quantity.
+- If quantity isn't shown, use 1.
+- If tax or tip aren't visible on the receipt, use 0.
+- Do not include subtotal or total as items.
+- Do not invent items that aren't in the image.`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    let geminiResponse;
+    try {
+      geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${
+          process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
+        }:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": process.env.GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: prompt },
+                  { inline_data: { mime_type: mimeType, data: imageBase64 } },
+                ],
+              },
+            ],
+          }),
+          signal: controller.signal,
+        },
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    const geminiData = await geminiResponse.json();
+
+    if (!geminiResponse.ok) {
+      console.error("Gemini error:", geminiData);
+      return res.status(geminiResponse.status).json({
+        error: geminiData?.error?.message || "Gemini request failed",
+      });
+    }
+
+    const rawText =
+      geminiData?.candidates?.[0]?.content?.parts
+        ?.map((p) => p.text || "")
+        .join("\n") || "";
+
+    const parsed = safeParse(rawText);
+    const receipt = normalizeReceipt(parsed);
+
+    if (!receipt || receipt.items.length === 0) {
+      return res.status(422).json({
+        error:
+          "Couldn't read any items from that screenshot. Try a clearer image, or add items manually.",
+      });
+    }
+
+    return res.status(200).json({ result: receipt });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      console.error("Gemini request timed out");
+      return res.status(504).json({ error: "Gemini request timed out" });
+    }
+    console.error("Server error:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to parse receipt" });
+  }
+}
