@@ -31,8 +31,13 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <style>
+      html,
       body {
         margin: 0;
+        overflow-x: hidden;
+      }
+      * {
+        box-sizing: border-box;
       }
     </style>
   </head>
@@ -709,7 +714,7 @@
         const [splitReceiptImage, setSplitReceiptImage] = useState(null); // { base64, mimeType, previewUrl }
         const [splitParsing, setSplitParsing] = useState(false);
         const [splitParseError, setSplitParseError] = useState(null);
-        const [splitItems, setSplitItems] = useState([]); // [{ id, name, price, quantity, assignedTo: [personId,...] }]
+        const [splitItems, setSplitItems] = useState([]); // [{ id, name, price, quantity, assignedTo: { [personId]: unitsAssigned } }]
         const [splitTax, setSplitTax] = useState(0);
         const [splitTip, setSplitTip] = useState(0);
 
@@ -738,10 +743,11 @@
         function removeSplitPerson(id) {
           setSplitPeople((prev) => prev.filter((p) => p.id !== id));
           setSplitItems((prev) =>
-            prev.map((it) => ({
-              ...it,
-              assignedTo: it.assignedTo.filter((pid) => pid !== id),
-            })),
+            prev.map((it) => {
+              const nextAssigned = { ...it.assignedTo };
+              delete nextAssigned[id];
+              return { ...it, assignedTo: nextAssigned };
+            }),
           );
         }
 
@@ -785,7 +791,7 @@
               name: it.name,
               price: it.price,
               quantity: it.quantity,
-              assignedTo: [],
+              assignedTo: {},
             }));
             setSplitItems(items);
             setSplitTax(data.result.tax || 0);
@@ -806,14 +812,40 @@
               name: "",
               price: 0,
               quantity: 1,
-              assignedTo: [],
+              assignedTo: {},
             },
           ]);
         }
 
         function updateSplitItem(id, patch) {
           setSplitItems((prev) =>
-            prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+            prev.map((it) => {
+              if (it.id !== id) return it;
+              const next = { ...it, ...patch };
+              // If quantity shrank, clamp any per-person assignments down so
+              // the total assigned units never exceeds the new quantity.
+              if (patch.quantity !== undefined) {
+                const q = Math.max(1, Number(patch.quantity) || 1);
+                let assignedSum = Object.values(next.assignedTo).reduce(
+                  (a, c) => a + c,
+                  0,
+                );
+                if (assignedSum > q) {
+                  const trimmed = { ...next.assignedTo };
+                  let excess = assignedSum - q;
+                  for (const pid of Object.keys(trimmed)) {
+                    if (excess <= 0) break;
+                    const cut = Math.min(trimmed[pid], excess);
+                    trimmed[pid] -= cut;
+                    excess -= cut;
+                    if (trimmed[pid] <= 0) delete trimmed[pid];
+                  }
+                  next.assignedTo = trimmed;
+                }
+                next.quantity = q;
+              }
+              return next;
+            }),
           );
         }
 
@@ -821,22 +853,35 @@
           setSplitItems((prev) => prev.filter((it) => it.id !== id));
         }
 
-        function toggleItemPerson(itemId, personId) {
+        // Adjusts how many units of an item are assigned to one person, by
+        // `delta` (+1 or -1). Refuses to go below 0 or above the item's
+        // remaining unassigned units.
+        function adjustItemPersonUnits(itemId, personId, delta) {
           setSplitItems((prev) =>
             prev.map((it) => {
               if (it.id !== itemId) return it;
-              const already = it.assignedTo.includes(personId);
-              return {
-                ...it,
-                assignedTo: already
-                  ? it.assignedTo.filter((pid) => pid !== personId)
-                  : [...it.assignedTo, personId],
-              };
+              const current = it.assignedTo[personId] || 0;
+              const assignedSum = Object.values(it.assignedTo).reduce(
+                (a, c) => a + c,
+                0,
+              );
+              const remaining = it.quantity - assignedSum;
+              let nextUnits = current + delta;
+              if (nextUnits < 0) nextUnits = 0;
+              if (delta > 0 && remaining <= 0) return it; // no units left to give out
+              if (nextUnits > it.quantity) nextUnits = it.quantity;
+              const nextAssigned = { ...it.assignedTo };
+              if (nextUnits === 0) {
+                delete nextAssigned[personId];
+              } else {
+                nextAssigned[personId] = nextUnits;
+              }
+              return { ...it, assignedTo: nextAssigned };
             }),
           );
         }
 
-        // Each item's price is split evenly among everyone it's assigned to.
+        // Each item's per-unit price is charged to whoever holds that unit.
         // Tax and tip are then allocated to each person proportional to their
         // share of the pre-tax subtotal.
         const splitTotals = useMemo(() => {
@@ -845,13 +890,13 @@
 
           let assignedSubtotal = 0;
           splitItems.forEach((it) => {
-            const n = it.assignedTo.length;
-            if (n === 0) return;
-            const share = it.price / n;
-            it.assignedTo.forEach((pid) => {
+            const q = it.quantity || 1;
+            const perUnit = it.price / q;
+            Object.entries(it.assignedTo).forEach(([pid, units]) => {
               if (perPersonSubtotal[pid] === undefined) return; // person was removed
-              perPersonSubtotal[pid] += share;
-              assignedSubtotal += share;
+              const cost = perUnit * units;
+              perPersonSubtotal[pid] += cost;
+              assignedSubtotal += cost;
             });
           });
 
@@ -864,15 +909,20 @@
             perPersonTotal[p.id] = sub + extraShare;
           });
 
-          const unassignedCount = splitItems.filter(
-            (it) => it.assignedTo.length === 0,
-          ).length;
+          const unassignedUnitsCount = splitItems.reduce((sum, it) => {
+            const q = it.quantity || 1;
+            const assignedSum = Object.values(it.assignedTo).reduce(
+              (a, c) => a + c,
+              0,
+            );
+            return sum + Math.max(0, q - assignedSum);
+          }, 0);
 
           return {
             perPersonSubtotal,
             perPersonTotal,
             assignedSubtotal,
-            unassignedCount,
+            unassignedUnitsCount,
           };
         }, [splitItems, splitPeople, splitTax, splitTip]);
 
@@ -2440,7 +2490,7 @@
                 onAddItem: addManualSplitItem,
                 onUpdateItem: updateSplitItem,
                 onRemoveItem: removeSplitItem,
-                onToggleItemPerson: toggleItemPerson,
+                onAdjustUnits: adjustItemPersonUnits,
                 tax: splitTax,
                 setTax: setSplitTax,
                 tip: splitTip,
@@ -3443,7 +3493,7 @@
           onAddItem,
           onUpdateItem,
           onRemoveItem,
-          onToggleItemPerson,
+          onAdjustUnits,
           tax,
           setTax,
           tip,
@@ -3641,8 +3691,14 @@
             React.createElement(
               "div",
               { className: "tda-list" },
-              items.map((it) =>
-                React.createElement(
+              items.map((it) => {
+                const q = it.quantity || 1;
+                const assignedSum = Object.values(it.assignedTo).reduce(
+                  (a, c) => a + c,
+                  0,
+                );
+                const remaining = q - assignedSum;
+                return React.createElement(
                   "div",
                   { key: it.id, className: "tda-card" },
                   React.createElement(
@@ -3660,13 +3716,27 @@
                       className: "tda-input",
                       type: "number",
                       step: "0.01",
-                      placeholder: "Price",
+                      placeholder: "Total price",
                       value: it.price,
                       onChange: (e) =>
                         onUpdateItem(it.id, {
                           price: Number(e.target.value) || 0,
                         }),
                       style: { width: "90px" },
+                    }),
+                    React.createElement("input", {
+                      className: "tda-input",
+                      type: "number",
+                      min: "1",
+                      step: "1",
+                      placeholder: "Qty",
+                      value: q,
+                      onChange: (e) =>
+                        onUpdateItem(it.id, {
+                          quantity: Math.max(1, Number(e.target.value) || 1),
+                        }),
+                      style: { width: "60px" },
+                      title: "Quantity",
                     }),
                     React.createElement(
                       "button",
@@ -3677,33 +3747,97 @@
                       "Remove",
                     ),
                   ),
-                  React.createElement(
-                    "div",
-                    { className: "tda-tags", style: { marginTop: "0.6rem" } },
-                    props.people.map((p) => {
-                      const active = it.assignedTo.includes(p.id);
-                      return React.createElement(
-                        "button",
-                        {
-                          key: p.id,
-                          className: `tda-chip ${active ? "active" : ""}`,
-                          onClick: () => onToggleItemPerson(it.id, p.id),
-                        },
-                        p.name,
-                      );
-                    }),
-                  ),
-                  it.assignedTo.length > 1 &&
+                  q > 1 &&
                     React.createElement(
                       "div",
                       {
                         className: "tda-fetching",
                         style: { marginTop: "0.4rem" },
                       },
-                      `Split ${it.assignedTo.length} ways`,
+                      `$${(it.price / q).toFixed(2)} each · ${remaining} of ${q} unassigned`,
                     ),
-                ),
-              ),
+                  React.createElement(
+                    "div",
+                    {
+                      style: {
+                        marginTop: "0.6rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.4rem",
+                      },
+                    },
+                    props.people.map((p) => {
+                      const units = it.assignedTo[p.id] || 0;
+                      return React.createElement(
+                        "div",
+                        {
+                          key: p.id,
+                          style: {
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.6rem",
+                          },
+                        },
+                        React.createElement(
+                          "span",
+                          {
+                            className: `tda-chip ${units > 0 ? "active" : ""}`,
+                            style: { minWidth: "90px", textAlign: "center" },
+                          },
+                          p.name,
+                        ),
+                        q === 1
+                          ? React.createElement(
+                              "button",
+                              {
+                                className: `tda-chip ${units > 0 ? "active" : ""}`,
+                                onClick: () =>
+                                  onAdjustUnits(
+                                    it.id,
+                                    p.id,
+                                    units > 0 ? -1 : 1,
+                                  ),
+                              },
+                              units > 0 ? "Assigned ✓" : "Assign",
+                            )
+                          : React.createElement(
+                              React.Fragment,
+                              null,
+                              React.createElement(
+                                "button",
+                                {
+                                  className: "tda-group-btn",
+                                  disabled: units === 0,
+                                  onClick: () => onAdjustUnits(it.id, p.id, -1),
+                                },
+                                "−",
+                              ),
+                              React.createElement(
+                                "b",
+                                {
+                                  style: {
+                                    minWidth: "1.2rem",
+                                    textAlign: "center",
+                                    color: "#EDE6D9",
+                                  },
+                                },
+                                units,
+                              ),
+                              React.createElement(
+                                "button",
+                                {
+                                  className: "tda-group-btn",
+                                  disabled: remaining <= 0,
+                                  onClick: () => onAdjustUnits(it.id, p.id, 1),
+                                },
+                                "+",
+                              ),
+                            ),
+                      );
+                    }),
+                  ),
+                );
+              }),
             ),
             React.createElement(
               "button",
@@ -3738,11 +3872,11 @@
                 }),
               ),
             ),
-            totals.unassignedCount > 0 &&
+            totals.unassignedUnitsCount > 0 &&
               React.createElement(
                 "div",
                 { className: "tda-fetching", style: { marginTop: "0.6rem" } },
-                `${totals.unassignedCount} item${totals.unassignedCount === 1 ? "" : "s"} not assigned to anyone yet.`,
+                `${totals.unassignedUnitsCount} unit${totals.unassignedUnitsCount === 1 ? "" : "s"} not assigned to anyone yet.`,
               ),
             React.createElement(
               "div",
