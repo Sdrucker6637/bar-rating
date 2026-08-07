@@ -3792,13 +3792,12 @@
                       "⚖ Split evenly",
                     ),
                   ),
-                  q > 1 &&
-                    includedIds.length > 0 &&
+                  includedIds.length > 0 &&
                     React.createElement(
                       "div",
                       {
                         style: {
-                          marginTop: "0.6rem",
+                          marginTop: "0.5rem",
                           display: "flex",
                           flexDirection: "column",
                           gap: "0.4rem",
@@ -3808,6 +3807,7 @@
                         .filter((p) => includedIds.includes(p.id))
                         .map((p) => {
                           const units = it.assignedTo[p.id] || 0;
+                          const cost = (it.price / q) * units;
                           return React.createElement(
                             "div",
                             {
@@ -3815,6 +3815,7 @@
                               style: {
                                 display: "flex",
                                 alignItems: "center",
+                                justifyContent: "space-between",
                                 gap: "0.6rem",
                               },
                             },
@@ -3823,41 +3824,67 @@
                               {
                                 style: {
                                   minWidth: "90px",
-                                  fontSize: "0.8rem",
+                                  fontFamily: "'IBM Plex Mono', monospace",
+                                  fontSize: "0.78rem",
                                   color: "#A79EB2",
                                 },
                               },
                               p.name,
                             ),
+                            q > 1
+                              ? React.createElement(
+                                  "div",
+                                  {
+                                    style: {
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "0.5rem",
+                                    },
+                                  },
+                                  React.createElement(
+                                    "button",
+                                    {
+                                      className: "tda-group-btn",
+                                      onClick: () =>
+                                        onAdjustUnits(it.id, p.id, -1),
+                                    },
+                                    "−",
+                                  ),
+                                  React.createElement(
+                                    "b",
+                                    {
+                                      style: {
+                                        minWidth: "1.6rem",
+                                        textAlign: "center",
+                                        color: "#EDE6D9",
+                                      },
+                                    },
+                                    Number.isInteger(units)
+                                      ? units
+                                      : units.toFixed(2),
+                                  ),
+                                  React.createElement(
+                                    "button",
+                                    {
+                                      className: "tda-group-btn",
+                                      disabled: remaining <= 0,
+                                      onClick: () =>
+                                        onAdjustUnits(it.id, p.id, 1),
+                                    },
+                                    "+",
+                                  ),
+                                )
+                              : React.createElement("span"),
                             React.createElement(
-                              "button",
-                              {
-                                className: "tda-group-btn",
-                                onClick: () => onAdjustUnits(it.id, p.id, -1),
-                              },
-                              "−",
-                            ),
-                            React.createElement(
-                              "b",
+                              "span",
                               {
                                 style: {
-                                  minWidth: "1.6rem",
-                                  textAlign: "center",
-                                  color: "#EDE6D9",
+                                  fontFamily: "'IBM Plex Mono', monospace",
+                                  fontSize: "0.8rem",
+                                  color: "#C9A876",
                                 },
                               },
-                              Number.isInteger(units)
-                                ? units
-                                : units.toFixed(2),
-                            ),
-                            React.createElement(
-                              "button",
-                              {
-                                className: "tda-group-btn",
-                                disabled: remaining <= 0,
-                                onClick: () => onAdjustUnits(it.id, p.id, 1),
-                              },
-                              "+",
+                              `$${cost.toFixed(2)}`,
                             ),
                           );
                         }),
