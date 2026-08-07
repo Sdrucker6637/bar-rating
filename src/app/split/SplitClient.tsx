@@ -405,29 +405,6 @@ export default function SplitClient() {
   }
 
   // ---------------- tabs step: crew ----------------
-  function togglePersonInPlace(placeIndex: number, personId: string) {
-    setSplitPlaces((prev) =>
-      prev.map((pl, i) => {
-        if (i !== placeIndex) return pl;
-        const inCrew = pl.crewIds.includes(personId);
-        if (inCrew) {
-          // Leaving this place frees up whatever units they had here.
-          return {
-            ...pl,
-            crewIds: pl.crewIds.filter((id) => id !== personId),
-            items: pl.items.map((it) => {
-              if (!(personId in it.assignedTo)) return it;
-              const nextAssigned = { ...it.assignedTo };
-              delete nextAssigned[personId];
-              return { ...it, assignedTo: nextAssigned };
-            }),
-          };
-        }
-        return { ...pl, crewIds: [...pl.crewIds, personId] };
-      }),
-    );
-  }
-
   // Adds someone to this place's crew only. If they're not already on the
   // master roster (someone joining for just this one stop), they're added
   // to the roster too — but only into this place's crew, not retroactively
@@ -597,7 +574,6 @@ export default function SplitClient() {
         onAdjustUnits={adjustItemPersonUnits}
         onSplitEvenly={splitItemEvenly}
         onToggleIncluded={toggleItemPersonIncluded}
-        onTogglePersonInPlace={togglePersonInPlace}
         onAddPersonToPlace={addPersonToPlace}
         placeTotalsList={placeTotalsList}
         grandTotals={grandTotals}

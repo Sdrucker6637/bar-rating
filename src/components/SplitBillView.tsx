@@ -46,7 +46,6 @@ interface SplitBillViewProps {
     itemId: string,
     personId: string,
   ) => void;
-  onTogglePersonInPlace: (placeIndex: number, personId: string) => void;
   onAddPersonToPlace: (placeIndex: number, name: string) => void;
 
   placeTotalsList: SplitTotals[];
@@ -97,7 +96,6 @@ export default function SplitBillView(props: SplitBillViewProps) {
     onAdjustUnits,
     onSplitEvenly,
     onToggleIncluded,
-    onTogglePersonInPlace,
     onAddPersonToPlace,
     placeTotalsList,
     grandTotals,
@@ -340,7 +338,6 @@ export default function SplitBillView(props: SplitBillViewProps) {
     if (!place || !totals) return null;
 
     const crew = people.filter((p) => place.crewIds.includes(p.id));
-    const nonCrew = people.filter((p) => !place.crewIds.includes(p.id));
 
     return (
       <div className="my-4">
@@ -378,55 +375,47 @@ export default function SplitBillView(props: SplitBillViewProps) {
           <div className="mb-1 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
             Who was here
           </div>
-          <div className="mb-3.5 flex flex-wrap gap-1.5">
-            {people.map((p) => {
-              const inCrew = place.crewIds.includes(p.id);
-              if (inCrew) {
-                return (
-                  <span
-                    key={p.id}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-greenLight bg-ink px-3 py-1.5 font-mono text-[0.72rem] text-greenLight"
-                  >
-                    {p.name}
-                    <button
-                      onClick={() =>
-                        onRemovePersonFromPlace(activePlaceIndex, p.id)
-                      }
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#C77676",
-                        cursor: "pointer",
-                        padding: 0,
-                        lineHeight: 1,
-                        fontSize: "0.75rem",
-                      }}
-                      title="Remove from this place"
-                    >
-                      ✕
-                    </button>
-                  </span>
-                );
-              }
-              return (
-                <button
+          {crew.length > 0 ? (
+            <div className="mb-3.5 flex flex-wrap items-center gap-1.5">
+              {crew.map((p) => (
+                <span
                   key={p.id}
-                  className="cursor-pointer rounded-full border border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-mist transition-colors hover:border-brass hover:text-cream"
-                  onClick={() => onTogglePersonInPlace(activePlaceIndex, p.id)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-greenLight bg-ink px-3 py-1.5 font-mono text-[0.72rem] text-greenLight"
                 >
                   {p.name}
-                </button>
-              );
-            })}
-            <AddPersonToPlaceButton
-              placeIndex={activePlaceIndex}
-              onAdd={onAddPersonToPlace}
-            />
-          </div>
-          {nonCrew.length === people.length && (
-            <div className="mb-3.5 font-mono text-[0.68rem] text-mute">
-              Nobody&apos;s assigned to this place yet — tap names above to add
-              them.
+                  <button
+                    onClick={() =>
+                      onRemovePersonFromPlace(activePlaceIndex, p.id)
+                    }
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#C77676",
+                      cursor: "pointer",
+                      padding: 0,
+                      lineHeight: 1,
+                      fontSize: "0.75rem",
+                    }}
+                    title="Remove from this place"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              <AddPersonToPlaceButton
+                placeIndex={activePlaceIndex}
+                onAdd={onAddPersonToPlace}
+              />
+            </div>
+          ) : (
+            <div className="mb-3.5 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[0.68rem] text-mute">
+                Nobody here yet —
+              </span>
+              <AddPersonToPlaceButton
+                placeIndex={activePlaceIndex}
+                onAdd={onAddPersonToPlace}
+              />
             </div>
           )}
 
@@ -681,28 +670,31 @@ export default function SplitBillView(props: SplitBillViewProps) {
           )}
 
           <div className="mt-5 border-t border-line pt-4">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              className="w-full cursor-pointer rounded-full border-none bg-brass px-5 py-3 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold disabled:cursor-default disabled:opacity-40"
+              disabled={crew.length === 0}
+              onClick={() => onSendPlaceText(activePlaceIndex)}
+            >
+              📱 Send text for this place
+            </button>
+            <div className="mt-2 text-center font-mono text-[0.68rem] text-mute">
+              Opens your messaging app with each person&apos;s total for this
+              place.
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-2.5">
               <button
-                className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
                 onClick={() => setStep("receipts")}
               >
                 ← Back to receipts
               </button>
               <button
-                className="ml-auto cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-40"
-                disabled={crew.length === 0}
-                onClick={() => onSendPlaceText(activePlaceIndex)}
-                title="Opens your messaging app with each person's total for this place"
+                className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                onClick={() => setStep("summary")}
               >
-                📱 Send text for this place
+                Next: Review all →
               </button>
             </div>
-            <button
-              className="mt-2.5 w-full cursor-pointer rounded-full border-none bg-brass px-5 py-3 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
-              onClick={() => setStep("summary")}
-            >
-              Next: Review all →
-            </button>
           </div>
         </div>
       </div>
@@ -810,8 +802,8 @@ function AddPersonToPlaceButton({
     >
       <input
         name="newPerson"
-        placeholder="+ someone new"
-        className="w-[110px] rounded-full border border-dashed border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-mist focus:border-brass focus:outline-none"
+        placeholder="+ add someone"
+        className="w-[130px] rounded-full border border-dashed border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-mist focus:border-brass focus:outline-none"
       />
     </form>
   );
