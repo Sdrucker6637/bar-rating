@@ -2240,6 +2240,7 @@
       .tda-toggle button { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.4rem 0.85rem; background:transparent; color:#A79EB2; border:none; cursor:pointer; }
       .tda-toggle button.active { background:#B8965F; color:#16130F; font-weight:600; }
       .tda-chip { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; padding:0.38rem 0.75rem; border-radius:999px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; }
+      .tda-chip:disabled { opacity:0.4; cursor:default; }
       .tda-chip.active { background:#3F5D4E; border-color:#3F5D4E; color:#EDE6D9; }
       .tda-chip-baller.active { background:#8A6D2F; border-color:#8A6D2F; }
       .tda-chip-explore.active { background:#3A4F66; border-color:#3A4F66; }
@@ -3711,6 +3712,10 @@
                 const includedIds = props.people
                   .filter((p) => (it.assignedTo[p.id] || 0) > 0)
                   .map((p) => p.id);
+                const splitTargetIds =
+                  includedIds.length > 0
+                    ? includedIds
+                    : props.people.map((p) => p.id);
                 const assignedSum = Object.values(it.assignedTo).reduce(
                   (a, c) => a + c,
                   0,
@@ -3784,10 +3789,11 @@
                       "button",
                       {
                         className: "tda-chip tda-chip-baller",
-                        disabled: includedIds.length === 0,
-                        onClick: () => onSplitEvenly(it.id, includedIds),
+                        onClick: () => onSplitEvenly(it.id, splitTargetIds),
                         title:
-                          "Divide this item evenly among the people selected above",
+                          includedIds.length > 0
+                            ? "Divide this item evenly among the people selected above"
+                            : "Divide this item evenly among everyone in the group",
                       },
                       "⚖ Split evenly",
                     ),
