@@ -101,6 +101,9 @@ export interface SplitPlace {
   crewIds: string[];
   parsing: boolean;
   parseError: string | null;
+  /** How many screenshots were included in the last successful parse — used
+   *  to skip re-reading receipts that haven't changed. */
+  parsedShotCount: number;
 }
 
 export interface SplitTotals {

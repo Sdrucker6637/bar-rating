@@ -34,7 +34,19 @@ function emptyPlace(id: string, crewIds: string[]): SplitPlace {
     crewIds: [...crewIds],
     parsing: false,
     parseError: null,
+    parsedShotCount: 0,
   };
+}
+
+function normName(n: string): string {
+  return n.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// Same-name + same-price line items are treated as the same receipt line —
+// used when merging a fresh parse into items that are already there so
+// re-reading a receipt never duplicates anything.
+function itemKey(name: string, price: number): string {
+  return `${normName(name)}|${price.toFixed(2)}`;
 }
 
 export default function SplitClient() {
@@ -44,6 +56,10 @@ export default function SplitClient() {
   const [placesCount, setPlacesCount] = useState(1);
   const [splitPlaces, setSplitPlaces] = useState<SplitPlace[]>([]);
   const [activePlaceIndex, setActivePlaceIndex] = useState(0);
+  // Roster ids captured when the places are created — people added later via
+  // "+ someone new" are deletable; the original crew isn't.
+  const [originalRosterIds, setOriginalRosterIds] = useState<string[]>([]);
+  const [readingAll, setReadingAll] = useState(false);
 
   function resetSplitBill() {
     setSplitStep("names");
@@ -52,6 +68,8 @@ export default function SplitClient() {
     setPlacesCount(1);
     setSplitPlaces([]);
     setActivePlaceIndex(0);
+    setOriginalRosterIds([]);
+    setReadingAll(false);
   }
 
   // ---------------- names step ----------------
@@ -81,6 +99,7 @@ export default function SplitClient() {
   // ---------------- places count step ----------------
   function confirmPlacesCount() {
     const ids = splitPeople.map((p) => p.id);
+    setOriginalRosterIds(ids);
     setSplitPlaces(
       Array.from({ length: placesCount }, (_, i) =>
         emptyPlace(`place${Date.now()}${i}`, ids),
@@ -135,9 +154,11 @@ export default function SplitClient() {
     );
   }
 
-  async function parsePlaceReceipts(placeIndex: number) {
+  // Parses one place's screenshots and merges the result into its items.
+  // Returns true when the read succeeded (or there was nothing to read).
+  async function parsePlaceReceipts(placeIndex: number): Promise<boolean> {
     const place = splitPlaces[placeIndex];
-    if (!place || place.screenshots.length === 0) return;
+    if (!place || place.screenshots.length === 0) return true;
     setSplitPlaces((prev) =>
       prev.map((pl, i) =>
         i === placeIndex ? { ...pl, parsing: true, parseError: null } : pl,
@@ -167,7 +188,7 @@ export default function SplitClient() {
               : pl,
           ),
         );
-        return;
+        return false;
       }
       const items: SplitItem[] = data.result.items.map(
         (it: { name: string; price: number; quantity: number }, i: number) => ({
@@ -179,23 +200,36 @@ export default function SplitClient() {
         }),
       );
       setSplitPlaces((prev) =>
-        prev.map((pl, i) =>
-          i === placeIndex
-            ? {
-                ...pl,
-                items,
-                tax: data.result.tax || 0,
-                tip: data.result.tip || 0,
-                name:
-                  !pl.nameEdited && data.result.placeName
-                    ? data.result.placeName
-                    : pl.name,
-                parsing: false,
-                parseError: null,
-              }
-            : pl,
-        ),
+        prev.map((pl, i) => {
+          if (i !== placeIndex) return pl;
+          // Merge rather than replace: anything the user added by hand in the
+          // tabs is kept, and re-reading the same receipt can't duplicate a
+          // line that's already there.
+          const merged = [...pl.items];
+          const seen = new Set(merged.map((it) => itemKey(it.name, it.price)));
+          items.forEach((it) => {
+            const key = itemKey(it.name, it.price);
+            if (!seen.has(key)) {
+              merged.push(it);
+              seen.add(key);
+            }
+          });
+          return {
+            ...pl,
+            items: merged,
+            tax: Math.max(pl.tax, data.result.tax || 0),
+            tip: Math.max(pl.tip, data.result.tip || 0),
+            name:
+              !pl.nameEdited && data.result.placeName
+                ? data.result.placeName
+                : pl.name,
+            parsedShotCount: pl.screenshots.length,
+            parsing: false,
+            parseError: null,
+          };
+        }),
       );
+      return true;
     } catch (e) {
       setSplitPlaces((prev) =>
         prev.map((pl, i) =>
@@ -208,12 +242,40 @@ export default function SplitClient() {
             : pl,
         ),
       );
+      return false;
     }
   }
 
   function proceedToTabs() {
     setActivePlaceIndex(0);
     setSplitStep("tabs");
+  }
+
+  // Reads every place's receipts in one go (only places with new or never-read
+  // screenshots are sent), then opens the tabs step. If every read failed we
+  // stay on the receipts step so the errors are visible.
+  async function readAllAndProceed() {
+    const toParse = splitPlaces
+      .map((pl, i) => ({ pl, i }))
+      .filter(
+        ({ pl }) =>
+          pl.screenshots.length > 0 &&
+          pl.parsedShotCount !== pl.screenshots.length,
+      );
+    if (toParse.length === 0) {
+      proceedToTabs();
+      return;
+    }
+    setReadingAll(true);
+    // Read one place at a time — gentler on the Gemini API than firing every
+    // receipt in parallel, and barely slower for the usual 2–4 stops.
+    const results: boolean[] = [];
+    for (const { i } of toParse) {
+      results.push(await parsePlaceReceipts(i));
+    }
+    setReadingAll(false);
+    if (results.every((ok) => !ok)) return; // all failed — stay & show errors
+    proceedToTabs();
   }
 
   // ---------------- tabs step: items ----------------
@@ -387,6 +449,34 @@ export default function SplitClient() {
     );
   }
 
+  // Removes someone from one place's crew, freeing whatever units they were
+  // assigned there. If they were added mid-flow via "+ someone new" and this
+  // was their last place, they're dropped from the roster entirely so they
+  // stop showing up on other tabs and in the summary.
+  function removePersonFromPlace(placeIndex: number, personId: string) {
+    setSplitPlaces((prev) =>
+      prev.map((pl, i) => {
+        if (i !== placeIndex) return pl;
+        return {
+          ...pl,
+          crewIds: pl.crewIds.filter((id) => id !== personId),
+          items: pl.items.map((it) => {
+            if (!(personId in it.assignedTo)) return it;
+            const nextAssigned = { ...it.assignedTo };
+            delete nextAssigned[personId];
+            return { ...it, assignedTo: nextAssigned };
+          }),
+        };
+      }),
+    );
+    const stillSomewhere = splitPlaces.some(
+      (pl, i) => i !== placeIndex && pl.crewIds.includes(personId),
+    );
+    if (!stillSomewhere && !originalRosterIds.includes(personId)) {
+      setSplitPeople((roster) => roster.filter((p) => p.id !== personId));
+    }
+  }
+
   // ---------------- totals ----------------
   function placeTotals(place: SplitPlace): SplitTotals {
     const perPersonSubtotal: Record<string, number> = {};
@@ -497,8 +587,9 @@ export default function SplitClient() {
         onSetPlaceName={setPlaceName}
         onAddScreenshots={addScreenshotsToPlace}
         onRemoveScreenshot={removeScreenshotFromPlace}
-        onParsePlace={parsePlaceReceipts}
-        onProceedToTabs={proceedToTabs}
+        onRemovePersonFromPlace={removePersonFromPlace}
+        readingAll={readingAll}
+        onReadAllAndProceed={readAllAndProceed}
         activePlaceIndex={activePlaceIndex}
         setActivePlaceIndex={setActivePlaceIndex}
         onAddItem={addManualItemToPlace}

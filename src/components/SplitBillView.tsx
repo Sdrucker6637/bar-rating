@@ -22,11 +22,12 @@ interface SplitBillViewProps {
   onSetPlaceName: (placeIndex: number, name: string) => void;
   onAddScreenshots: (placeIndex: number, files: FileList) => void;
   onRemoveScreenshot: (placeIndex: number, shotId: string) => void;
-  onParsePlace: (placeIndex: number) => void;
-  onProceedToTabs: () => void;
+  readingAll: boolean;
+  onReadAllAndProceed: () => void;
 
   activePlaceIndex: number;
   setActivePlaceIndex: (i: number) => void;
+  onRemovePersonFromPlace: (placeIndex: number, personId: string) => void;
   onAddItem: (placeIndex: number) => void;
   onRemoveItem: (placeIndex: number, itemId: string) => void;
   onAdjustUnits: (
@@ -86,10 +87,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
     onSetPlaceName,
     onAddScreenshots,
     onRemoveScreenshot,
-    onParsePlace,
-    onProceedToTabs,
+    readingAll,
+    onReadAllAndProceed,
     activePlaceIndex,
     setActivePlaceIndex,
+    onRemovePersonFromPlace,
     onAddItem,
     onRemoveItem,
     onAdjustUnits,
@@ -286,6 +288,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
               </div>
             )}
 
+            {place.parsing && (
+              <div className="mb-3 font-mono text-[0.75rem] text-brass">
+                Reading receipt…
+              </div>
+            )}
             {place.parseError && (
               <div className="mb-3 font-mono text-[0.75rem] text-red">
                 {place.parseError}
@@ -300,18 +307,6 @@ export default function SplitBillView(props: SplitBillViewProps) {
                   : ""}
               </div>
             )}
-
-            <button
-              className="cursor-pointer rounded-full border-none bg-brass px-5 py-2 font-mono text-[0.78rem] font-semibold text-deep hover:bg-gold disabled:cursor-default disabled:opacity-50"
-              disabled={place.screenshots.length === 0 || place.parsing}
-              onClick={() => onParsePlace(i)}
-            >
-              {place.parsing
-                ? "Reading receipt…"
-                : place.items.length > 0
-                  ? "Re-read receipt"
-                  : "Read receipt"}
-            </button>
           </div>
         ))}
 
@@ -323,15 +318,16 @@ export default function SplitBillView(props: SplitBillViewProps) {
             ← Back
           </button>
           <button
-            className="cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
-            onClick={onProceedToTabs}
+            className="cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold disabled:cursor-default disabled:opacity-50"
+            disabled={readingAll}
+            onClick={onReadAllAndProceed}
           >
-            Next: Divide items →
+            {readingAll ? "Reading receipts…" : "Next: Divide items →"}
           </button>
         </div>
         <div className="text-center font-mono text-[0.68rem] text-mute">
-          You can skip reading a receipt and add its items by hand on the next
-          step.
+          Every receipt is read automatically when you continue — you can also
+          skip a place and add its items by hand on the next step.
         </div>
       </div>
     );
@@ -367,20 +363,55 @@ export default function SplitBillView(props: SplitBillViewProps) {
         <div className="rounded-lg border border-line bg-panel p-4">
           <PanelHeading>{placeLabel(place, activePlaceIndex)}</PanelHeading>
 
+          {place.parseError && (
+            <div className="mb-3 rounded-lg border border-redDeep bg-ink px-3 py-2.5 font-mono text-[0.72rem] text-red">
+              Couldn&apos;t read this receipt: {place.parseError}
+            </div>
+          )}
+          {place.items.length === 0 && !place.parseError && (
+            <div className="mb-3 rounded-lg border border-line2 bg-ink px-3 py-2.5 font-mono text-[0.72rem] text-mute">
+              No items yet — tap + Add item to enter them by hand, or go back
+              to try the receipt again.
+            </div>
+          )}
+
           <div className="mb-1 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
             Who was here
           </div>
           <div className="mb-3.5 flex flex-wrap gap-1.5">
             {people.map((p) => {
-              const included = place.crewIds.includes(p.id);
+              const inCrew = place.crewIds.includes(p.id);
+              if (inCrew) {
+                return (
+                  <span
+                    key={p.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-greenLight bg-ink px-3 py-1.5 font-mono text-[0.72rem] text-greenLight"
+                  >
+                    {p.name}
+                    <button
+                      onClick={() =>
+                        onRemovePersonFromPlace(activePlaceIndex, p.id)
+                      }
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#C77676",
+                        cursor: "pointer",
+                        padding: 0,
+                        lineHeight: 1,
+                        fontSize: "0.75rem",
+                      }}
+                      title="Remove from this place"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                );
+              }
               return (
                 <button
                   key={p.id}
-                  className={`cursor-pointer rounded-full border px-3 py-1.5 font-mono text-[0.72rem] ${
-                    included
-                      ? "border-greenLight text-greenLight"
-                      : "border-line2 text-mist"
-                  }`}
+                  className="cursor-pointer rounded-full border border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-mist transition-colors hover:border-brass hover:text-cream"
                   onClick={() => onTogglePersonInPlace(activePlaceIndex, p.id)}
                 >
                   {p.name}
@@ -649,22 +680,25 @@ export default function SplitBillView(props: SplitBillViewProps) {
             </div>
           )}
 
-          <div className="mt-4 flex flex-wrap items-center gap-2.5">
+          <div className="mt-5 border-t border-line pt-4">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                onClick={() => setStep("receipts")}
+              >
+                ← Back to receipts
+              </button>
+              <button
+                className="ml-auto cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-40"
+                disabled={crew.length === 0}
+                onClick={() => onSendPlaceText(activePlaceIndex)}
+                title="Opens your messaging app with each person's total for this place"
+              >
+                📱 Send text for this place
+              </button>
+            </div>
             <button
-              className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
-              onClick={() => setStep("receipts")}
-            >
-              ← Back to receipts
-            </button>
-            <button
-              className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist disabled:cursor-default disabled:opacity-50"
-              disabled={crew.length === 0}
-              onClick={() => onSendPlaceText(activePlaceIndex)}
-            >
-              📱 Send text for this place
-            </button>
-            <button
-              className="ml-auto cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
+              className="mt-2.5 w-full cursor-pointer rounded-full border-none bg-brass px-5 py-3 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
               onClick={() => setStep("summary")}
             >
               Next: Review all →
@@ -724,25 +758,31 @@ export default function SplitBillView(props: SplitBillViewProps) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-col gap-2.5">
         <button
-          className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
-          onClick={() => setStep("tabs")}
-        >
-          ← Back to tabs
-        </button>
-        <button
-          className="flex-1 cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
+          className="w-full cursor-pointer rounded-full border-none bg-brass px-5 py-3 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
           onClick={onSendGrandText}
         >
           📱 Send full summary as text
         </button>
-        <button
-          className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
-          onClick={onReset}
-        >
-          Start over
-        </button>
+        <div className="text-center font-mono text-[0.68rem] text-mute">
+          Opens your messaging app with each place&apos;s totals and the grand
+          total per person.
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+            onClick={() => setStep("tabs")}
+          >
+            ← Back to tabs
+          </button>
+          <button
+            className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+            onClick={onReset}
+          >
+            Start over
+          </button>
+        </div>
       </div>
     </div>
   );
