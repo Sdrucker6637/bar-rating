@@ -2279,6 +2279,17 @@
       .tda-add-btn { font-family:'IBM Plex Mono',monospace; font-size:0.78rem; padding:0.6rem 1.1rem; border-radius:5px; border:1px dashed #302938; background:transparent; color:#B8965F; cursor:pointer; width:100%; margin-top:0.75rem; }
       .tda-add-btn:hover { border-color:#B8965F; background:rgba(184,150,95,0.05); }
       .tda-search-panel { background:#17141B; border:1px solid #262029; border-radius:8px; padding:1.1rem; margin:1rem 0; }
+      .tda-upload-zone { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.4rem; text-align:center; border:1.5px dashed #302938; border-radius:10px; padding:2.5rem 1.5rem; cursor:pointer; background:#0E0D10; transition:border-color 0.15s, background 0.15s; }
+      .tda-upload-zone:hover { border-color:#B8965F; background:#141118; }
+      .tda-upload-icon { font-size:2.2rem; line-height:1; margin-bottom:0.3rem; }
+      .tda-upload-title { font-family:'Fraunces',serif; font-weight:500; font-size:1.05rem; color:#EDE6D9; }
+      .tda-upload-hint { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#857C8E; }
+      .tda-upload-preview { max-width:100%; max-height:360px; border-radius:8px; border:1px solid #302938; display:block; }
+      .tda-upload-change { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#B8965F; margin-top:0.6rem; }
+      @media (max-width: 600px) {
+        .tda-upload-zone { padding:1.75rem 1rem; }
+        .tda-upload-preview { max-height:260px; }
+      }
       .tda-search-row { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; }
       .tda-find-btn { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; padding:0.6rem 1.2rem; border-radius:999px; border:none; background:#B8965F; color:#16130F; font-weight:600; cursor:pointer; }
       .tda-find-btn:hover { background:#C9A876; }
@@ -3532,6 +3543,11 @@
               "Who's splitting the bill?",
             ),
             React.createElement(
+              "div",
+              { className: "tda-fetching", style: { marginBottom: "0.9rem" } },
+              "Add names one at a time — press Enter or tap + Add after each one.",
+            ),
+            React.createElement(
               "form",
               {
                 onSubmit: (e) => {
@@ -3626,28 +3642,56 @@
             ),
             React.createElement(
               "div",
-              { className: "tda-fetching", style: { marginBottom: "0.9rem" } },
+              { className: "tda-fetching", style: { marginBottom: "1rem" } },
               "Open the receipt link, screenshot the itemized page, then upload it below.",
             ),
+            React.createElement(
+              "label",
+              {
+                htmlFor: "tda-receipt-upload-input",
+                className: "tda-upload-zone",
+              },
+              receiptImage
+                ? React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement("img", {
+                      src: receiptImage.previewUrl,
+                      className: "tda-upload-preview",
+                    }),
+                    React.createElement(
+                      "div",
+                      { className: "tda-upload-change" },
+                      "Tap to choose a different screenshot",
+                    ),
+                  )
+                : React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement(
+                      "div",
+                      { className: "tda-upload-icon" },
+                      "🧾",
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "tda-upload-title" },
+                      "Tap to upload a screenshot",
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "tda-upload-hint" },
+                      "PNG or JPG of the itemized receipt",
+                    ),
+                  ),
+            ),
             React.createElement("input", {
+              id: "tda-receipt-upload-input",
               type: "file",
               accept: "image/*",
               onChange: onFileChange,
-              className: "tda-input",
-              style: { marginBottom: "0.9rem" },
+              style: { display: "none" },
             }),
-            receiptImage &&
-              React.createElement("img", {
-                src: receiptImage.previewUrl,
-                style: {
-                  maxWidth: "260px",
-                  maxHeight: "340px",
-                  borderRadius: "8px",
-                  border: "1px solid #302938",
-                  display: "block",
-                  marginBottom: "0.9rem",
-                },
-              }),
             parseError &&
               React.createElement(
                 "div",
@@ -3720,7 +3764,7 @@
                 const remaining = q - assignedSum;
                 const assignedShares = Object.values(it.assignedTo);
                 const isEvenlySplit =
-                  assignedShares.length > 0 &&
+                  assignedShares.length > 1 &&
                   Math.abs(assignedSum - q) < 0.001 &&
                   assignedShares.every(
                     (s) => Math.abs(s - assignedShares[0]) < 0.001,
