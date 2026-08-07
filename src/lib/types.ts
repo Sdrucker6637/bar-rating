@@ -35,14 +35,12 @@ export interface PlaceResult {
   placeId: string | null;
   mapsLink: string;
   rating?: number | null;
-  // Enrichment fields (filled in by Gemini after the place is verified)
   neighborhood?: string;
   description?: string;
   tags?: string[];
   happyHour?: string;
   capacityHint?: number | null;
   notes?: string;
-  // Internal routing flags (never persisted)
   _placeIntent?: "visited" | "wishlist" | "crawlStart";
   _wishFormId?: string;
 }
@@ -79,11 +77,42 @@ export interface SplitItem {
   assignedTo: Record<string, number>; // personId -> units assigned
 }
 
+/** One uploaded screenshot of a receipt (a place may have several). */
+export interface SplitScreenshot {
+  id: string;
+  base64: string;
+  mimeType: string;
+  previewUrl: string;
+}
+
+/** One tab in the Split flow — one bar/place with its own receipt(s),
+ *  items, and the subset of the group ("crew") who were there. */
+export interface SplitPlace {
+  id: string;
+  name: string;
+  /** True once the user has hand-edited the name — stops later Gemini
+   *  parses from overwriting a name the user chose themselves. */
+  nameEdited: boolean;
+  screenshots: SplitScreenshot[];
+  items: SplitItem[];
+  tax: number;
+  tip: number;
+  /** Subset of the master `SplitPerson` roster who were at this place. */
+  crewIds: string[];
+  parsing: boolean;
+  parseError: string | null;
+}
+
 export interface SplitTotals {
   perPersonSubtotal: Record<string, number>;
   perPersonTotal: Record<string, number>;
   assignedSubtotal: number;
   unassignedUnitsCount: number;
+}
+
+/** Sum of every place's perPersonTotal, keyed by person id. */
+export interface SplitGrandTotals {
+  perPersonTotal: Record<string, number>;
 }
 
 export interface PlacesModalState {
