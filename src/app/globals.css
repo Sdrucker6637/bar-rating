@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: #0e0d10;
+}
+
+/* ---------- pulse animation (skeleton / loading text) ---------- */
+@keyframes tda-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* ---------- Heatmap container (also anchors the popup theming below) ---------- */
+.tda-heatmap-container {
+  height: 560px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #262029;
+  margin-top: 1rem;
+  overflow: hidden;
+}
+
+/* ---------- Leaflet popup theming ---------- */
+.tda-heatmap-container .leaflet-popup-content-wrapper {
+  background: #17141b;
+  color: #ede6d9;
+  border-radius: 8px;
+  border: 1px solid #302938;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.tda-heatmap-container .leaflet-popup-tip {
+  background: #17141b;
+  border: 1px solid #302938;
+}
+.tda-heatmap-container .leaflet-popup-close-button {
+  color: #857c8e !important;
+}
+
+/* ---------- Leaflet popup inner content (injected via HTML strings) ---------- */
+.tda-map-popup-name {
+  font-family: "Fraunces", serif;
+  font-weight: 500;
+  font-size: 1.02rem;
+  color: #ede6d9;
+}
+.tda-map-popup-score {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.82rem;
+  color: #c9a876;
+  margin-top: 0.3rem;
+}
+.tda-map-popup-score.tda-muted {
+  color: #a79eb2;
+}
+
+/* ---------- 16px inputs on small screens stop iOS Safari auto-zoom ---------- */
+@media (max-width: 600px) {
+  .tda-input,
+  .tda-select {
+    font-size: 16px;
+  }
+}
