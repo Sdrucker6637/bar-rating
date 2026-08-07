@@ -2209,6 +2209,14 @@
           );
         }
 
+        const TabIntro = (title, sub) =>
+          React.createElement(
+            "div",
+            { className: "tda-tab-intro" },
+            React.createElement("h2", null, title),
+            React.createElement("p", null, sub),
+          );
+
         const appContent = React.createElement(
           "div",
           { className: "tda-root" },
@@ -2227,7 +2235,10 @@
       .tda-tab { flex:1 1 0; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase; padding:0.65rem 0.8rem; border-radius:3px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; transition:all 0.15s ease; }
       .tda-tab:hover { border-color:#B8965F; color:#EDE6D9; }
       .tda-tab.active { background:#B8965F; color:#16130F; border-color:#B8965F; font-weight:600; }
-      .tda-champion { border:1px solid #B8965F; border-radius:4px; padding:1.1rem 1.4rem; margin:1.75rem 0 1.25rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; background:linear-gradient(135deg,rgba(184,150,95,0.08),transparent); flex-wrap:wrap; }
+      .tda-tab-intro { margin-bottom:1rem; }
+      .tda-tab-intro h2 { font-family:'Fraunces',serif; font-weight:500; font-size:1.4rem; margin:0; color:#EDE6D9; letter-spacing:-0.01em; }
+      .tda-tab-intro p { margin:0.4rem 0 0; font-size:0.88rem; color:#A79EB2; line-height:1.5; max-width:62ch; }
+      .tda-champion { border:1px solid #B8965F; border-radius:4px; padding:1.1rem 1.4rem; margin:1.25rem 0 1.25rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; background:linear-gradient(135deg,rgba(184,150,95,0.08),transparent); flex-wrap:wrap; }
       .tda-champion-eyebrow { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase; color:#C9A876; }
       .tda-champion-name { font-family:'Fraunces',serif; font-weight:500; font-size:1.6rem; margin-top:0.25rem; }
       .tda-champion-score { font-family:'IBM Plex Mono',monospace; font-size:2rem; color:#C9A876; font-weight:600; }
@@ -2289,6 +2300,8 @@
       @media (max-width: 600px) {
         .tda-upload-zone { padding:1.75rem 1rem; }
         .tda-upload-preview { max-height:260px; }
+        /* 16px inputs stop iOS Safari from auto-zooming into focused fields */
+        .tda-input, .tda-select { font-size:16px; }
       }
       .tda-search-row { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; }
       .tda-find-btn { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; padding:0.6rem 1.2rem; border-radius:999px; border:none; background:#B8965F; color:#16130F; font-weight:600; cursor:pointer; }
@@ -2325,6 +2338,10 @@
       .tda-modal-actions { display:flex; gap:0.6rem; margin-top:1rem; }
       .tda-primary-btn { flex:1; font-family:'IBM Plex Mono',monospace; font-weight:600; padding:0.65rem; border-radius:5px; border:none; background:#B8965F; color:#16130F; cursor:pointer; }
       .tda-secondary-btn { flex:1; font-family:'IBM Plex Mono',monospace; padding:0.65rem; border-radius:5px; border:1px solid #302938; background:transparent; color:#A79EB2; cursor:pointer; }
+      .tda-receipt-actions { display:flex; align-items:center; justify-content:space-between; gap:0.6rem; flex-wrap:wrap; margin-top:1.1rem; }
+      .tda-skip-row { display:flex; justify-content:flex-end; }
+      .tda-skip-btn { font-family:'IBM Plex Mono',monospace; font-size:0.72rem; background:none; border:none; color:#857C8E; cursor:pointer; padding:0.6rem 0; text-decoration:underline; text-underline-offset:3px; }
+      .tda-skip-btn:hover { color:#C9A876; }
       .tda-details-desc { margin-top:0.7rem; line-height:1.55; color:#D8D1C4; font-size:0.92rem; }
       .tda-details-row { margin-top:0.9rem; font-family:'IBM Plex Mono',monospace; font-size:0.78rem; color:#A79EB2; display:flex; flex-direction:column; gap:0.35rem; }
       .tda-spinner { font-family:'IBM Plex Mono',monospace; font-size:0.8rem; color:#857C8E; padding:1.5rem 0; text-align:center; }
@@ -2450,6 +2467,10 @@
               React.createElement(
                 React.Fragment,
                 null,
+                TabIntro(
+                  "Find a New Bar",
+                  "Search by vibe for fresh spots, roll the dice on a surprise pick, or add a bar to the wishlist by name.",
+                ),
                 searchPanel,
                 React.createElement(
                   "button",
@@ -2497,44 +2518,56 @@
                 ),
               ),
             tab === "heatmap" &&
-              React.createElement(TourMapView, { bars: bars || [] }),
+              React.createElement(
+                React.Fragment,
+                null,
+                TabIntro(
+                  "Tour Map",
+                  "Every stop on the tour — top-rated visits glow warm, wishlist spots cluster by neighborhood.",
+                ),
+                React.createElement(TourMapView, { bars: bars || [] }),
+              ),
             tab === "split" &&
-              React.createElement(SplitTheBillView, {
-                step: splitStep,
-                setStep: setSplitStep,
-                people: splitPeople,
-                nameInput: splitNameInput,
-                setNameInput: setSplitNameInput,
-                onAddPerson: addSplitPerson,
-                onRemovePerson: removeSplitPerson,
-                receiptImage: splitReceiptImage,
-                onFileChange: handleReceiptFileChange,
-                onParseReceipt: parseSplitReceipt,
-                parsing: splitParsing,
-                parseError: splitParseError,
-                items: splitItems,
-                onAddItem: addManualSplitItem,
-                onRemoveItem: removeSplitItem,
-                onAdjustUnits: adjustItemPersonUnits,
-                onSplitEvenly: splitItemEvenly,
-                onToggleIncluded: toggleItemPersonIncluded,
-                tax: splitTax,
-                tip: splitTip,
-                totals: splitTotals,
-                onSendText: sendSplitText,
-                onReset: resetSplitBill,
-              }),
+              React.createElement(
+                React.Fragment,
+                null,
+                TabIntro(
+                  "Split the Bill",
+                  "Add your crew, snap the itemized receipt, and divide the tab fairly — no math required.",
+                ),
+                React.createElement(SplitTheBillView, {
+                  step: splitStep,
+                  setStep: setSplitStep,
+                  people: splitPeople,
+                  nameInput: splitNameInput,
+                  setNameInput: setSplitNameInput,
+                  onAddPerson: addSplitPerson,
+                  onRemovePerson: removeSplitPerson,
+                  receiptImage: splitReceiptImage,
+                  onFileChange: handleReceiptFileChange,
+                  onParseReceipt: parseSplitReceipt,
+                  parsing: splitParsing,
+                  parseError: splitParseError,
+                  items: splitItems,
+                  onAddItem: addManualSplitItem,
+                  onRemoveItem: removeSplitItem,
+                  onAdjustUnits: adjustItemPersonUnits,
+                  onSplitEvenly: splitItemEvenly,
+                  onToggleIncluded: toggleItemPersonIncluded,
+                  tax: splitTax,
+                  tip: splitTip,
+                  totals: splitTotals,
+                  onSendText: sendSplitText,
+                  onReset: resetSplitBill,
+                }),
+              ),
             tab === "leaderboard" &&
               React.createElement(
                 React.Fragment,
                 null,
-                React.createElement(
-                  "button",
-                  {
-                    className: "tda-add-btn",
-                    onClick: () => startManualAdd("visited"),
-                  },
-                  "+ Add a bar you visited & rank it",
+                TabIntro(
+                  "Current Leaderboard",
+                  "Where we stand — every rated bar ranked by average score across vibe, value, service, food, and drinks.",
                 ),
                 filteredVisited.length > 0 &&
                   (() => {
@@ -2567,6 +2600,14 @@
                       ),
                     );
                   })(),
+                React.createElement(
+                  "button",
+                  {
+                    className: "tda-add-btn",
+                    onClick: () => startManualAdd("visited"),
+                  },
+                  "+ Add a bar you visited & rank it",
+                ),
                 React.createElement(
                   "div",
                   { className: "tda-controls" },
@@ -3607,13 +3648,23 @@
                 ),
               ),
             React.createElement(
-              "button",
+              "div",
               {
-                className: "tda-find-btn",
-                disabled: people.length < 2,
-                onClick: () => setStep("receipt"),
+                style: {
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: "0.6rem",
+                },
               },
-              "Next: Add receipt →",
+              React.createElement(
+                "button",
+                {
+                  className: "tda-find-btn",
+                  disabled: people.length < 2,
+                  onClick: () => setStep("receipt"),
+                },
+                "Next: Add receipt →",
+              ),
             ),
             people.length > 0 &&
               people.length < 2 &&
@@ -3700,12 +3751,25 @@
               ),
             React.createElement(
               "div",
-              { className: "tda-search-row" },
+              { className: "tda-skip-row" },
+              React.createElement(
+                "button",
+                {
+                  className: "tda-skip-btn",
+                  onClick: () => setStep("assign"),
+                },
+                "Skip — enter items manually",
+              ),
+            ),
+            React.createElement(
+              "div",
+              { className: "tda-receipt-actions" },
               React.createElement(
                 "button",
                 {
                   className: "tda-secondary-btn",
                   onClick: () => setStep("names"),
+                  style: { flex: "0 0 auto" },
                 },
                 "← Back",
               ),
@@ -3717,14 +3781,6 @@
                   onClick: onParseReceipt,
                 },
                 parsing ? "Reading receipt…" : "Read receipt",
-              ),
-              React.createElement(
-                "button",
-                {
-                  className: "tda-secondary-btn",
-                  onClick: () => setStep("assign"),
-                },
-                "Skip — enter items manually",
               ),
             ),
           );
