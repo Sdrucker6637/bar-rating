@@ -55,7 +55,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <nav className="my-7 flex gap-2">
+        <nav className="my-7 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {TABS.map((t) => {
             const active =
               pathname === t.route ||
@@ -64,7 +64,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <Link
                 key={t.route}
                 href={t.route}
-                className={`flex-[1_1_0] rounded-[3px] border px-3 py-2.5 text-center font-mono text-[0.75rem] uppercase tracking-[0.06em] transition-all duration-150 ${
+                className={`flex min-h-[52px] flex-col items-center justify-center rounded-lg border px-2 py-2 text-center font-mono text-[0.72rem] uppercase leading-snug tracking-[0.06em] transition-colors duration-150 ${
                   active
                     ? "border-brass bg-brass font-semibold text-deep"
                     : "border-line2 bg-transparent text-mist hover:border-brass hover:text-cream"

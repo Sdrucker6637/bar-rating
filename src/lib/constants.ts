@@ -62,29 +62,36 @@ export const SURPRISE_VIBES = [
   "live music",
 ];
 
+// Cold → hot ramps with clearly distinct endpoints so low and high bars read
+// instantly against the dark map tiles. The cold ends are teal/green — the
+// old navy (#1B2A4A) and near-black green (#0F2E26) matched the map's dark
+// tiles and vanished. Visited runs teal → brass → gold → near-white;
+// wishlist runs green → sage → mint (density-based).
 export const HEAT_GRADIENTS: Record<
   "visited" | "wishlist",
   Record<number, string>
 > = {
   visited: {
-    0.2: "#302938",
-    0.4: "#3A4F66",
-    0.6: "#8A6D2F",
-    0.8: "#C9A876",
-    1.0: "#E5B93F",
+    0.0: "#2E6E8C", // teal — bottom tier (pops against the navy map)
+    0.25: "#4A8FB0", // lighter teal-blue
+    0.5: "#8A6D2F", // brass (app accent)
+    0.75: "#D9A83C", // bright gold
+    1.0: "#FFE3A0", // warm near-white — top rated
   },
   wishlist: {
-    0.2: "#1F2E28",
-    0.4: "#2E4438",
-    0.6: "#3F5D4E",
-    0.8: "#5C8D74",
-    1.0: "#7FA88E",
+    0.0: "#24533F", // green — sparse (lighter than the map, still reads)
+    0.25: "#2F6249", // dark green
+    0.5: "#3E7A57", // green
+    0.75: "#6FAD85", // sage
+    1.0: "#B7E6C3", // light mint — densest cluster
   },
 };
 
-export const HEAT_DOT_COLOR: Record<"visited" | "wishlist", string> = {
-  visited: "#C9A876",
-  wishlist: "#7FA88E",
+// Wishlist markers have no scores to vary by, so they keep a single color —
+// mint, matching the top of the wishlist ramp. Visited markers are colored
+// straight from the visited gradient instead (see MapView).
+export const HEAT_DOT_COLOR: Record<"wishlist", string> = {
+  wishlist: "#B7E6C3",
 };
 
 /** Crawl planning (straight-line walking-time approximation) */
