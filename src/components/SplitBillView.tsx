@@ -757,7 +757,7 @@ function AddPersonToPlaceButton({
 }) {
   return (
     <form
-      onSubmit={(e: FormEvent) => {
+      onSubmit={(e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const input = e.currentTarget.elements.namedItem(
           "newPerson",
