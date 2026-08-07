@@ -1,4 +1,5 @@
-// api/places.js
+import { NextResponse } from "next/server";
+
 // Vercel serverless function (Node.js runtime). Replaces the old
 // OpenStreetMap / Nominatim-backed api/search-bar.js.
 //
@@ -29,7 +30,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const CACHE_COLLECTION = "placesSearchCache";
 
 // Places API (New) priceLevel enum, ranked low to high.
-const PRICE_LEVEL_RANK = {
+const PRICE_LEVEL_RANK: Record<string, number> = {
   PRICE_LEVEL_FREE: 0,
   PRICE_LEVEL_INEXPENSIVE: 1,
   PRICE_LEVEL_MODERATE: 2,
@@ -40,7 +41,7 @@ const PRICE_LEVEL_RANK = {
 const BAR_TYPES = ["bar", "night_club", "pub", "wine_bar"];
 
 // ---------- tiny cache-key helper (no crypto module needed) ----------
-function hashString(str) {
+function hashString(str: string): string {
   // FNV-1a, good enough for a stable, short, collision-resistant doc id.
   let hash = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
@@ -49,7 +50,11 @@ function hashString(str) {
   }
   return hash.toString(16);
 }
-function cacheKeyFor(textQuery, exploreMode, centerKey) {
+function cacheKeyFor(
+  textQuery: string,
+  exploreMode: boolean,
+  centerKey: string | null,
+): string {
   const normalized = textQuery.trim().toLowerCase().replace(/\s+/g, " ");
   const slug = normalized
     .replace(/[^a-z0-9]+/g, "-")
@@ -59,7 +64,16 @@ function cacheKeyFor(textQuery, exploreMode, centerKey) {
 }
 
 // ---------- Firestore REST <-> JS value conversion ----------
-function toFirestoreValue(value) {
+type FsValue =
+  | { nullValue: null }
+  | { stringValue: string }
+  | { booleanValue: boolean }
+  | { integerValue: string }
+  | { doubleValue: number }
+  | { arrayValue: { values?: FsValue[] } }
+  | { mapValue: { fields?: Record<string, FsValue> } };
+
+function toFirestoreValue(value: unknown): FsValue {
   if (value === null || value === undefined) return { nullValue: null };
   if (typeof value === "string") return { stringValue: value };
   if (typeof value === "boolean") return { booleanValue: value };
@@ -72,41 +86,44 @@ function toFirestoreValue(value) {
     return { arrayValue: { values: value.map(toFirestoreValue) } };
   }
   if (typeof value === "object") {
-    const fields = {};
-    for (const k of Object.keys(value)) fields[k] = toFirestoreValue(value[k]);
+    const fields: Record<string, FsValue> = {};
+    for (const k of Object.keys(value as Record<string, unknown>))
+      fields[k] = toFirestoreValue((value as Record<string, unknown>)[k]);
     return { mapValue: { fields } };
   }
   return { nullValue: null };
 }
-function fromFirestoreValue(v) {
+function fromFirestoreValue(v: FsValue | undefined | null): unknown {
   if (!v) return null;
   if ("nullValue" in v) return null;
   if ("stringValue" in v) return v.stringValue;
   if ("booleanValue" in v) return v.booleanValue;
   if ("integerValue" in v) return parseInt(v.integerValue, 10);
   if ("doubleValue" in v) return v.doubleValue;
-  if ("arrayValue" in v)
-    return (v.arrayValue.values || []).map(fromFirestoreValue);
+  if ("arrayValue" in v) return (v.arrayValue.values || []).map(fromFirestoreValue);
   if ("mapValue" in v) {
-    const out = {};
+    const out: Record<string, unknown> = {};
     const fields = v.mapValue.fields || {};
     for (const k of Object.keys(fields)) out[k] = fromFirestoreValue(fields[k]);
     return out;
   }
   return null;
 }
-function docToObject(doc) {
+function docToObject(doc: { fields?: Record<string, FsValue> }): Record<string, unknown> {
   const fields = (doc && doc.fields) || {};
-  const out = {};
+  const out: Record<string, unknown> = {};
   for (const k of Object.keys(fields)) out[k] = fromFirestoreValue(fields[k]);
   return out;
 }
 
-function firestoreDocUrl(projectId, docId) {
+function firestoreDocUrl(projectId: string, docId: string): string {
   return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${CACHE_COLLECTION}/${docId}`;
 }
 
-async function readCache(projectId, docId) {
+async function readCache(
+  projectId: string,
+  docId: string,
+): Promise<Record<string, unknown> | null> {
   try {
     const response = await fetch(firestoreDocUrl(projectId, docId));
     if (response.status === 404) return null;
@@ -126,9 +143,13 @@ async function readCache(projectId, docId) {
   }
 }
 
-async function writeCache(projectId, docId, data) {
+async function writeCache(
+  projectId: string,
+  docId: string,
+  data: Record<string, unknown>,
+): Promise<void> {
   try {
-    const fields = {};
+    const fields: Record<string, FsValue> = {};
     for (const k of Object.keys(data)) fields[k] = toFirestoreValue(data[k]);
     const response = await fetch(firestoreDocUrl(projectId, docId), {
       method: "PATCH",
@@ -148,10 +169,30 @@ async function writeCache(projectId, docId, data) {
   }
 }
 
+interface RawPlace {
+  displayName?: string;
+  formattedAddress?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  placeId?: string | null;
+  mapsLink?: string;
+  businessStatus?: string;
+  priceLevel?: string;
+  types?: string[];
+  rating?: number | null;
+}
+
+interface ShapeOptions {
+  ballerMode: boolean;
+  query: string;
+  maxResultCount: number;
+  exactLookup: boolean;
+}
+
 // ---------- filter + shape a raw Places result set for the client ----------
 function filterAndShape(
-  rawPlaces,
-  { ballerMode, query, maxResultCount, exactLookup },
+  rawPlaces: RawPlace[],
+  { ballerMode, query, maxResultCount, exactLookup }: ShapeOptions,
 ) {
   return rawPlaces
     .filter((p) => p.businessStatus === "OPERATIONAL")
@@ -160,7 +201,7 @@ function filterAndShape(
     )
     .filter((p) => {
       if (ballerMode) return true;
-      const rank = PRICE_LEVEL_RANK[p.priceLevel];
+      const rank = PRICE_LEVEL_RANK[p.priceLevel || ""];
       return rank === undefined || rank <= 2;
     })
     .slice(0, maxResultCount)
@@ -179,19 +220,28 @@ function filterAndShape(
     }));
 }
 
-module.exports = async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "Method not allowed" });
-    return;
-  }
-
+export async function POST(req: Request) {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
-    res.status(500).json({ error: "Server is missing GOOGLE_PLACES_API_KEY" });
-    return;
+    return NextResponse.json(
+      { error: "Server is missing GOOGLE_PLACES_API_KEY" },
+      { status: 500 },
+    );
   }
   const projectId = process.env.FIREBASE_PROJECT_ID;
 
+  const body = (await req.json().catch(() => ({}))) as {
+    query?: string;
+    neighborhood?: string;
+    address?: string;
+    ballerMode?: boolean;
+    exploreMode?: boolean;
+    limit?: number;
+    exactLookup?: boolean;
+    centerLat?: number;
+    centerLng?: number;
+    radiusMeters?: number;
+  };
   const {
     query,
     neighborhood = "",
@@ -203,11 +253,10 @@ module.exports = async function handler(req, res) {
     centerLat,
     centerLng,
     radiusMeters,
-  } = req.body || {};
+  } = body;
 
   if (!query || !String(query).trim()) {
-    res.status(400).json({ error: "Missing query" });
-    return;
+    return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
 
   const textQuery = exactLookup
@@ -232,12 +281,10 @@ module.exports = async function handler(req, res) {
     ? `${effectiveCenter.latitude.toFixed(3)},${effectiveCenter.longitude.toFixed(3)}`
     : null;
 
-  const cacheDocId = projectId
-    ? cacheKeyFor(textQuery, exploreMode, centerKey)
-    : null;
+  const cacheDocId = projectId ? cacheKeyFor(textQuery, exploreMode, centerKey) : null;
 
   // ---- 1. Try the shared cache first ----
-  if (cacheDocId) {
+  if (cacheDocId && projectId) {
     const cached = await readCache(projectId, cacheDocId);
     if (
       cached &&
@@ -245,20 +292,19 @@ module.exports = async function handler(req, res) {
       typeof cached.timestamp === "number"
     ) {
       if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
-        const shaped = filterAndShape(cached.places, {
+        const shaped = filterAndShape(cached.places as RawPlace[], {
           ballerMode,
           query,
           maxResultCount,
           exactLookup,
         });
-        res.status(200).json(shaped);
-        return;
+        return NextResponse.json(shaped);
       }
     }
   }
 
   // ---- 2. Cache miss (or no Firestore project configured) — call Google ----
-  const requestBody = {
+  const requestBody: Record<string, unknown> = {
     textQuery,
     maxResultCount,
     locationBias: {
@@ -299,8 +345,10 @@ module.exports = async function handler(req, res) {
     if (!response.ok) {
       const errText = await response.text();
       console.error("Places API error", response.status, errText);
-      res.status(502).json({ error: "Places API request failed" });
-      return;
+      return NextResponse.json(
+        { error: "Places API request failed" },
+        { status: 502 },
+      );
     }
 
     const data = await response.json();
@@ -308,21 +356,23 @@ module.exports = async function handler(req, res) {
 
     // Normalize into a flat shape once, so both the cache write and the
     // response shaping downstream work off the same simple structure.
-    const rawPlaces = places.map((p) => ({
-      displayName: p.displayName?.text || "",
+    const rawPlaces: RawPlace[] = places.map((p: Record<string, unknown>) => ({
+      displayName: (p.displayName as { text?: string } | undefined)?.text || "",
       formattedAddress: p.formattedAddress || "",
-      latitude: p.location?.latitude ?? null,
-      longitude: p.location?.longitude ?? null,
+      latitude: (p.location as { latitude?: number | null } | undefined)
+        ?.latitude ?? null,
+      longitude: (p.location as { longitude?: number | null } | undefined)
+        ?.longitude ?? null,
       placeId: p.id || null,
       mapsLink: p.googleMapsUri || "",
       businessStatus: p.businessStatus || "",
       priceLevel: p.priceLevel || "",
-      types: p.types || [],
+      types: Array.isArray(p.types) ? (p.types as string[]) : [],
       rating: typeof p.rating === "number" ? p.rating : null,
     }));
 
     // ---- 3. Cache the successful (even if empty) result for next time ----
-    if (cacheDocId) {
+    if (cacheDocId && projectId) {
       await writeCache(projectId, cacheDocId, {
         places: rawPlaces,
         timestamp: Date.now(),
@@ -336,9 +386,12 @@ module.exports = async function handler(req, res) {
       maxResultCount,
       exactLookup,
     });
-    res.status(200).json(shaped);
+    return NextResponse.json(shaped);
   } catch (e) {
     console.error("Places lookup failed", e);
-    res.status(500).json({ error: "Places lookup failed" });
+    return NextResponse.json(
+      { error: "Places lookup failed" },
+      { status: 500 },
+    );
   }
-};
+}
