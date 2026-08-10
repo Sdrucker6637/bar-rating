@@ -42,6 +42,24 @@ const config: Config = {
         serif: ["Fraunces", "serif"],
         mono: ["'IBM Plex Mono'", "monospace"],
       },
+      // New: a real, small type scale so headings stop drifting per-component.
+      fontSize: {
+        display: [
+          "clamp(2.1rem, 6vw, 3.4rem)",
+          { lineHeight: "1.04", letterSpacing: "-0.02em" },
+        ],
+        "title-lg": [
+          "1.55rem",
+          { lineHeight: "1.15", letterSpacing: "-0.01em" },
+        ],
+        "title-md": ["1.18rem", { lineHeight: "1.2" }],
+        "title-sm": ["1.02rem", { lineHeight: "1.25" }],
+        kicker: ["0.7rem", { lineHeight: "1.4", letterSpacing: "0.14em" }],
+      },
+      boxShadow: {
+        lift: "0 2px 10px rgba(0,0,0,0.35)",
+        panel: "0 10px 28px rgba(0,0,0,0.45)",
+      },
     },
   },
   plugins: [],

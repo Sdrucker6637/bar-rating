@@ -76,7 +76,10 @@ export default function SuggestionCard({
         )
       )}
       {s.happyHour && (
-        <div className="mt-2 text-[0.82rem] leading-[1.4]" style={{ color: "#C9A876" }}>
+        <div
+          className="mt-2 text-[0.82rem] leading-[1.4]"
+          style={{ color: "#C9A876" }}
+        >
           🕔 {s.happyHour}
         </div>
       )}

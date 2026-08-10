@@ -2,6 +2,7 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
+import { primaryBtnCls } from "@/lib/ui";
 
 export default function InfoModal() {
   const { showInfo, setShowInfo } = useTour();
@@ -53,10 +54,7 @@ export default function InfoModal() {
         </div>
       </div>
       <div className="mt-4 flex gap-2.5">
-        <button
-          className="flex-1 cursor-pointer rounded-[5px] border-none bg-brass px-3 py-2.5 font-mono font-semibold text-deep"
-          onClick={() => setShowInfo(false)}
-        >
+        <button className={primaryBtnCls} onClick={() => setShowInfo(false)}>
           Got it
         </button>
       </div>

@@ -4,7 +4,7 @@ import { useTour } from "@/lib/tour-context";
 import { avgWithFood, avgWithoutFood, fmt } from "@/lib/scoring";
 import BarCard from "./BarCard";
 import TabIntro from "./TabIntro";
-import { addBtnCls, inputCls } from "@/lib/ui";
+import { addBtnCls, inputCls, kickerCls } from "@/lib/ui";
 
 export default function LeaderboardView() {
   const {
@@ -35,31 +35,20 @@ export default function LeaderboardView() {
       />
 
       {champ && (
-        <div
-          className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-[4px] border border-brass px-5 py-4"
-          style={{
-            background:
-              "linear-gradient(135deg,rgba(184,150,95,0.08),transparent)",
-          }}
-        >
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-lg border border-brass bg-gradient-to-br from-[rgba(184,150,95,0.1)] to-transparent px-6 py-5">
           <div>
-            <div className="font-mono text-[0.68rem] uppercase tracking-[0.12em] text-gold">
-              🏆 Reigning Champion
-            </div>
-            <div className="mt-1 font-serif text-[1.6rem] font-medium">
+            <div className={kickerCls}>🏆 Reigning Champion</div>
+            <div className="mt-1.5 font-serif text-title-lg font-medium text-cream">
               {champ.name}
             </div>
           </div>
-          <div className="font-mono text-3xl font-semibold text-gold">
+          <div className="font-mono text-display leading-none text-gold">
             {fmt(champScore)}
           </div>
         </div>
       )}
 
-      <button
-        className={addBtnCls}
-        onClick={() => startManualAdd("visited")}
-      >
+      <button className={addBtnCls} onClick={() => startManualAdd("visited")}>
         + Add a bar you visited &amp; rank it
       </button>
 
@@ -110,9 +99,7 @@ export default function LeaderboardView() {
                 key={b.id}
                 b={b}
                 rank={ranked ? rankCounter : null}
-                score={
-                  foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b)
-                }
+                score={foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b)}
                 scoreLabel={foodMode === "with" ? "with food" : "no food"}
                 isFetching={fetchingIds.has(b.id)}
                 onNameClick={() => {

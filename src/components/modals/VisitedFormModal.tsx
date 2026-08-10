@@ -2,7 +2,7 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
-import { inputCls } from "@/lib/ui";
+import { inputCls, primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
 
 export default function VisitedFormModal() {
   const {
@@ -75,15 +75,12 @@ export default function VisitedFormModal() {
         <div className="mt-4 flex gap-2.5">
           <button
             type="button"
-            className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+            className={secondaryBtnCls}
             onClick={() => setShowVisitedForm(false)}
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="flex-1 cursor-pointer rounded-[5px] border-none bg-brass px-3 py-2.5 font-mono font-semibold text-deep"
-          >
+          <button type="submit" className={primaryBtnCls}>
             {visitedForm.id ? "Save ranking" : "Add to leaderboard"}
           </button>
         </div>

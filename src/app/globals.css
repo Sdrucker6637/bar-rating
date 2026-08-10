@@ -77,3 +77,20 @@ body {
     font-size: 16px;
   }
 }
+
+/* ---------- accessible focus ring for the dark theme (default outline is invisible) ---------- */
+:focus-visible {
+  outline: 2px solid #c9a876;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- horizontal-scrolling nav / chip rows: hide scrollbar, keep scroll ---------- */
+.tda-scroll-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tda-scroll-x::-webkit-scrollbar {
+  display: none;
+}

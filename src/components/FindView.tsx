@@ -5,7 +5,7 @@ import SearchPanel from "./SearchPanel";
 import SuggestionCard from "./SuggestionCard";
 import BarCard from "./BarCard";
 import TabIntro from "./TabIntro";
-import { addBtnCls } from "@/lib/ui";
+import { addBtnCls, kickerCls } from "@/lib/ui";
 
 export default function FindView() {
   const {
@@ -56,21 +56,21 @@ export default function FindView() {
         </div>
       )}
 
-      <button
-        className={addBtnCls}
-        onClick={() => startManualAdd("wishlist")}
-      >
+      <button className={addBtnCls} onClick={() => startManualAdd("wishlist")}>
         + Add to wishlist by name
       </button>
 
-      <div className="mt-9 flex items-center gap-3">
-        <h2 className="m-0 whitespace-nowrap font-serif text-[1.15rem] font-medium text-cream">
-          Our Wishlist
-        </h2>
-        <div className="h-px flex-1 bg-line" />
-        <span className="font-mono text-[0.7rem] text-mute">
-          {filteredToTry.length} bar{filteredToTry.length === 1 ? "" : "s"}
-        </span>
+      <div className="mt-10 mb-1">
+        <div className={kickerCls}>Wishlist</div>
+        <div className="mt-1 flex items-center gap-3">
+          <h2 className="m-0 font-serif text-title-md font-medium text-cream">
+            Our Wishlist
+          </h2>
+          <div className="h-px flex-1 bg-line" />
+          <span className="font-mono text-[0.7rem] text-mute">
+            {filteredToTry.length} bar{filteredToTry.length === 1 ? "" : "s"}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-2.5">

@@ -1,7 +1,15 @@
 "use client";
 
 import { useTour } from "@/lib/tour-context";
-import { inputCls, chipCls } from "@/lib/ui";
+import {
+  inputCls,
+  chipCls,
+  chipActiveCls,
+  findBtnCls,
+  altBtnCls,
+  groupBtnCls,
+  kickerCls,
+} from "@/lib/ui";
 
 export default function SearchPanel() {
   const {
@@ -23,106 +31,89 @@ export default function SearchPanel() {
   } = useTour();
 
   return (
-    <div className="my-4 rounded-lg border border-line bg-panel p-4">
-      <div className="flex flex-wrap items-center gap-2.5">
-        <input
-          className={`${inputCls} min-w-0 flex-[1_1_220px]`}
-          placeholder="Search by vibe or neighborhood (optional)"
-          value={vibeQuery}
-          onChange={(e) => setVibeQuery(e.target.value)}
-        />
-        <div className="flex items-center gap-1.5 font-mono text-[0.85rem]">
-          <span style={{ color: "#857C8E" }}>Group of</span>
-          <button
-            className="h-[26px] w-[26px] cursor-pointer rounded-[5px] border border-line2 bg-ink text-base leading-none text-brass"
-            onClick={() => setGroupSize(Math.max(1, groupSize - 1))}
-          >
-            −
-          </button>
-          <b className="text-cream">{groupSize}</b>
-          <button
-            className="h-[26px] w-[26px] cursor-pointer rounded-[5px] border border-line2 bg-ink text-base leading-none text-brass"
-            onClick={() => setGroupSize(groupSize + 1)}
-          >
-            +
-          </button>
-        </div>
+    <div className="my-4 rounded-lg border border-line bg-panel p-4 sm:p-5">
+      <input
+        className={inputCls}
+        placeholder="Search by vibe or neighborhood (optional)"
+        value={vibeQuery}
+        onChange={(e) => setVibeQuery(e.target.value)}
+      />
+
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+        <span className={`${kickerCls} mr-0.5`}>Filters</span>
         <button
-          className={`${chipCls} ${
-            fitsGroupOnly
-              ? "border-green bg-green text-cream"
-              : ""
-          }`}
+          className={`${chipCls} ${fitsGroupOnly ? chipActiveCls : ""}`}
+          aria-pressed={fitsGroupOnly}
           onClick={() => setFitsGroupOnly(!fitsGroupOnly)}
         >
-          Fits our group
+          👥 Fits our group
         </button>
         <button
-          className={`${chipCls} ${
-            ballerMode ? "border-goldDeep bg-goldDeep text-cream" : ""
-          }`}
+          className={`${chipCls} ${ballerMode ? chipActiveCls : ""}`}
+          aria-pressed={ballerMode}
           onClick={() => setBallerMode(!ballerMode)}
         >
           💰 Baller mode
         </button>
         <button
-          className={`${chipCls} ${
-            exploreMode ? "border-blue bg-blue text-cream" : ""
-          }`}
+          className={`${chipCls} ${exploreMode ? chipActiveCls : ""}`}
+          aria-pressed={exploreMode}
           onClick={() => setExploreMode(!exploreMode)}
         >
           🧭 Explore mode
         </button>
+        <div className="ml-auto flex items-center gap-1.5 font-mono text-[0.8rem] text-mist">
+          <span>Group of</span>
+          <button
+            aria-label="Decrease group size"
+            className={groupBtnCls}
+            onClick={() => setGroupSize(Math.max(1, groupSize - 1))}
+          >
+            −
+          </button>
+          <b className="w-4 text-center text-cream">{groupSize}</b>
+          <button
+            aria-label="Increase group size"
+            className={groupBtnCls}
+            disabled={groupSize >= 20}
+            onClick={() => setGroupSize(Math.min(20, groupSize + 1))}
+          >
+            +
+          </button>
+        </div>
+      </div>
+      <div className="mt-1.5 font-mono text-[0.62rem] text-dim">
+        Baller &amp; Explore apply to Find Bars and Surprise Us.
       </div>
 
-      <div className="mt-3 flex flex-wrap items-start gap-4">
-        <div className="flex flex-[1_1_200px] flex-col items-center gap-1 text-center">
-          <button
-            className="w-full cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold disabled:cursor-default disabled:opacity-50"
-            onClick={runSearch}
-            disabled={searching || !vibeQuery.trim()}
-          >
-            {searching ? "Searching…" : "🔍 Find Bars"}
-          </button>
-          <span className="font-mono text-[0.65rem] leading-[1.4] text-dim">
-            Search for a specific bar or location.
-          </span>
-        </div>
-        <div className="flex flex-[1_1_200px] flex-col items-center gap-1 text-center">
-          <button
-            className="w-full cursor-pointer rounded-full border border-brass bg-transparent px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-gold hover:bg-[rgba(184,150,95,0.12)] disabled:cursor-default disabled:opacity-50"
-            onClick={runRandomSearch}
-            disabled={searching}
-          >
-            🎲 Surprise Us
-          </button>
-          <span className="font-mono text-[0.65rem] leading-[1.4] text-dim">
-            Discover random bars based on your filters.
-          </span>
-        </div>
-        <div className="flex flex-[1_1_200px] flex-col items-center gap-1 text-center">
-          <button
-            className="w-full cursor-pointer rounded-full border border-greenLight bg-transparent px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-greenLight hover:bg-[rgba(127,168,142,0.12)]"
-            onClick={() => setShowCrawlModal(true)}
-          >
-            🚶 Plan a Crawl
-          </button>
-          <span className="font-mono text-[0.65rem] leading-[1.4] text-dim">
-            Chain nearby bars into a walking route.
-          </span>
-        </div>
-        <div className="flex flex-[1_1_200px] flex-col items-center gap-1 text-center">
-          <button
-            className="w-full cursor-pointer rounded-full border border-blueLight bg-transparent px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-blueLight hover:bg-[rgba(127,168,201,0.12)] disabled:cursor-default disabled:opacity-50"
-            onClick={runNearbySearch}
-            disabled={searching}
-          >
-            📍 Nearby
-          </button>
-          <span className="font-mono text-[0.65rem] leading-[1.4] text-dim">
-            Find one great bar within about a 10 minute walk.
-          </span>
-        </div>
+      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
+        <button
+          className={`${findBtnCls} col-span-2 sm:col-span-1 sm:flex-1`}
+          onClick={runSearch}
+          disabled={searching || !vibeQuery.trim()}
+        >
+          {searching ? "Searching…" : "🔍 Find Bars"}
+        </button>
+        <button
+          className={`${altBtnCls} sm:flex-1`}
+          onClick={runRandomSearch}
+          disabled={searching}
+        >
+          🎲 Surprise Us
+        </button>
+        <button
+          className={`${altBtnCls} sm:flex-1`}
+          onClick={runNearbySearch}
+          disabled={searching}
+        >
+          📍 Nearby
+        </button>
+        <button
+          className={`${altBtnCls} sm:flex-1`}
+          onClick={() => setShowCrawlModal(true)}
+        >
+          🚶 Plan a Crawl
+        </button>
       </div>
     </div>
   );

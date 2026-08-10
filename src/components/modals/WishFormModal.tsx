@@ -2,7 +2,7 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
-import { inputCls } from "@/lib/ui";
+import { inputCls, primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
 
 export default function WishFormModal() {
   const { showWishForm, setShowWishForm, wishForm, setWishForm, saveWishForm } =
@@ -12,7 +12,9 @@ export default function WishFormModal() {
 
   return (
     <Modal onClose={() => setShowWishForm(false)}>
-      <h3 className="mt-0 font-serif font-medium text-cream">Add to wishlist</h3>
+      <h3 className="mt-0 font-serif font-medium text-cream">
+        Add to wishlist
+      </h3>
       <form onSubmit={saveWishForm}>
         <div className="mb-2.5 flex flex-col gap-1">
           <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
@@ -44,21 +46,20 @@ export default function WishFormModal() {
           <input
             className={inputCls}
             value={wishForm.notes}
-            onChange={(e) => setWishForm({ ...wishForm, notes: e.target.value })}
+            onChange={(e) =>
+              setWishForm({ ...wishForm, notes: e.target.value })
+            }
           />
         </div>
         <div className="mt-4 flex gap-2.5">
           <button
             type="button"
-            className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+            className={secondaryBtnCls}
             onClick={() => setShowWishForm(false)}
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="flex-1 cursor-pointer rounded-[5px] border-none bg-brass px-3 py-2.5 font-mono font-semibold text-deep"
-          >
+          <button type="submit" className={primaryBtnCls}>
             Add to wishlist
           </button>
         </div>

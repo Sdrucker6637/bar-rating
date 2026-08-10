@@ -2,6 +2,7 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
+import { primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
 
 export default function PlacesModal() {
   const { placesModal, setPlacesModal, confirmPlaceSelection } = useTour();
@@ -40,13 +41,13 @@ export default function PlacesModal() {
           </p>
           <div className="mt-4 flex gap-2.5">
             <button
-              className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+              className={secondaryBtnCls}
               onClick={() => setPlacesModal(null)}
             >
               Cancel
             </button>
             <button
-              className="flex-1 cursor-pointer rounded-[5px] border-none bg-brass px-3 py-2.5 font-mono font-semibold text-deep"
+              className={primaryBtnCls}
               onClick={() => confirmPlaceSelection({})}
             >
               Add anyway
@@ -74,13 +75,13 @@ export default function PlacesModal() {
           ))}
           <div className="mt-5 flex gap-2.5">
             <button
-              className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+              className={secondaryBtnCls}
               onClick={() => setPlacesModal(null)}
             >
               Cancel
             </button>
             <button
-              className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+              className={secondaryBtnCls}
               onClick={() => confirmPlaceSelection({})}
             >
               None of these — add anyway
