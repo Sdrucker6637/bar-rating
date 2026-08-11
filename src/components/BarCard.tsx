@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Bar } from "@/lib/types";
 import { fmt } from "@/lib/scoring";
 import { displayDescription } from "@/lib/parse";
-import { ghostBtnCls, delBtnCls, tagCls, cardHoverCls } from "@/lib/ui";
+import { ghostBtnCls, delBtnCls, tagCls, cardHoverCls, cardBaseShadowCls } from "@/lib/ui";
 
 interface BarCardProps {
   b: Bar;
@@ -61,7 +61,7 @@ export default function BarCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-4 pl-6 pr-5 ${cardHoverCls} ${
+      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-4 pl-6 pr-5 ${cardBaseShadowCls} ${cardHoverCls} ${
         b.disqualified ? "opacity-70" : ""
       } ${rank === 1 ? "border-gold/30" : ""}`}
     >

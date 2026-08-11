@@ -13,9 +13,21 @@ body {
 }
 
 body {
-  background: #0e0d10;
-  background-image: radial-gradient(rgba(237, 230, 217, 0.028) 1px, transparent 1px);
-  background-size: 3px 3px;
+  /* Matches Shell's backgroundColor as a pre-hydration/no-JS fallback.
+     The actual layered texture (vignette + grain) lives on Shell's root
+     element, since that div is what's actually visible — this rule
+     previously duplicated a grain layer here that never rendered because
+     Shell's opaque background always painted over it. */
+  background: #100e10;
+}
+
+/* ---------- ornamental section divider — used sparingly ---------- */
+.tda-ornament {
+  text-align: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: rgba(184, 150, 95, 0.4);
 }
 
 /* ---------- pulse animation (skeleton / loading text) ---------- */

@@ -29,14 +29,25 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       className="tda-root"
       style={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(130% 85% at 50% 15%, rgba(20,18,24,0) 0%, rgba(8,7,9,0.45) 100%), linear-gradient(180deg,#15131A 0%,#0E0D10 45%,#0B0A0C 100%)",
+        backgroundColor: "#100E10",
+        backgroundImage: [
+          // a whisper of brass warmth near the top — not a glow, barely there
+          "radial-gradient(60% 38% at 50% 0%, rgba(184,150,95,0.035), transparent 72%)",
+          // edge vignette: center stays neutral, corners recede into warm black
+          "radial-gradient(130% 85% at 50% 18%, rgba(0,0,0,0) 0%, rgba(6,5,6,0.5) 100%)",
+          // fine grain — the actual texture layer (previously defined on body,
+          // where it never rendered because this div's opaque background
+          // always painted over it)
+          "radial-gradient(rgba(237,230,217,0.03) 1px, transparent 1px)",
+        ].join(", "),
+        backgroundSize: "100% 100%, 100% 100%, 3px 3px",
+        backgroundRepeat: "no-repeat, no-repeat, repeat",
         color: "#EDE6D9",
         fontFamily: "'Inter', sans-serif",
         paddingBottom: "4rem",
       }}
     >
-      <div className="mx-auto max-w-[980px] px-5">
+      <div className="mx-auto max-w-[980px] px-5 sm:border-x sm:border-[rgba(184,150,95,0.055)]">
         <header className="border-b border-[rgba(184,150,95,0.16)] pb-7 pt-12 text-center">
           <h1 className="m-0 font-serif text-display font-medium text-cream">
             Tour de <span className="italic text-gold">Alcoholism</span>

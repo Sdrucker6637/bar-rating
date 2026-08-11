@@ -44,9 +44,15 @@ export const chipActiveCls = "border-brass bg-brass text-deep font-semibold";
  *  than chipActiveCls so playful modes read as distinct from plain utility filters. */
 export const modeChipActiveCls = "border-goldDeep bg-goldDeep text-cream font-semibold";
 
+/** Restrained resting shadow so cards read as physical objects rather than
+ *  flat fills — a faint top highlight plus a soft, tight drop shadow.
+ *  Deliberately small/tight, not a "floating card" effect. */
+export const cardBaseShadowCls =
+  "shadow-[inset_0_1px_0_rgba(237,230,217,0.025),0_4px_14px_rgba(0,0,0,0.22)]";
+
 /** Shared hover feedback for passive (non-button) card containers, so lists feel alive. */
 export const cardHoverCls =
-  "transition-all duration-200 hover:border-line2 hover:shadow-lift";
+  "transition-all duration-200 hover:border-line2 hover:shadow-[inset_0_1px_0_rgba(237,230,217,0.05),0_12px_28px_rgba(0,0,0,0.4)]";
 
 export const groupBtnCls =
   "flex h-7 w-7 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border border-line2 bg-ink text-base leading-none text-brass transition-colors hover:border-brass disabled:cursor-default disabled:opacity-30";

@@ -39,11 +39,15 @@ export default function LeaderboardView() {
         <div className="relative mb-6 overflow-hidden rounded-lg border border-brass bg-gradient-to-br from-[rgba(184,150,95,0.1)] to-transparent px-6 py-5">
           <span
             aria-hidden="true"
-            className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-brass to-transparent"
+            className="absolute inset-x-0 top-0 h-px bg-brass/50"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 top-[4px] h-px bg-brass/20"
           />
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className={kickerCls}>🏆 Reigning Champion</div>
+              <div className={kickerCls}>🏆 The House Record</div>
               <div className="mt-1.5 font-serif text-title-lg font-medium text-cream">
                 {champ.name}
               </div>
@@ -93,6 +97,12 @@ export default function LeaderboardView() {
           </button>
         </div>
       </div>
+
+      {filteredVisited.length > 0 && (
+        <div className="tda-ornament my-5" aria-hidden="true">
+          — · — · —
+        </div>
+      )}
 
       <div className="mt-4 flex flex-col gap-2.5">
         {filteredVisited.length === 0 && (
