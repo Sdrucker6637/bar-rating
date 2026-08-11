@@ -30,14 +30,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       style={{
         minHeight: "100vh",
         background:
-          "radial-gradient(120% 60% at 50% 0%, rgba(184,150,95,0.07), transparent 55%), linear-gradient(180deg,#14121A 0%,#0E0D10 55%)",
+          "radial-gradient(130% 85% at 50% 15%, rgba(20,18,24,0) 0%, rgba(8,7,9,0.45) 100%), linear-gradient(180deg,#15131A 0%,#0E0D10 45%,#0B0A0C 100%)",
         color: "#EDE6D9",
         fontFamily: "'Inter', sans-serif",
         paddingBottom: "4rem",
       }}
     >
       <div className="mx-auto max-w-[980px] px-5">
-        <header className="border-b border-line pb-7 pt-12 text-center">
+        <header className="border-b border-[rgba(184,150,95,0.16)] pb-7 pt-12 text-center">
           <h1 className="m-0 font-serif text-display font-medium text-cream">
             Tour de <span className="italic text-gold">Alcoholism</span>
             <button
