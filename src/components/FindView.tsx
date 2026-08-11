@@ -5,6 +5,7 @@ import SearchPanel from "./SearchPanel";
 import SuggestionCard from "./SuggestionCard";
 import BarCard from "./BarCard";
 import TabIntro from "./TabIntro";
+import EmptyState from "./EmptyState";
 import { addBtnCls, kickerCls } from "@/lib/ui";
 
 export default function FindView() {
@@ -33,14 +34,14 @@ export default function FindView() {
       <SearchPanel />
 
       {searching && (
-        <div className="py-6 text-center font-mono text-[0.8rem] text-mute">
-          scouting the city…
-        </div>
+        <EmptyState icon="🧭" title="Scouting the city…" hint="This takes a moment" />
       )}
       {searchDone && !searching && searchResults.length === 0 && (
-        <div className="py-10 text-center font-mono text-[0.85rem] text-mute">
-          No fresh matches came back — try a different vibe.
-        </div>
+        <EmptyState
+          icon="🚫"
+          title="No fresh matches came back."
+          hint="Try a different vibe"
+        />
       )}
       {searchResults.length > 0 && (
         <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
@@ -75,9 +76,11 @@ export default function FindView() {
 
       <div className="mt-4 flex flex-col gap-2.5">
         {filteredToTry.length === 0 && (
-          <div className="py-10 text-center font-mono text-[0.85rem] text-mute">
-            Nothing on the list yet — use the button above to add one.
-          </div>
+          <EmptyState
+            icon="📋"
+            title="Nothing on the list yet."
+            hint="Use the button above to add one"
+          />
         )}
         {filteredToTry.map((b) => (
           <BarCard

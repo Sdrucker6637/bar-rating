@@ -4,6 +4,7 @@ import { useTour } from "@/lib/tour-context";
 import { avgWithFood, avgWithoutFood, fmt } from "@/lib/scoring";
 import BarCard from "./BarCard";
 import TabIntro from "./TabIntro";
+import EmptyState from "./EmptyState";
 import { addBtnCls, inputCls, kickerCls } from "@/lib/ui";
 
 export default function LeaderboardView() {
@@ -35,11 +36,20 @@ export default function LeaderboardView() {
       />
 
       {champ && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-lg border border-brass bg-gradient-to-br from-[rgba(184,150,95,0.1)] to-transparent px-6 py-5">
+        <div className="relative mb-6 flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-lg border border-brass bg-gradient-to-br from-[rgba(184,150,95,0.1)] to-transparent px-6 py-5">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-4 -top-8 select-none font-serif text-[8rem] italic leading-none text-gold/[0.06]"
+          >
+            01
+          </span>
           <div>
             <div className={kickerCls}>🏆 Reigning Champion</div>
             <div className="mt-1.5 font-serif text-title-lg font-medium text-cream">
               {champ.name}
+            </div>
+            <div className="mt-1 font-serif text-[0.85rem] italic text-mist">
+              Nothing else comes close.
             </div>
           </div>
           <div className="font-mono text-display leading-none text-gold">
@@ -52,7 +62,8 @@ export default function LeaderboardView() {
         + Add a bar you visited &amp; rank it
       </button>
 
-      <div className="my-4 flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-panel px-4 py-3.5">
+      <div className={`${kickerCls} mt-6 mb-2`}>Refine the Field</div>
+      <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-panel px-4 py-3.5">
         <input
           className={`${inputCls} min-w-0 flex-[1_1_200px]`}
           placeholder="Search name, neighborhood, notes…"
@@ -85,9 +96,11 @@ export default function LeaderboardView() {
 
       <div className="mt-4 flex flex-col gap-2.5">
         {filteredVisited.length === 0 && (
-          <div className="py-10 text-center font-mono text-[0.85rem] text-mute">
-            No stages match that search yet.
-          </div>
+          <EmptyState
+            icon="🔍"
+            title="No stages match that search yet."
+            hint="Try a different name or neighborhood"
+          />
         )}
         {(() => {
           let rankCounter = 0;

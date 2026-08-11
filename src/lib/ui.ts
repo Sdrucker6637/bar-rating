@@ -40,6 +40,14 @@ export const chipCls =
 
 export const chipActiveCls = "border-brass bg-brass text-deep font-semibold";
 
+/** Active state for "mode" toggles (Baller/Explore) — deliberately a different accent
+ *  than chipActiveCls so playful modes read as distinct from plain utility filters. */
+export const modeChipActiveCls = "border-goldDeep bg-goldDeep text-cream font-semibold";
+
+/** Shared hover feedback for passive (non-button) card containers, so lists feel alive. */
+export const cardHoverCls =
+  "transition-all duration-200 hover:border-line2 hover:shadow-lift";
+
 export const groupBtnCls =
   "flex h-7 w-7 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border border-line2 bg-ink text-base leading-none text-brass transition-colors hover:border-brass disabled:cursor-default disabled:opacity-30";
 

@@ -5,6 +5,7 @@ import {
   inputCls,
   chipCls,
   chipActiveCls,
+  modeChipActiveCls,
   findBtnCls,
   altBtnCls,
   groupBtnCls,
@@ -48,20 +49,6 @@ export default function SearchPanel() {
         >
           👥 Fits our group
         </button>
-        <button
-          className={`${chipCls} ${ballerMode ? chipActiveCls : ""}`}
-          aria-pressed={ballerMode}
-          onClick={() => setBallerMode(!ballerMode)}
-        >
-          💰 Baller mode
-        </button>
-        <button
-          className={`${chipCls} ${exploreMode ? chipActiveCls : ""}`}
-          aria-pressed={exploreMode}
-          onClick={() => setExploreMode(!exploreMode)}
-        >
-          🧭 Explore mode
-        </button>
         <div className="ml-auto flex items-center gap-1.5 font-mono text-[0.8rem] text-mist">
           <span>Group of</span>
           <button
@@ -82,38 +69,67 @@ export default function SearchPanel() {
           </button>
         </div>
       </div>
-      <div className="mt-1.5 font-mono text-[0.62rem] text-dim">
-        Baller &amp; Explore apply to Find Bars and Surprise Us.
+
+      <div className="mt-3 flex flex-wrap items-center gap-2.5 border-t border-dashed border-line2 pt-3">
+        <span className="mr-0.5 font-serif text-[0.82rem] italic text-mist">
+          House Rules
+        </span>
+        <button
+          className={`${chipCls} ${ballerMode ? modeChipActiveCls : ""}`}
+          aria-pressed={ballerMode}
+          onClick={() => setBallerMode(!ballerMode)}
+        >
+          💰 Baller mode
+        </button>
+        <button
+          className={`${chipCls} ${exploreMode ? modeChipActiveCls : ""}`}
+          aria-pressed={exploreMode}
+          onClick={() => setExploreMode(!exploreMode)}
+        >
+          🧭 Explore mode
+        </button>
+        <span className="font-mono text-[0.62rem] text-dim">
+          — applies to Find Bars &amp; Surprise Us
+        </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
-        <button
-          className={`${findBtnCls} col-span-2 sm:col-span-1 sm:flex-1`}
-          onClick={runSearch}
-          disabled={searching || !vibeQuery.trim()}
-        >
-          {searching ? "Searching…" : "🔍 Find Bars"}
-        </button>
-        <button
-          className={`${altBtnCls} sm:flex-1`}
-          onClick={runRandomSearch}
-          disabled={searching}
-        >
-          🎲 Surprise Us
-        </button>
-        <button
-          className={`${altBtnCls} sm:flex-1`}
-          onClick={runNearbySearch}
-          disabled={searching}
-        >
-          📍 Nearby
-        </button>
-        <button
-          className={`${altBtnCls} sm:flex-1`}
-          onClick={() => setShowCrawlModal(true)}
-        >
-          🚶 Plan a Crawl
-        </button>
+      <div className="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-3 sm:flex sm:flex-wrap sm:items-start">
+        <div className="col-span-2 flex flex-col gap-1 sm:col-span-1 sm:flex-1">
+          <button
+            className={findBtnCls}
+            onClick={runSearch}
+            disabled={searching || !vibeQuery.trim()}
+          >
+            {searching ? "Searching…" : "🔍 Find Bars"}
+          </button>
+          <span className="text-center font-serif text-[0.72rem] italic text-dim">
+            Know what you&apos;re after? Type it in.
+          </span>
+        </div>
+        <div className="flex flex-col gap-1 sm:flex-1">
+          <button className={altBtnCls} onClick={runRandomSearch} disabled={searching}>
+            🎲 Surprise Us
+          </button>
+          <span className="text-center font-serif text-[0.72rem] italic text-dim">
+            Let fate pick the round.
+          </span>
+        </div>
+        <div className="flex flex-col gap-1 sm:flex-1">
+          <button className={altBtnCls} onClick={runNearbySearch} disabled={searching}>
+            📍 Nearby
+          </button>
+          <span className="text-center font-serif text-[0.72rem] italic text-dim">
+            Closest pour, no thinking required.
+          </span>
+        </div>
+        <div className="flex flex-col gap-1 sm:flex-1">
+          <button className={altBtnCls} onClick={() => setShowCrawlModal(true)}>
+            🚶 Plan a Crawl
+          </button>
+          <span className="text-center font-serif text-[0.72rem] italic text-dim">
+            String bars together, one stumble at a time.
+          </span>
+        </div>
       </div>
     </div>
   );

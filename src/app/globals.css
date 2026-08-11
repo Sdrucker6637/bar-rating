@@ -14,6 +14,8 @@ body {
 
 body {
   background: #0e0d10;
+  background-image: radial-gradient(rgba(237, 230, 217, 0.028) 1px, transparent 1px);
+  background-size: 3px 3px;
 }
 
 /* ---------- pulse animation (skeleton / loading text) ---------- */

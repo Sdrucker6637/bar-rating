@@ -2,7 +2,7 @@
 
 import type { PlaceResult } from "@/lib/types";
 import { displayDescription } from "@/lib/parse";
-import { linkBtnCls } from "@/lib/ui";
+import { linkBtnCls, cardHoverCls } from "@/lib/ui";
 
 interface SuggestionCardProps {
   s: PlaceResult;
@@ -26,7 +26,7 @@ export default function SuggestionCard({
   const desc = displayDescription(s.description);
 
   return (
-    <div className="rounded-lg border border-line2 bg-ink p-3.5">
+    <div className={`rounded-lg border border-line2 bg-ink p-3.5 ${cardHoverCls}`}>
       <div className="font-serif text-[1.05rem] font-medium text-cream">
         {s.name}
       </div>

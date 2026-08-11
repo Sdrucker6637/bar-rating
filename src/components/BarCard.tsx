@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Bar } from "@/lib/types";
 import { fmt } from "@/lib/scoring";
 import { displayDescription } from "@/lib/parse";
-import { ghostBtnCls, delBtnCls, tagCls } from "@/lib/ui";
+import { ghostBtnCls, delBtnCls, tagCls, cardHoverCls } from "@/lib/ui";
 
 interface BarCardProps {
   b: Bar;
@@ -61,14 +61,23 @@ export default function BarCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-4 pl-6 pr-5 ${
+      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-4 pl-6 pr-5 ${cardHoverCls} ${
         b.disqualified ? "opacity-70" : ""
-      }`}
+      } ${rank === 1 ? "border-gold/30" : ""}`}
     >
       <span
         className={`absolute inset-y-0 left-0 w-1.5 ${railColor}`}
         aria-hidden="true"
       />
+
+      {rank === 1 && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-2 -top-4 select-none font-serif text-[5.5rem] italic leading-none text-gold/[0.07]"
+        >
+          01
+        </span>
+      )}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
