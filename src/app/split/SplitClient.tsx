@@ -49,6 +49,34 @@ function itemKey(name: string, price: number): string {
   return `${normName(name)}|${price.toFixed(2)}`;
 }
 
+// Fairly splits `totalCents` across entries proportional to `weight`,
+// guaranteeing the returned cents sum to EXACTLY `totalCents` (largest-
+// remainder method). This is what keeps e.g. $8.00 split 3 ways from
+// displaying as $2.67 + $2.67 + $2.67 = $8.01 — the leftover cent(s) are
+// handed to whichever share got rounded down the most.
+function distributeCents(
+  totalCents: number,
+  entries: Array<{ id: string; weight: number }>,
+): Record<string, number> {
+  const totalWeight = entries.reduce((sum, e) => sum + e.weight, 0);
+  if (totalWeight <= 0) return {};
+  const shares = entries.map((e) => {
+    const exact = (totalCents * e.weight) / totalWeight;
+    return { id: e.id, cents: Math.floor(exact), remainder: exact - Math.floor(exact) };
+  });
+  const allocated = shares.reduce((sum, s) => sum + s.cents, 0);
+  const leftover = totalCents - allocated;
+  const byRemainder = [...shares].sort((a, b) => b.remainder - a.remainder);
+  for (let i = 0; i < leftover; i++) {
+    byRemainder[i % byRemainder.length].cents += 1;
+  }
+  const out: Record<string, number> = {};
+  shares.forEach((s) => {
+    out[s.id] = s.cents;
+  });
+  return out;
+}
+
 export default function SplitClient() {
   const [splitStep, setSplitStep] = useState<SplitStep>("names");
   const [splitPeople, setSplitPeople] = useState<SplitPerson[]>([]);
@@ -379,6 +407,11 @@ export default function SplitClient() {
     );
   }
 
+  // Toggling a person on/off an item rebalances the WHOLE currently-included
+  // set evenly across the item's quantity — the same rule "Split evenly"
+  // uses. This is the fix for the bug where clicking each person's chip
+  // individually gave every person the item's full quantity (and therefore
+  // its full price) instead of dividing it among them.
   function toggleItemPersonIncluded(
     placeIndex: number,
     itemId: string,
@@ -391,12 +424,19 @@ export default function SplitClient() {
           ...pl,
           items: pl.items.map((it) => {
             if (it.id !== itemId) return it;
-            const nextAssigned = { ...it.assignedTo };
-            if (nextAssigned[personId]) {
-              delete nextAssigned[personId];
-            } else {
-              nextAssigned[personId] = Math.min(1, it.quantity);
-            }
+            const currentlyIncluded = Object.keys(it.assignedTo).filter(
+              (pid) => (it.assignedTo[pid] || 0) > 0,
+            );
+            const isIncluded = currentlyIncluded.includes(personId);
+            const nextIncluded = isIncluded
+              ? currentlyIncluded.filter((pid) => pid !== personId)
+              : [...currentlyIncluded, personId];
+            if (nextIncluded.length === 0) return { ...it, assignedTo: {} };
+            const share = it.quantity / nextIncluded.length;
+            const nextAssigned: Record<string, number> = {};
+            nextIncluded.forEach((pid) => {
+              nextAssigned[pid] = share;
+            });
             return { ...it, assignedTo: nextAssigned };
           }),
         };
@@ -461,11 +501,15 @@ export default function SplitClient() {
 
     let assignedSubtotal = 0;
     place.items.forEach((it) => {
-      const q = it.quantity || 1;
-      const perUnit = it.price / q;
-      Object.entries(it.assignedTo).forEach(([pid, units]) => {
+      const entries = Object.entries(it.assignedTo)
+        .filter(([, units]) => (units || 0) > 0)
+        .map(([pid, units]) => ({ id: pid, weight: units }));
+      if (entries.length === 0) return;
+      const totalCents = Math.round(it.price * 100);
+      const centsByPerson = distributeCents(totalCents, entries);
+      Object.entries(centsByPerson).forEach(([pid, cents]) => {
         if (perPersonSubtotal[pid] === undefined) return;
-        const cost = perUnit * units;
+        const cost = cents / 100;
         perPersonSubtotal[pid] += cost;
         assignedSubtotal += cost;
       });
