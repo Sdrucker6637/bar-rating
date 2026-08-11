@@ -27,7 +27,7 @@ export default function FindView() {
   return (
     <div>
       <TabIntro
-        title="Find a New Bar"
+        title="Where Are We Drinking Tonight?"
         sub="Search by vibe for fresh spots, roll the dice on a surprise pick, or add a bar to the wishlist by name."
       />
 

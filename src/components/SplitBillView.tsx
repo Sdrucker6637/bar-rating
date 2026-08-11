@@ -3,6 +3,7 @@
 import type { ChangeEvent, FormEvent } from "react";
 import type { SplitPerson, SplitPlace, SplitTotals } from "@/lib/types";
 import type { SplitStep } from "@/app/split/SplitClient";
+import { distributeCents } from "@/lib/splitMath";
 import { inputCls, groupBtnCls, addBtnCls } from "@/lib/ui";
 
 interface SplitBillViewProps {
@@ -439,6 +440,18 @@ export default function SplitBillView(props: SplitBillViewProps) {
                 assignedShares.every(
                   (s) => Math.abs(s - assignedShares[0]) < 0.001,
                 );
+              // Single source of truth for "who owes what on this item" —
+              // the exact same cents-accurate split used for the real
+              // totals (src/lib/splitMath.ts), so the number shown under
+              // each person's name here always matches what they're
+              // actually billed. Never re-derive this with price/qty math.
+              const itemCentsByPerson = distributeCents(
+                Math.round(it.price * 100),
+                includedIds.map((pid) => ({
+                  id: pid,
+                  weight: it.assignedTo[pid] || 0,
+                })),
+              );
               return (
                 <div
                   key={it.id}
@@ -456,15 +469,14 @@ export default function SplitBillView(props: SplitBillViewProps) {
                     <div className="cursor-pointer font-serif text-[1.1rem] font-medium text-cream">
                       {it.name || "(unnamed item)"}
                     </div>
-                    <div
-                      style={{
-                        fontFamily: "'IBM Plex Mono', monospace",
-                        fontSize: "0.8rem",
-                        color: "#A79EB2",
-                      }}
-                    >
-                      ${it.price.toFixed(2)}
-                      {q > 1 ? ` · Qty ${q}` : ""}
+                    <div className="flex items-baseline gap-1.5 font-mono text-[0.8rem] text-mist">
+                      <span>${it.price.toFixed(2)}</span>
+                      {q > 1 && <span>· Qty {q}</span>}
+                      {includedIds.length > 1 && (
+                        <span className="rounded-full border border-goldDeep bg-[rgba(138,109,47,0.15)] px-2 py-0.5 font-mono text-[0.66rem] text-gold">
+                          ÷ {includedIds.length} ways
+                        </span>
+                      )}
                     </div>
                     <button
                       className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist hover:border-redDeep hover:text-red"
@@ -519,17 +531,19 @@ export default function SplitBillView(props: SplitBillViewProps) {
                   {includedIds.length > 0 && (
                     <div
                       style={{
-                        marginTop: "0.5rem",
+                        marginTop: "0.65rem",
+                        paddingTop: "0.6rem",
                         display: "flex",
                         flexDirection: "column",
                         gap: "0.4rem",
                       }}
+                      className="border-t border-dashed border-line2"
                     >
                       {crew
                         .filter((p) => includedIds.includes(p.id))
                         .map((p) => {
                           const units = it.assignedTo[p.id] || 0;
-                          const cost = (it.price / q) * units;
+                          const cost = (itemCentsByPerson[p.id] || 0) / 100;
                           return (
                             <div
                               key={p.id}
