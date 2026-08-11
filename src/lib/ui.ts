@@ -24,15 +24,23 @@ export const secondaryBtnCls = `${btnBase} flex-1 border border-line2 bg-transpa
 export const addBtnCls =
   "mt-3 w-full cursor-pointer rounded-lg border border-dashed border-line2 bg-transparent px-5 py-3 font-mono text-[0.78rem] uppercase tracking-[0.04em] text-brass transition-colors hover:border-brass hover:bg-[rgba(184,150,95,0.06)]";
 
-/** Low-emphasis action inside a card footer (Map, Edit, Disqualify). */
+/** Low-emphasis action inside a card footer (Map, Disqualify) — navigation/
+ *  neutral actions, brass on hover. */
 export const ghostBtnCls =
-  "inline-flex cursor-pointer items-center gap-1 rounded-[6px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[0.7rem] text-mist no-underline transition-colors hover:border-brass hover:text-cream";
+  "inline-flex cursor-pointer items-center gap-1 rounded-[6px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[0.7rem] text-mist no-underline transition-colors active:scale-[0.97] hover:border-brass hover:text-cream";
+
+/** Same shape as ghostBtnCls but for "management" actions (Edit) — a muted
+ *  green accent instead of brass, so it reads as a distinct kind of action
+ *  rather than identical-looking buttons doing different things. */
+export const ghostBtnGreenCls =
+  "inline-flex cursor-pointer items-center gap-1 rounded-[6px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[0.7rem] text-mist no-underline transition-colors active:scale-[0.97] hover:border-greenLight hover:text-cream";
 
 export const linkBtnCls = ghostBtnCls;
 
-/** Destructive action — deliberately quiet at rest so it never reads as equal-weight to safe actions. */
+/** Destructive action — deliberately quiet/desaturated at rest so it never
+ *  reads as equal-weight to safe actions; only warms toward red on hover. */
 export const delBtnCls =
-  "cursor-pointer rounded-[6px] border border-transparent bg-transparent px-2 py-1.5 font-mono text-[0.68rem] text-dim no-underline transition-colors hover:border-redDeep hover:bg-[rgba(199,118,118,0.08)] hover:text-red";
+  "cursor-pointer rounded-[6px] border border-transparent bg-transparent px-2 py-1.5 font-mono text-[0.68rem] text-dim no-underline transition-colors active:scale-[0.97] hover:border-redDeep hover:bg-[rgba(199,118,118,0.08)] hover:text-red";
 
 /** Filter/mode toggle chip. Combine with chipActiveCls from the caller for the active state. */
 export const chipCls =
@@ -49,6 +57,13 @@ export const modeChipActiveCls = "border-goldDeep bg-goldDeep text-cream font-se
  *  Deliberately small/tight, not a "floating card" effect. */
 export const cardBaseShadowCls =
   "shadow-[inset_0_1px_0_rgba(237,230,217,0.025),0_4px_14px_rgba(0,0,0,0.22)]";
+
+/** A whisper of warm light catching one corner of a card — reads as the
+ *  card sitting in the room's ambient light rather than a flat dark fill.
+ *  Background-IMAGE layered on top of the card's own background-COLOR
+ *  utility (bg-panel/bg-ink), so both coexist. */
+export const cardWarmSurfaceCls =
+  "bg-[linear-gradient(160deg,rgba(184,150,95,0.045)_0%,transparent_45%)]";
 
 /** Shared hover feedback for passive (non-button) card containers, so lists feel alive. */
 export const cardHoverCls =

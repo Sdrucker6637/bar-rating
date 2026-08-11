@@ -29,19 +29,22 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       className="tda-root"
       style={{
         minHeight: "100vh",
-        backgroundColor: "#100E10",
+        backgroundColor: "#120F10",
         backgroundImage: [
-          // a whisper of brass warmth near the top — not a glow, barely there
-          "radial-gradient(60% 38% at 50% 0%, rgba(184,150,95,0.035), transparent 72%)",
-          // edge vignette: center stays neutral, corners recede into warm black
-          "radial-gradient(130% 85% at 50% 18%, rgba(0,0,0,0) 0%, rgba(6,5,6,0.5) 100%)",
-          // fine grain — the actual texture layer (previously defined on body,
-          // where it never rendered because this div's opaque background
-          // always painted over it)
-          "radial-gradient(rgba(237,230,217,0.03) 1px, transparent 1px)",
+          // two small, asymmetric warm pools — like sconces on a wall, not a
+          // single centered glow
+          "radial-gradient(38% 30% at 18% 8%, rgba(184,150,95,0.05), transparent 70%)",
+          "radial-gradient(32% 26% at 84% 14%, rgba(184,150,95,0.032), transparent 72%)",
+          // edge vignette: corners recede into warm-black, center stays lit
+          "radial-gradient(130% 85% at 50% 22%, rgba(0,0,0,0) 0%, rgba(4,4,3,0.55) 100%)",
+          // faint vertical seams suggesting wood wall paneling
+          "repeating-linear-gradient(90deg, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 1px, transparent 1px, transparent 150px)",
+          // deep green undertone bleeding in from one side, walnut brown
+          // deepening the other — room-corner tonal variation, not a flat fill
+          "linear-gradient(115deg, rgba(31,46,40,0.16) 0%, transparent 45%, transparent 60%, rgba(22,19,15,0.3) 100%)",
         ].join(", "),
-        backgroundSize: "100% 100%, 100% 100%, 3px 3px",
-        backgroundRepeat: "no-repeat, no-repeat, repeat",
+        backgroundSize: "100% 100%, 100% 100%, 100% 100%, auto, 100% 100%",
+        backgroundRepeat: "no-repeat, no-repeat, no-repeat, no-repeat, no-repeat",
         color: "#EDE6D9",
         fontFamily: "'Inter', sans-serif",
         paddingBottom: "4rem",
@@ -66,7 +69,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <nav className="tda-scroll-x sticky top-0 z-20 -mx-5 my-7 flex gap-2 border-b border-line bg-[#0E0D10]/90 px-5 py-3 sm:static sm:mx-0 sm:border-none sm:bg-transparent sm:px-0 sm:py-0">
+        <nav className="tda-scroll-x sticky top-0 z-20 -mx-5 my-7 flex gap-2 border-b border-line bg-[#120F10]/90 px-5 py-3 sm:static sm:mx-0 sm:border-none sm:bg-transparent sm:px-0 sm:py-0">
           {TABS.map((t) => {
             const active =
               pathname === t.route ||

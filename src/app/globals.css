@@ -18,7 +18,7 @@ body {
      element, since that div is what's actually visible — this rule
      previously duplicated a grain layer here that never rendered because
      Shell's opaque background always painted over it. */
-  background: #100e10;
+  background: #120f10;
 }
 
 /* ---------- ornamental section divider — used sparingly ---------- */

@@ -4,7 +4,15 @@ import { useState } from "react";
 import type { Bar } from "@/lib/types";
 import { fmt } from "@/lib/scoring";
 import { displayDescription } from "@/lib/parse";
-import { ghostBtnCls, delBtnCls, tagCls, cardHoverCls, cardBaseShadowCls } from "@/lib/ui";
+import {
+  ghostBtnCls,
+  ghostBtnGreenCls,
+  delBtnCls,
+  tagCls,
+  cardHoverCls,
+  cardBaseShadowCls,
+  cardWarmSurfaceCls,
+} from "@/lib/ui";
 
 interface BarCardProps {
   b: Bar;
@@ -61,7 +69,7 @@ export default function BarCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-4 pl-6 pr-5 ${cardBaseShadowCls} ${cardHoverCls} ${
+      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-4 pl-6 pr-5 ${cardBaseShadowCls} ${cardWarmSurfaceCls} ${cardHoverCls} ${
         b.disqualified ? "opacity-70" : ""
       } ${rank === 1 ? "border-gold/30" : ""}`}
     >
@@ -223,7 +231,7 @@ export default function BarCard({
         </div>
       )}
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-[rgba(184,150,95,0.12)] pt-3">
         {b.mapsLink && (
           <a
             className={ghostBtnCls}
@@ -231,12 +239,12 @@ export default function BarCard({
             target="_blank"
             rel="noreferrer"
           >
-            Map ↗
+            <span aria-hidden="true">🗺️</span> Map ↗
           </a>
         )}
 
-        <button className={ghostBtnCls} onClick={onEdit}>
-          {editLabel || "Edit"}
+        <button className={ghostBtnGreenCls} onClick={onEdit}>
+          <span aria-hidden="true">✎</span> {editLabel || "Edit"}
         </button>
 
         {b.status === "visited" && onDisqualify && (
@@ -246,7 +254,7 @@ export default function BarCard({
         )}
 
         <button className={`${delBtnCls} ml-auto`} onClick={onDelete}>
-          Remove
+          <span aria-hidden="true">✕</span> Remove
         </button>
       </div>
     </div>
