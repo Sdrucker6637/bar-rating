@@ -31,29 +31,29 @@ export default function LeaderboardView() {
   return (
     <div>
       <TabIntro
-        title="Current Leaderboard"
+        title="Tonight's Rankings"
         sub="Where we stand — every rated bar ranked by average score across vibe, value, service, food, and drinks."
       />
 
       {champ && (
-        <div className="relative mb-6 flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-lg border border-brass bg-gradient-to-br from-[rgba(184,150,95,0.1)] to-transparent px-6 py-5">
+        <div className="relative mb-6 overflow-hidden rounded-lg border border-brass bg-gradient-to-br from-[rgba(184,150,95,0.1)] to-transparent px-6 py-5">
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -right-4 -top-8 select-none font-serif text-[8rem] italic leading-none text-gold/[0.06]"
-          >
-            01
-          </span>
-          <div>
-            <div className={kickerCls}>🏆 Reigning Champion</div>
-            <div className="mt-1.5 font-serif text-title-lg font-medium text-cream">
-              {champ.name}
+            className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-brass to-transparent"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className={kickerCls}>🏆 Reigning Champion</div>
+              <div className="mt-1.5 font-serif text-title-lg font-medium text-cream">
+                {champ.name}
+              </div>
+              <div className="mt-1 font-serif text-[0.85rem] italic text-mist">
+                Nothing else comes close.
+              </div>
             </div>
-            <div className="mt-1 font-serif text-[0.85rem] italic text-mist">
-              Nothing else comes close.
+            <div className="font-mono text-display leading-none text-gold">
+              {fmt(champScore)}
             </div>
-          </div>
-          <div className="font-mono text-display leading-none text-gold">
-            {fmt(champScore)}
           </div>
         </div>
       )}

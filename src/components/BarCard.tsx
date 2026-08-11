@@ -70,22 +70,13 @@ export default function BarCard({
         aria-hidden="true"
       />
 
-      {rank === 1 && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-2 -top-4 select-none font-serif text-[5.5rem] italic leading-none text-gold/[0.07]"
-        >
-          01
-        </span>
-      )}
-
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           {rank ? (
             <span
               className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[0.85rem] font-semibold ${
                 rank === 1
-                  ? "border-gold text-gold"
+                  ? "border-gold bg-gold text-deep shadow-lift"
                   : rank === 2
                     ? "border-silver text-silverLight"
                     : rank === 3
