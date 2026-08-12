@@ -272,11 +272,10 @@ export default function SplitBillView(props: SplitBillViewProps) {
             >
               <Icon name="receipt" size={26} className="text-brass/80" />
               <div className="font-serif text-[1rem] font-medium text-cream">
-                Tap to add screenshot(s)
+                Upload a receipt
               </div>
               <div className="font-mono text-[0.7rem] text-mute">
-                Add more than one if the receipt didn&apos;t fit in a single
-                shot
+                Use a screenshot or photo of your receipt
               </div>
             </label>
             <input
@@ -492,7 +491,6 @@ export default function SplitBillView(props: SplitBillViewProps) {
                   <div
                     style={{
                       display: "flex",
-                      justifyContent: "space-between",
                       alignItems: "baseline",
                       gap: "0.6rem",
                       flexWrap: "wrap",
@@ -501,21 +499,32 @@ export default function SplitBillView(props: SplitBillViewProps) {
                     <div className="font-serif text-[1.1rem] font-medium text-cream">
                       {it.name || "(unnamed item)"}
                     </div>
-                    <div className="flex items-baseline gap-1.5 font-mono text-[0.8rem] text-mist">
-                      <span>${it.price.toFixed(2)}</span>
-                      {q > 1 && <span>· Qty {q}</span>}
-                      {includedIds.length > 1 && (
-                        <span className="rounded-full border border-goldDeep bg-[rgba(138,109,47,0.15)] px-2 py-0.5 font-mono text-[0.66rem] text-gold">
-                          ÷ {includedIds.length} ways
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      className="cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist hover:border-redDeep hover:text-red"
-                      onClick={() => onRemoveItem(activePlaceIndex, it.id)}
+                    <div
+                      style={{
+                        marginLeft: "auto",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "flex-end",
+                        gap: "0.6rem",
+                      }}
                     >
-                      Remove
-                    </button>
+                      <div className="flex items-center gap-1.5 font-mono text-[0.8rem] text-mist">
+                        <span>${it.price.toFixed(2)}</span>
+                        {q > 1 && <span>· Qty {q}</span>}
+                        {includedIds.length > 1 && (
+                          <span className="rounded-full border border-goldDeep bg-[rgba(138,109,47,0.15)] px-2 py-0.5 font-mono text-[0.66rem] text-gold">
+                            ÷ {includedIds.length} ways
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        className="cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist hover:border-redDeep hover:text-red"
+                        onClick={() => onRemoveItem(activePlaceIndex, it.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                   {q > 1 && (
                     <div className="mt-0.5 font-mono text-[0.68rem] text-mute">
@@ -615,14 +624,17 @@ export default function SplitBillView(props: SplitBillViewProps) {
                                   </button>
                                   <b
                                     style={{
-                                      minWidth: "1.6rem",
-                                      textAlign: "center",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      minWidth: "1.75rem",
+                                      height: "1.75rem",
+                                      fontFamily: "'IBM Plex Mono', monospace",
+                                      fontSize: "0.8rem",
                                       color: "#EDE6D9",
                                     }}
                                   >
-                                    {Number.isInteger(units)
-                                      ? units
-                                      : units.toFixed(2)}
+                                    {units}
                                   </b>
                                   <button
                                     className={groupBtnCls}

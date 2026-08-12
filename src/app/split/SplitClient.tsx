@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import SplitBillView from "@/components/SplitBillView";
 import TabIntro from "@/components/TabIntro";
-import { distributeCents } from "@/lib/splitMath";
+import { distributeCents, distributeWholeUnits } from "@/lib/splitMath";
 import type {
   SplitItem,
   SplitPerson,
@@ -127,6 +127,30 @@ export default function SplitClient() {
     );
   }
 
+  // Some phones/browsers report an empty mime type for HEIC/HEIF camera
+  // photos (and a few other formats). Sniff the image's magic bytes from the
+  // base64 payload so receipt photos still reach the parser with a type
+  // Gemini understands instead of being mislabeled as JPEG.
+  function sniffImageMime(base64: string): string {
+    try {
+      const head = atob(base64.slice(0, 32));
+      if (head.startsWith("\xff\xd8\xff")) return "image/jpeg";
+      if (head.startsWith("\x89PNG")) return "image/png";
+      if (head.startsWith("GIF8")) return "image/gif";
+      if (head.slice(0, 4) === "RIFF" && head.slice(8, 12) === "WEBP")
+        return "image/webp";
+      if (head.slice(4, 8) === "ftyp") {
+        const brand = head.slice(8, 12);
+        if (["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand)) {
+          return "image/heic";
+        }
+      }
+    } catch {
+      /* base64 may be empty/malformed — fall through */
+    }
+    return "";
+  }
+
   function addScreenshotsToPlace(placeIndex: number, files: FileList) {
     Array.from(files).forEach((file) => {
       const reader = new FileReader();
@@ -136,7 +160,7 @@ export default function SplitClient() {
         const shot: SplitScreenshot = {
           id: `shot${Date.now()}${Math.random()}`,
           base64,
-          mimeType: file.type || "image/jpeg",
+          mimeType: file.type || sniffImageMime(base64) || "image/jpeg",
           previewUrl: dataUrl,
         };
         setSplitPlaces((prev) =>
@@ -377,11 +401,24 @@ export default function SplitClient() {
           items: pl.items.map((it) => {
             if (it.id !== itemId) return it;
             if (personIds.length === 0) return { ...it, assignedTo: {} };
-            const share = it.quantity / personIds.length;
+            const q = it.quantity || 1;
             const nextAssigned: Record<string, number> = {};
-            personIds.forEach((pid) => {
-              nextAssigned[pid] = share;
-            });
+            if (q === 1) {
+              // Single unit — split its cost evenly across everyone (each
+              // person takes a fractional share of the one unit).
+              const share = 1 / personIds.length;
+              personIds.forEach((pid) => {
+                nextAssigned[pid] = share;
+              });
+            } else {
+              // Multiple units — hand out WHOLE units as evenly as possible
+              // (2,1,1,1 for 5 drinks / 4 people) so unit counts and the +/−
+              // steppers stay in whole numbers that sum to the quantity.
+              const shares = distributeWholeUnits(q, personIds.length);
+              personIds.forEach((pid, i) => {
+                nextAssigned[pid] = shares[i];
+              });
+            }
             return { ...it, assignedTo: nextAssigned };
           }),
         };
@@ -414,11 +451,21 @@ export default function SplitClient() {
               ? currentlyIncluded.filter((pid) => pid !== personId)
               : [...currentlyIncluded, personId];
             if (nextIncluded.length === 0) return { ...it, assignedTo: {} };
-            const share = it.quantity / nextIncluded.length;
+            const q = it.quantity || 1;
             const nextAssigned: Record<string, number> = {};
-            nextIncluded.forEach((pid) => {
-              nextAssigned[pid] = share;
-            });
+            if (q === 1) {
+              const share = 1 / nextIncluded.length;
+              nextIncluded.forEach((pid) => {
+                nextAssigned[pid] = share;
+              });
+            } else {
+              // Same whole-unit rule as "Split evenly": redistribute the
+              // quantity in whole units among whoever is currently included.
+              const shares = distributeWholeUnits(q, nextIncluded.length);
+              nextIncluded.forEach((pid, i) => {
+                nextAssigned[pid] = shares[i];
+              });
+            }
             return { ...it, assignedTo: nextAssigned };
           }),
         };

@@ -9,6 +9,19 @@
  * SplitBillView's per-item display, so the on-screen breakdown for a
  * single item always matches what actually gets billed.
  */
+/**
+ * Splits `total` whole units into `n` whole-number shares as evenly as
+ * possible (largest-remainder): 5 units over 4 people -> [2, 1, 1, 1],
+ * 8 over 4 -> [2, 2, 2, 2]. Used for multi-quantity items so unit
+ * assignments stay whole numbers that sum to the item's quantity.
+ */
+export function distributeWholeUnits(total: number, n: number): number[] {
+  if (n <= 0) return [];
+  const base = Math.floor(total / n);
+  const extra = total - base * n;
+  return Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
 export function distributeCents(
   totalCents: number,
   entries: Array<{ id: string; weight: number }>,
