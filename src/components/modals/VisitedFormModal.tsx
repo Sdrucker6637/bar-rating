@@ -18,13 +18,13 @@ export default function VisitedFormModal() {
   const set = (patch: Partial<typeof visitedForm>) =>
     setVisitedForm({ ...visitedForm, ...patch });
 
-  const scoreFields: Array<[string, keyof typeof visitedForm, string]> = [
-    ["Vibe (0-10)", "vibe", "🎭"],
-    ["Value (0-10)", "value", "💰"],
-    ["Service (0-10)", "service", "🤝"],
-    ["Food (0-10)", "food", "🍽️"],
-    ["Drinks (0-10)", "drinks", "🍸"],
-    ["Bathroom bonus", "bathroomBonus", "🚻"],
+  const scoreFields: Array<[string, keyof typeof visitedForm]> = [
+    ["Vibe (0-10)", "vibe"],
+    ["Value (0-10)", "value"],
+    ["Service (0-10)", "service"],
+    ["Food (0-10)", "food"],
+    ["Drinks (0-10)", "drinks"],
+    ["Bathroom bonus", "bathroomBonus"],
   ];
 
   return (

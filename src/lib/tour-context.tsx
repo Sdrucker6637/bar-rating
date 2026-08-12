@@ -22,6 +22,14 @@ import type { Bar, PlaceResult, VisitedForm, WishForm } from "./types";
 
 export type CrawlStop = PlaceResult & { distanceMeters?: number };
 
+// House rules for the "Fits our group" size: default 6, valid range 1–20.
+// Every read of the stored value (Firestore snapshot, seed) and every write
+// clamps through here, so a stale/out-of-range value can never surface in
+// the UI or leak into filtering.
+const DEFAULT_GROUP_SIZE = 6;
+const clampGroupSize = (n: number) =>
+  Math.min(20, Math.max(1, Math.round(n)));
+
 export interface PlacesModalState {
   suggestion: PlaceResult;
   results: PlaceResult[];
@@ -135,7 +143,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   // not it was saved — kept out of future results so retrying a search or
   // hitting Surprise Us repeatedly doesn't just replay what you already saw.
   const [seenNames, setSeenNames] = useState<Set<string>>(() => new Set());
-  const [groupSize, setGroupSizeState] = useState(4);
+  const [groupSize, setGroupSizeState] = useState(DEFAULT_GROUP_SIZE);
   const [loading, setLoading] = useState(true);
   const [connError, setConnError] = useState(false);
   const [search, setSearch] = useState("");
@@ -188,10 +196,23 @@ export function TourProvider({ children }: { children: ReactNode }) {
         if (snap.exists) {
           const data = snap.data() || {};
           setBars((data.bars as Bar[]) || []);
-          if (data.groupSize) setGroupSizeState(data.groupSize as number);
+          const stored = Number(data.groupSize);
+          if (Number.isFinite(stored)) {
+            if (stored >= 1 && stored <= 20) {
+              setGroupSizeState(stored);
+            } else {
+              // Out-of-range legacy value (e.g. 29 from an old version) —
+              // reset to the house default and correct the stored copy so
+              // it doesn't keep winning on every reload.
+              setGroupSizeState(DEFAULT_GROUP_SIZE);
+              docRef
+                .set({ groupSize: DEFAULT_GROUP_SIZE }, { merge: true })
+                .catch(() => {});
+            }
+          }
         } else {
           docRef
-            .set({ bars: seedBars, groupSize: 4 })
+            .set({ bars: seedBars, groupSize: DEFAULT_GROUP_SIZE })
             .catch(() => setConnError(true));
           setBars(seedBars);
         }
@@ -225,8 +246,9 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const setGroupSize = useCallback(
     (n: number) => {
-      setGroupSizeState(n);
-      docRef.set({ groupSize: n }, { merge: true }).catch(() => {});
+      const clamped = clampGroupSize(n);
+      setGroupSizeState(clamped);
+      docRef.set({ groupSize: clamped }, { merge: true }).catch(() => {});
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [],

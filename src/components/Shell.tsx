@@ -12,10 +12,10 @@ import PlacesModal from "./modals/PlacesModal";
 import CrawlModal from "./modals/CrawlModal";
 
 const TABS = [
-  { route: "/leaderboard", label: "Leaderboard", icon: "🏆" },
-  { route: "/find", label: "Find", icon: "🔎" },
-  { route: "/map", label: "Map", icon: "🗺️" },
-  { route: "/split", label: "Split", icon: "🧾" },
+  { route: "/leaderboard", label: "Leaderboard" },
+  { route: "/find", label: "Discover" },
+  { route: "/map", label: "Tour Map" },
+  { route: "/split", label: "Split the Bill" },
 ];
 
 export default function Shell({ children }: { children: React.ReactNode }) {
@@ -26,25 +26,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="tda-root"
+      className="tda-root tda-atmosphere"
       style={{
         minHeight: "100vh",
-        backgroundColor: "#120F10",
-        backgroundImage: [
-          // two small, asymmetric warm pools — like sconces on a wall, not a
-          // single centered glow
-          "radial-gradient(38% 30% at 18% 8%, rgba(184,150,95,0.05), transparent 70%)",
-          "radial-gradient(32% 26% at 84% 14%, rgba(184,150,95,0.032), transparent 72%)",
-          // edge vignette: corners recede into warm-black, center stays lit
-          "radial-gradient(130% 85% at 50% 22%, rgba(0,0,0,0) 0%, rgba(4,4,3,0.55) 100%)",
-          // faint vertical seams suggesting wood wall paneling
-          "repeating-linear-gradient(90deg, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 1px, transparent 1px, transparent 150px)",
-          // deep green undertone bleeding in from one side, walnut brown
-          // deepening the other — room-corner tonal variation, not a flat fill
-          "linear-gradient(115deg, rgba(31,46,40,0.16) 0%, transparent 45%, transparent 60%, rgba(22,19,15,0.3) 100%)",
-        ].join(", "),
-        backgroundSize: "100% 100%, 100% 100%, 100% 100%, auto, 100% 100%",
-        backgroundRepeat: "no-repeat, no-repeat, no-repeat, no-repeat, no-repeat",
         color: "#EDE6D9",
         fontFamily: "'Inter', sans-serif",
         paddingBottom: "4rem",
@@ -69,26 +53,35 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <nav className="tda-scroll-x sticky top-0 z-20 -mx-5 my-7 flex gap-2 border-b border-line bg-[#120F10]/90 px-5 py-3 sm:static sm:mx-0 sm:border-none sm:bg-transparent sm:px-0 sm:py-0">
-          {TABS.map((t) => {
-            const active =
-              pathname === t.route ||
-              (t.route === "/leaderboard" && pathname === "/");
-            return (
-              <Link
-                key={t.route}
-                href={t.route}
-                className={`flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 font-mono text-[0.75rem] uppercase tracking-[0.06em] transition-all duration-150 sm:flex-1 sm:justify-center ${
-                  active
-                    ? "border-brass bg-brass font-semibold text-deep shadow-lift"
-                    : "border-line2 bg-transparent text-mist hover:border-brass hover:text-cream"
-                }`}
-              >
-                <span aria-hidden="true">{t.icon}</span>
-                {t.label}
-              </Link>
-            );
-          })}
+        <nav
+          className="tda-scroll-x sticky top-0 z-20 -mx-5 mb-8 border-b border-line bg-[#12100F]/95 px-5 backdrop-blur-sm sm:static sm:mx-0 sm:mb-8 sm:border-b sm:border-line sm:bg-transparent sm:px-0 sm:backdrop-blur-none"
+          aria-label="Sections"
+        >
+          <div className="flex items-stretch">
+            {TABS.map((t) => {
+              const active =
+                pathname === t.route ||
+                (t.route === "/leaderboard" && pathname === "/");
+              return (
+                <Link
+                  key={t.route}
+                  href={t.route}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative flex flex-shrink-0 items-center whitespace-nowrap px-4 py-3 font-mono text-[0.72rem] uppercase tracking-[0.16em] transition-colors duration-150 sm:flex-1 sm:justify-center sm:border-r sm:border-line sm:px-2 sm:first:border-l ${
+                    active ? "text-cream" : "text-mute hover:text-mist"
+                  }`}
+                >
+                  {t.label}
+                  <span
+                    aria-hidden="true"
+                    className={`absolute bottom-0 left-1/2 h-[2px] -translate-x-1/2 bg-brass transition-all duration-150 ${
+                      active ? "w-9 opacity-100" : "w-0 opacity-0"
+                    }`}
+                  />
+                </Link>
+              );
+            })}
+          </div>
         </nav>
 
         {children}

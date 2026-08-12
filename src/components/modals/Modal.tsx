@@ -31,10 +31,14 @@ export default function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className="max-h-[85vh] w-full overflow-y-auto rounded-[10px] border border-line2 bg-panel p-6 shadow-panel"
+        className="relative max-h-[85vh] w-full overflow-y-auto rounded-[10px] border border-line2 bg-panel p-6 shadow-panel"
         style={{ maxWidth }}
         onClick={(e) => e.stopPropagation()}
       >
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-px bg-brass/50"
+        />
         {children}
       </div>
     </div>

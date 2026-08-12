@@ -3,6 +3,7 @@
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
 import { primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
+import Icon from "../Icon";
 
 export default function PlacesModal() {
   const { placesModal, setPlacesModal, confirmPlaceSelection } = useTour();
@@ -22,8 +23,9 @@ export default function PlacesModal() {
         &ldquo;{suggestion.name}&rdquo;
       </p>
       {suggestion.address && (
-        <p className="mb-4 font-mono text-[0.7rem] text-mute">
-          📍 {suggestion.address}
+        <p className="mb-4 flex items-center gap-1.5 font-mono text-[0.7rem] text-mute">
+          <Icon name="pin" size={12} />
+          {suggestion.address}
         </p>
       )}
 

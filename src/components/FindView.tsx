@@ -7,6 +7,7 @@ import BarCard from "./BarCard";
 import TabIntro from "./TabIntro";
 import EmptyState from "./EmptyState";
 import { addBtnCls, kickerCls } from "@/lib/ui";
+import Icon from "./Icon";
 
 export default function FindView() {
   const {
@@ -34,11 +35,15 @@ export default function FindView() {
       <SearchPanel />
 
       {searching && (
-        <EmptyState icon="🧭" title="Scouting the city…" hint="This takes a moment" />
+        <EmptyState
+          icon={<Icon name="compass" size={18} />}
+          title="Scouting the city…"
+          hint="This takes a moment"
+        />
       )}
       {searchDone && !searching && searchResults.length === 0 && (
         <EmptyState
-          icon="🚫"
+          icon={<Icon name="xCircle" size={18} />}
           title="No fresh matches came back."
           hint="Try a different vibe"
         />
@@ -77,7 +82,7 @@ export default function FindView() {
       <div className="mt-4 flex flex-col gap-2.5">
         {filteredToTry.length === 0 && (
           <EmptyState
-            icon="📋"
+            icon={<Icon name="ledger" size={18} />}
             title="Nothing on the list yet."
             hint="Use the button above to add one"
           />

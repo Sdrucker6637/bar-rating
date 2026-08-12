@@ -4,7 +4,18 @@ import type { ChangeEvent, FormEvent } from "react";
 import type { SplitPerson, SplitPlace, SplitTotals } from "@/lib/types";
 import type { SplitStep } from "@/app/split/SplitClient";
 import { distributeCents } from "@/lib/splitMath";
-import { inputCls, groupBtnCls, addBtnCls } from "@/lib/ui";
+import {
+  inputCls,
+  groupBtnCls,
+  addBtnCls,
+  btnPrimaryCls,
+  btnSecondaryCls,
+  chipCls,
+  chipActiveCls,
+  cardBaseShadowCls,
+  cardWarmSurfaceCls,
+} from "@/lib/ui";
+import Icon from "./Icon";
 
 interface SplitBillViewProps {
   step: SplitStep;
@@ -108,7 +119,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
   // ---------------- names ----------------
   if (step === "names") {
     return (
-      <div className="my-4 rounded-lg border border-line bg-panel p-4">
+      <div
+        className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+      >
         <PanelHeading>Who&apos;s splitting the bill?</PanelHeading>
         <div className="mb-3.5 font-mono text-[0.68rem] text-mute">
           Add names one at a time — press Enter or tap + Add after each one.
@@ -127,33 +140,26 @@ export default function SplitBillView(props: SplitBillViewProps) {
             onChange={(e) => setNameInput(e.target.value)}
             autoFocus
           />
-          <button
-            type="submit"
-            className="cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
-          >
+          <button type="submit" className={btnPrimaryCls}>
             + Add
           </button>
         </form>
         {people.length > 0 && (
-          <div className="mb-5 flex flex-wrap gap-1">
+          <div className="mb-5 flex flex-wrap gap-1.5">
             {people.map((p) => (
               <span
                 key={p.id}
-                className="rounded-full bg-line px-3 py-1.5 font-mono text-[0.85rem] text-mist"
+                className="inline-flex items-center gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-2.5 py-1.5"
               >
-                {p.name}{" "}
+                <span className="font-serif text-[0.88rem] font-medium leading-tight text-cream">
+                  {p.name}
+                </span>
                 <button
                   onClick={() => onRemovePerson(p.id)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#C77676",
-                    cursor: "pointer",
-                    marginLeft: "0.3rem",
-                    fontSize: "0.8rem",
-                  }}
+                  title={`Remove ${p.name}`}
+                  className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/75 transition-colors hover:border-red/40 hover:bg-[rgba(199,118,118,0.12)] hover:text-red"
                 >
-                  ✕
+                  <Icon name="x" size={9} />
                 </button>
               </span>
             ))}
@@ -161,11 +167,12 @@ export default function SplitBillView(props: SplitBillViewProps) {
         )}
         <div className="mt-2.5 flex justify-end">
           <button
-            className="cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold disabled:cursor-default disabled:opacity-50"
+            className={btnPrimaryCls}
             disabled={people.length < 2}
             onClick={() => setStep("placesCount")}
           >
-            Next: How many places? →
+            Next: How many places?
+            <Icon name="arrowRight" size={13} />
           </button>
         </div>
         {people.length > 0 && people.length < 2 && (
@@ -180,7 +187,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
   // ---------------- places count ----------------
   if (step === "placesCount") {
     return (
-      <div className="my-4 rounded-lg border border-line bg-panel p-4">
+      <div
+        className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+      >
         <PanelHeading>How many places did you go?</PanelHeading>
         <div className="mb-4 font-mono text-[0.68rem] text-mute">
           One tab will be created per place, so each receipt gets its own crew
@@ -202,17 +211,12 @@ export default function SplitBillView(props: SplitBillViewProps) {
           </button>
         </div>
         <div className="mt-4 flex items-center justify-between gap-2.5">
-          <button
-            className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
-            onClick={() => setStep("names")}
-          >
-            ← Back
+          <button className={btnSecondaryCls} onClick={() => setStep("names")}>
+            <Icon name="arrowLeft" size={12} /> Back
           </button>
-          <button
-            className="cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
-            onClick={onConfirmPlacesCount}
-          >
-            Next: Add receipts →
+          <button className={btnPrimaryCls} onClick={onConfirmPlacesCount}>
+            Next: Add receipts
+            <Icon name="arrowRight" size={13} />
           </button>
         </div>
       </div>
@@ -226,7 +230,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
         {places.map((place, i) => (
           <div
             key={place.id}
-            className="rounded-lg border border-line bg-panel p-4"
+            className={`rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
           >
             <div className="mb-2.5 flex flex-col gap-1">
               <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
@@ -245,7 +249,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
               htmlFor={`tda-receipt-upload-${place.id}`}
               className="mb-3 flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[10px] border-[1.5px] border-dashed border-line2 bg-ink p-6 text-center transition-colors duration-150 hover:border-brass hover:bg-panelHover"
             >
-              <div className="mb-1 text-[1.8rem] leading-none">🧾</div>
+              <Icon name="receipt" size={26} className="text-brass/80" />
               <div className="font-serif text-[1rem] font-medium text-cream">
                 Tap to add screenshot(s)
               </div>
@@ -311,17 +315,18 @@ export default function SplitBillView(props: SplitBillViewProps) {
 
         <div className="flex items-center justify-between gap-2.5">
           <button
-            className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+            className={btnSecondaryCls}
             onClick={() => setStep("placesCount")}
           >
-            ← Back
+            <Icon name="arrowLeft" size={12} /> Back
           </button>
           <button
-            className="cursor-pointer rounded-full border-none bg-brass px-5 py-2.5 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold disabled:cursor-default disabled:opacity-50"
+            className={btnPrimaryCls}
             disabled={readingAll}
             onClick={onReadAllAndProceed}
           >
-            {readingAll ? "Reading receipts…" : "Next: Divide items →"}
+            {readingAll ? "Reading receipts…" : "Next: Divide items"}
+            {!readingAll && <Icon name="arrowRight" size={13} />}
           </button>
         </div>
         <div className="text-center font-mono text-[0.68rem] text-mute">
@@ -346,10 +351,8 @@ export default function SplitBillView(props: SplitBillViewProps) {
           {places.map((pl, i) => (
             <button
               key={pl.id}
-              className={`cursor-pointer whitespace-nowrap rounded-full border px-3.5 py-1.5 font-mono text-[0.72rem] ${
-                i === activePlaceIndex
-                  ? "border-brass bg-brass font-semibold text-deep"
-                  : "border-line2 bg-transparent text-mist"
+              className={`${chipCls} whitespace-nowrap ${
+                i === activePlaceIndex ? chipActiveCls : ""
               }`}
               onClick={() => setActivePlaceIndex(i)}
             >
@@ -358,7 +361,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
           ))}
         </div>
 
-        <div className="rounded-lg border border-line bg-panel p-4">
+        <div
+          className={`rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+        >
           <PanelHeading>{placeLabel(place, activePlaceIndex)}</PanelHeading>
 
           {place.parseError && (
@@ -388,18 +393,10 @@ export default function SplitBillView(props: SplitBillViewProps) {
                     onClick={() =>
                       onRemovePersonFromPlace(activePlaceIndex, p.id)
                     }
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#C77676",
-                      cursor: "pointer",
-                      padding: 0,
-                      lineHeight: 1,
-                      fontSize: "0.75rem",
-                    }}
+                    className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-red/75 transition-colors hover:bg-[rgba(199,118,118,0.15)] hover:text-red"
                     title="Remove from this place"
                   >
-                    ✕
+                    <Icon name="x" size={9} />
                   </button>
                 </span>
               ))}
@@ -525,7 +522,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                           : "Divide this item evenly among everyone at this place"
                       }
                     >
-                      ⚖ Split evenly
+                      Split evenly
                     </button>
                   </div>
                   {includedIds.length > 0 && (
@@ -685,11 +682,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
 
           <div className="mt-5 border-t border-line pt-4">
             <button
-              className="w-full cursor-pointer rounded-full border-none bg-brass px-5 py-3 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold disabled:cursor-default disabled:opacity-40"
+              className={`${btnPrimaryCls} w-full`}
               disabled={crew.length === 0}
               onClick={() => onSendPlaceText(activePlaceIndex)}
             >
-              📱 Send text for this place
+              <Icon name="message" size={13} /> Send text for this place
             </button>
             <div className="mt-2 text-center font-mono text-[0.68rem] text-mute">
               Opens your messaging app with each person&apos;s total for this
@@ -697,16 +694,17 @@ export default function SplitBillView(props: SplitBillViewProps) {
             </div>
             <div className="mt-2.5 flex flex-wrap gap-2.5">
               <button
-                className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                className={`${btnSecondaryCls} flex-1`}
                 onClick={() => setStep("receipts")}
               >
-                ← Back to receipts
+                <Icon name="arrowLeft" size={12} /> Back to receipts
               </button>
               <button
-                className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                className={`${btnSecondaryCls} flex-1`}
                 onClick={() => setStep("summary")}
               >
-                Next: Review all →
+                Next: Review all
+                <Icon name="arrowRight" size={12} />
               </button>
             </div>
           </div>
@@ -722,10 +720,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
         const totals = placeTotalsList[i];
         const crew = people.filter((p) => place.crewIds.includes(p.id));
         if (crew.length === 0) return null;
-        return (
-          <div
+        return (<div
             key={place.id}
-            className="rounded-lg border border-line bg-panel p-4"
+            className={`rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
           >
             <PanelHeading>{placeLabel(place, i)}</PanelHeading>
             <div className="flex flex-col gap-1.5">
@@ -745,7 +742,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
         );
       })}
 
-      <div className="rounded-lg border border-brass bg-panel p-4">
+      <div
+        className={`rounded-lg border border-brass bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+      >
         <PanelHeading>Grand total</PanelHeading>
         <div className="flex flex-col gap-2.5">
           {people.map((p) => (
@@ -766,10 +765,10 @@ export default function SplitBillView(props: SplitBillViewProps) {
 
       <div className="flex flex-col gap-2.5">
         <button
-          className="w-full cursor-pointer rounded-full border-none bg-brass px-5 py-3 font-mono text-[0.8rem] font-semibold text-deep hover:bg-gold"
+          className={`${btnPrimaryCls} w-full`}
           onClick={onSendGrandText}
         >
-          📱 Send full summary as text
+          <Icon name="message" size={13} /> Send full summary as text
         </button>
         <div className="text-center font-mono text-[0.68rem] text-mute">
           Opens your messaging app with each place&apos;s totals and the grand
@@ -777,13 +776,13 @@ export default function SplitBillView(props: SplitBillViewProps) {
         </div>
         <div className="flex flex-wrap gap-2.5">
           <button
-            className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+            className={`${btnSecondaryCls} flex-1`}
             onClick={() => setStep("tabs")}
           >
-            ← Back to tabs
+            <Icon name="arrowLeft" size={12} /> Back to tabs
           </button>
           <button
-            className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3.5 py-2.5 font-mono text-[0.78rem] text-mist transition-colors hover:border-brass hover:text-cream"
+            className={`${btnSecondaryCls} flex-1`}
             onClick={onReset}
           >
             Start over

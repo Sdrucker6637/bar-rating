@@ -6,6 +6,7 @@ import Modal from "./Modal";
 import { displayDescription } from "@/lib/parse";
 import { estimateWalkMinutes, haversineMeters } from "@/lib/scoring";
 import { findBtnCls, inputCls, secondaryBtnCls } from "@/lib/ui";
+import Icon from "../Icon";
 
 export default function CrawlModal() {
   const {
@@ -31,8 +32,9 @@ export default function CrawlModal() {
 
   return (
     <Modal onClose={closeCrawlModal} maxWidth="640px">
-      <h3 className="mt-0 font-serif font-medium text-cream">
-        🚶 Plan a Crawl
+      <h3 className="mt-0 flex items-center gap-2.5 font-serif font-medium text-cream">
+        <Icon name="map" size={16} className="text-gold" />
+        Plan a Crawl
       </h3>
 
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
@@ -165,11 +167,17 @@ export default function CrawlModal() {
                         I visited
                       </button>
                       <button
-                        className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-50"
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-[5px] border border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-50"
                         disabled={replacingIndex !== null}
                         onClick={() => replaceStop(i)}
                       >
-                        {replacingIndex === i ? "Finding…" : "↺ Replace"}
+                        {replacingIndex === i ? (
+                          "Finding…"
+                        ) : (
+                          <>
+                            <Icon name="refresh" size={11} /> Replace
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

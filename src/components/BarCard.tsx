@@ -7,12 +7,14 @@ import { displayDescription } from "@/lib/parse";
 import {
   ghostBtnCls,
   ghostBtnGreenCls,
-  delBtnCls,
+  dqBtnCls,
+  removeBtnCls,
   tagCls,
   cardHoverCls,
   cardBaseShadowCls,
   cardWarmSurfaceCls,
 } from "@/lib/ui";
+import Icon from "./Icon";
 
 interface BarCardProps {
   b: Bar;
@@ -27,12 +29,12 @@ interface BarCardProps {
   onDisqualify?: () => void;
 }
 
-const STATS: Array<[keyof Bar, string, string]> = [
-  ["vibe", "Vibe", "🎭"],
-  ["value", "Value", "💰"],
-  ["service", "Service", "🤝"],
-  ["food", "Food", "🍽️"],
-  ["drinks", "Drinks", "🍸"],
+const STATS: Array<[keyof Bar, string]> = [
+  ["vibe", "Vibe"],
+  ["value", "Value"],
+  ["service", "Service"],
+  ["food", "Food"],
+  ["drinks", "Drinks"],
 ];
 
 export default function BarCard({
@@ -69,7 +71,7 @@ export default function BarCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-4 pl-6 pr-5 ${cardBaseShadowCls} ${cardWarmSurfaceCls} ${cardHoverCls} ${
+      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-5 pl-6 pr-5 ${cardBaseShadowCls} ${cardWarmSurfaceCls} ${cardHoverCls} ${
         b.disqualified ? "opacity-70" : ""
       } ${rank === 1 ? "border-gold/30" : ""}`}
     >
@@ -78,8 +80,8 @@ export default function BarCard({
         aria-hidden="true"
       />
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {rank ? (
             <span
               className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[0.85rem] font-semibold ${
@@ -103,7 +105,7 @@ export default function BarCard({
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-2">
               <div
-                className="cursor-pointer truncate font-serif text-title-sm font-medium underline decoration-brass/40 decoration-[3px] underline-offset-[3px] hover:text-gold hover:decoration-gold"
+                className="min-w-0 cursor-pointer truncate font-serif text-title-sm font-medium underline decoration-brass/40 decoration-[3px] underline-offset-[3px] hover:text-gold hover:decoration-gold"
                 onClick={onNameClick}
               >
                 {b.mapsLink ? (
@@ -137,11 +139,15 @@ export default function BarCard({
         </div>
 
         {score !== undefined && score !== null && (
-          <div className="flex-shrink-0 rounded-[6px] border border-line2 bg-ink px-3 py-1.5 text-right">
-            <div className="font-mono text-[1.2rem] font-semibold leading-none text-gold">
+          <div className="flex-shrink-0 rounded-[6px] border border-line2 bg-ink px-3.5 py-2 text-right shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
+            <div className="font-serif text-[1.3rem] font-medium leading-none text-gold">
               {b.disqualified ? "N/A" : fmt(score)}
             </div>
-            <div className="mt-0.5 text-[0.58rem] uppercase tracking-[0.06em] text-mute">
+            <div
+              className="ml-auto mt-1.5 h-px w-6 bg-brass/30"
+              aria-hidden="true"
+            />
+            <div className="mt-1 text-[0.56rem] uppercase tracking-[0.08em] text-mute">
               {b.disqualified ? "disqualified" : scoreLabel}
             </div>
           </div>
@@ -155,7 +161,7 @@ export default function BarCard({
       )}
 
       {b.tags && b.tags.length > 0 && (
-        <div className="mt-2.5 flex flex-wrap gap-1">
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
           {b.tags.map((t) => (
             <span key={t} className={tagCls}>
               {t}
@@ -182,38 +188,56 @@ export default function BarCard({
       )}
 
       {b.status === "visited" && (
-        <div className="mt-3 flex divide-x divide-line rounded-[6px] border border-line2 bg-ink font-mono text-[0.72rem] text-mist">
-          {STATS.map(([key, label, icon]) => (
-            <div
-              key={key}
-              className="flex flex-1 flex-col items-center gap-0.5 px-2 py-2 text-center"
-            >
-              <span aria-hidden="true">{icon}</span>
-              <b className="text-cream">
-                {fmt(b[key] as unknown as number | null)}
-              </b>
-              <span className="text-[0.6rem] uppercase tracking-[0.04em] text-dim">
-                {label}
-              </span>
-            </div>
-          ))}
+        <div className="mt-3.5 rounded-[6px] border border-line2 bg-ink shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
+          <div className="flex divide-x divide-line">
+            {STATS.map(([key, label]) => {
+              const v = b[key] as unknown as number | null;
+              const strong = v !== null && v >= 8.5;
+              const exceptional = v !== null && v >= 9.5;
+              return (
+                <div
+                  key={key}
+                  className="flex flex-1 flex-col items-center gap-1.5 px-1 py-2.5 text-center"
+                >
+                  <span
+                    className={`font-serif text-[1.12rem] font-medium leading-none ${
+                      exceptional
+                        ? "text-gold [text-shadow:0_0_16px_rgba(201,168,118,0.35)]"
+                        : strong
+                          ? "text-gold"
+                          : "text-cream"
+                    }`}
+                  >
+                    {fmt(v)}
+                  </span>
+                  <span className="font-mono text-[0.58rem] uppercase tracking-[0.08em] text-mute">
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
 
-          {b.bathroomBonus > 0 && (
-            <div className="flex flex-1 flex-col items-center gap-0.5 px-2 py-2 text-center">
-              <span aria-hidden="true">🚻</span>
-              <b className="text-cream">{fmt(b.bathroomBonus)}</b>
-              <span className="text-[0.6rem] uppercase tracking-[0.04em] text-dim">
-                Bonus
-              </span>
-            </div>
-          )}
+            {b.bathroomBonus > 0 && (
+              <div className="flex flex-[1.8] flex-col items-center gap-1.5 px-1 py-2.5 text-center">
+                <span className="font-serif text-[1.12rem] font-medium leading-none text-cream">
+                  {fmt(b.bathroomBonus)}
+                </span>
+                <span className="whitespace-nowrap font-mono text-[0.58rem] uppercase tracking-[0.08em] text-mute">
+                  Bathroom bonus
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {(b.happyHour || b.notes) && (
         <div className="mt-3 space-y-1.5 border-l-2 border-goldDeep/40 pl-3">
           {b.happyHour && (
-            <div className="text-[0.82rem] text-mist">🕔 {b.happyHour}</div>
+            <div className="flex items-center gap-1.5 text-[0.82rem] text-mist">
+              <Icon name="clock" size={12} className="text-gold/70" />
+              {b.happyHour}
+            </div>
           )}
 
           {b.notes && (
@@ -231,7 +255,7 @@ export default function BarCard({
         </div>
       )}
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-[rgba(184,150,95,0.12)] pt-3">
+      <div className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-2 border-t border-[rgba(184,150,95,0.14)] pt-3">
         {b.mapsLink && (
           <a
             className={ghostBtnCls}
@@ -239,23 +263,26 @@ export default function BarCard({
             target="_blank"
             rel="noreferrer"
           >
-            <span aria-hidden="true">🗺️</span> Map ↗
+            <Icon name="external" size={12} /> Map
           </a>
         )}
 
         <button className={ghostBtnGreenCls} onClick={onEdit}>
-          <span aria-hidden="true">✎</span> {editLabel || "Edit"}
+          <Icon name="pencil" size={12} /> {editLabel || "Edit"}
         </button>
 
         {b.status === "visited" && onDisqualify && (
-          <button className={ghostBtnCls} onClick={onDisqualify}>
+          <button className={dqBtnCls} onClick={onDisqualify}>
+            <Icon name="xCircle" size={11} />
             {b.disqualified ? "Un-disqualify" : "Disqualify"}
           </button>
         )}
 
-        <button className={`${delBtnCls} ml-auto`} onClick={onDelete}>
-          <span aria-hidden="true">✕</span> Remove
-        </button>
+        {isWishlist && (
+          <button className={`${removeBtnCls} ml-auto`} onClick={onDelete}>
+            <Icon name="x" size={11} /> Remove
+          </button>
+        )}
       </div>
     </div>
   );
