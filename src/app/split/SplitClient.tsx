@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import SplitBillView from "@/components/SplitBillView";
 import TabIntro from "@/components/TabIntro";
+import { distributeCents, distributeWholeUnits } from "@/lib/splitMath";
 import type {
   SplitItem,
   SplitPerson,
@@ -73,11 +74,20 @@ export default function SplitClient() {
   }
 
   // ---------------- names step ----------------
-  function addSplitPerson() {
+  // Returns a validation message (or null) so the UI can surface feedback.
+  // The roster must never contain two people with the same name — that would
+  // make item assignment ambiguous. Empty/whitespace-only names are silently
+  // ignored (nothing to add, nothing to say).
+  function addSplitPerson(): string | null {
     const name = splitNameInput.trim();
-    if (!name) return;
+    if (!name) return null;
+    const duplicate = splitPeople.find(
+      (p) => p.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (duplicate) return `${name} is already in the group.`;
     setSplitPeople((prev) => [...prev, { id: newPersonId(), name }]);
     setSplitNameInput("");
+    return null;
   }
 
   function removeSplitPerson(id: string) {
@@ -117,6 +127,30 @@ export default function SplitClient() {
     );
   }
 
+  // Some phones/browsers report an empty mime type for HEIC/HEIF camera
+  // photos (and a few other formats). Sniff the image's magic bytes from the
+  // base64 payload so receipt photos still reach the parser with a type
+  // Gemini understands instead of being mislabeled as JPEG.
+  function sniffImageMime(base64: string): string {
+    try {
+      const head = atob(base64.slice(0, 32));
+      if (head.startsWith("\xff\xd8\xff")) return "image/jpeg";
+      if (head.startsWith("\x89PNG")) return "image/png";
+      if (head.startsWith("GIF8")) return "image/gif";
+      if (head.slice(0, 4) === "RIFF" && head.slice(8, 12) === "WEBP")
+        return "image/webp";
+      if (head.slice(4, 8) === "ftyp") {
+        const brand = head.slice(8, 12);
+        if (["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand)) {
+          return "image/heic";
+        }
+      }
+    } catch {
+      /* base64 may be empty/malformed — fall through */
+    }
+    return "";
+  }
+
   function addScreenshotsToPlace(placeIndex: number, files: FileList) {
     Array.from(files).forEach((file) => {
       const reader = new FileReader();
@@ -126,7 +160,7 @@ export default function SplitClient() {
         const shot: SplitScreenshot = {
           id: `shot${Date.now()}${Math.random()}`,
           base64,
-          mimeType: file.type || "image/jpeg",
+          mimeType: file.type || sniffImageMime(base64) || "image/jpeg",
           previewUrl: dataUrl,
         };
         setSplitPlaces((prev) =>
@@ -367,11 +401,24 @@ export default function SplitClient() {
           items: pl.items.map((it) => {
             if (it.id !== itemId) return it;
             if (personIds.length === 0) return { ...it, assignedTo: {} };
-            const share = it.quantity / personIds.length;
+            const q = it.quantity || 1;
             const nextAssigned: Record<string, number> = {};
-            personIds.forEach((pid) => {
-              nextAssigned[pid] = share;
-            });
+            if (q === 1) {
+              // Single unit — split its cost evenly across everyone (each
+              // person takes a fractional share of the one unit).
+              const share = 1 / personIds.length;
+              personIds.forEach((pid) => {
+                nextAssigned[pid] = share;
+              });
+            } else {
+              // Multiple units — hand out WHOLE units as evenly as possible
+              // (2,1,1,1 for 5 drinks / 4 people) so unit counts and the +/−
+              // steppers stay in whole numbers that sum to the quantity.
+              const shares = distributeWholeUnits(q, personIds.length);
+              personIds.forEach((pid, i) => {
+                nextAssigned[pid] = shares[i];
+              });
+            }
             return { ...it, assignedTo: nextAssigned };
           }),
         };
@@ -379,6 +426,11 @@ export default function SplitClient() {
     );
   }
 
+  // Toggling a person on/off an item rebalances the WHOLE currently-included
+  // set evenly across the item's quantity — the same rule "Split evenly"
+  // uses. This is the fix for the bug where clicking each person's chip
+  // individually gave every person the item's full quantity (and therefore
+  // its full price) instead of dividing it among them.
   function toggleItemPersonIncluded(
     placeIndex: number,
     itemId: string,
@@ -391,11 +443,28 @@ export default function SplitClient() {
           ...pl,
           items: pl.items.map((it) => {
             if (it.id !== itemId) return it;
-            const nextAssigned = { ...it.assignedTo };
-            if (nextAssigned[personId]) {
-              delete nextAssigned[personId];
+            const currentlyIncluded = Object.keys(it.assignedTo).filter(
+              (pid) => (it.assignedTo[pid] || 0) > 0,
+            );
+            const isIncluded = currentlyIncluded.includes(personId);
+            const nextIncluded = isIncluded
+              ? currentlyIncluded.filter((pid) => pid !== personId)
+              : [...currentlyIncluded, personId];
+            if (nextIncluded.length === 0) return { ...it, assignedTo: {} };
+            const q = it.quantity || 1;
+            const nextAssigned: Record<string, number> = {};
+            if (q === 1) {
+              const share = 1 / nextIncluded.length;
+              nextIncluded.forEach((pid) => {
+                nextAssigned[pid] = share;
+              });
             } else {
-              nextAssigned[personId] = Math.min(1, it.quantity);
+              // Same whole-unit rule as "Split evenly": redistribute the
+              // quantity in whole units among whoever is currently included.
+              const shares = distributeWholeUnits(q, nextIncluded.length);
+              nextIncluded.forEach((pid, i) => {
+                nextAssigned[pid] = shares[i];
+              });
             }
             return { ...it, assignedTo: nextAssigned };
           }),
@@ -461,11 +530,15 @@ export default function SplitClient() {
 
     let assignedSubtotal = 0;
     place.items.forEach((it) => {
-      const q = it.quantity || 1;
-      const perUnit = it.price / q;
-      Object.entries(it.assignedTo).forEach(([pid, units]) => {
+      const entries = Object.entries(it.assignedTo)
+        .filter(([, units]) => (units || 0) > 0)
+        .map(([pid, units]) => ({ id: pid, weight: units }));
+      if (entries.length === 0) return;
+      const totalCents = Math.round(it.price * 100);
+      const centsByPerson = distributeCents(totalCents, entries);
+      Object.entries(centsByPerson).forEach(([pid, cents]) => {
         if (perPersonSubtotal[pid] === undefined) return;
-        const cost = perUnit * units;
+        const cost = cents / 100;
         perPersonSubtotal[pid] += cost;
         assignedSubtotal += cost;
       });

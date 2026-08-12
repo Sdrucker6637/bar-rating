@@ -2,6 +2,8 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
+import { primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
+import Icon from "../Icon";
 
 export default function PlacesModal() {
   const { placesModal, setPlacesModal, confirmPlaceSelection } = useTour();
@@ -21,8 +23,9 @@ export default function PlacesModal() {
         &ldquo;{suggestion.name}&rdquo;
       </p>
       {suggestion.address && (
-        <p className="mb-4 font-mono text-[0.7rem] text-mute">
-          📍 {suggestion.address}
+        <p className="mb-4 flex items-center gap-1.5 font-mono text-[0.7rem] text-mute">
+          <Icon name="pin" size={12} />
+          {suggestion.address}
         </p>
       )}
 
@@ -40,13 +43,13 @@ export default function PlacesModal() {
           </p>
           <div className="mt-4 flex gap-2.5">
             <button
-              className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+              className={secondaryBtnCls}
               onClick={() => setPlacesModal(null)}
             >
               Cancel
             </button>
             <button
-              className="flex-1 cursor-pointer rounded-[5px] border-none bg-brass px-3 py-2.5 font-mono font-semibold text-deep"
+              className={primaryBtnCls}
               onClick={() => confirmPlaceSelection({})}
             >
               Add anyway
@@ -74,13 +77,13 @@ export default function PlacesModal() {
           ))}
           <div className="mt-5 flex gap-2.5">
             <button
-              className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+              className={secondaryBtnCls}
               onClick={() => setPlacesModal(null)}
             >
               Cancel
             </button>
             <button
-              className="flex-1 cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-2.5 font-mono text-mist"
+              className={secondaryBtnCls}
               onClick={() => confirmPlaceSelection({})}
             >
               None of these — add anyway

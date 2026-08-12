@@ -2,6 +2,8 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
+import { primaryBtnCls } from "@/lib/ui";
+import Icon from "../Icon";
 
 export default function InfoModal() {
   const { showInfo, setShowInfo } = useTour();
@@ -18,21 +20,27 @@ export default function InfoModal() {
       </div>
       <div className="mt-3.5 flex flex-col gap-1 font-mono text-[0.78rem] text-mist">
         <div>
-          <b className="text-gold">💰 Baller Mode</b>
+          <b className="inline-flex items-center gap-2 text-gold">
+            <Icon name="dollar" size={13} /> Baller Mode
+          </b>
           <div className="mt-1 font-sans text-[0.92rem] leading-[1.55] text-creamSoft">
             Allows recommendations from more expensive bars. Useful for special
             occasions, rooftops, and premium experiences.
           </div>
         </div>
         <div className="mt-3">
-          <b className="text-gold">🌎 Explore Mode</b>
+          <b className="inline-flex items-center gap-2 text-gold">
+            <Icon name="globe" size={13} /> Explore Mode
+          </b>
           <div className="mt-1 font-sans text-[0.92rem] leading-[1.55] text-creamSoft">
             Expands the search distance beyond the normal limit. Useful when
             discovering bars outside your usual area.
           </div>
         </div>
         <div className="mt-3">
-          <b className="text-gold">🚶 Plan a Crawl</b>
+          <b className="inline-flex items-center gap-2 text-gold">
+            <Icon name="map" size={13} /> Plan a Crawl
+          </b>
           <div className="mt-1 font-sans text-[0.92rem] leading-[1.55] text-creamSoft">
             Without a starting bar, Tour de Alcoholism picks a random starting
             point and builds a walkable crawl.
@@ -43,7 +51,9 @@ export default function InfoModal() {
           </div>
         </div>
         <div className="mt-3">
-          <b className="text-gold">🍻 OG Rules</b>
+          <b className="inline-flex items-center gap-2 text-gold">
+            <Icon name="beer" size={13} /> OG Rules
+          </b>
           <div className="mt-1 font-sans text-[0.92rem] leading-[1.55] text-creamSoft">
             No American Whiskey.
           </div>
@@ -53,10 +63,7 @@ export default function InfoModal() {
         </div>
       </div>
       <div className="mt-4 flex gap-2.5">
-        <button
-          className="flex-1 cursor-pointer rounded-[5px] border-none bg-brass px-3 py-2.5 font-mono font-semibold text-deep"
-          onClick={() => setShowInfo(false)}
-        >
+        <button className={primaryBtnCls} onClick={() => setShowInfo(false)}>
           Got it
         </button>
       </div>

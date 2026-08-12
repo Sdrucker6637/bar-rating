@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Bar } from "@/lib/types";
 import { avgWithFood, avgWithoutFood, fmt } from "@/lib/scoring";
 import { HEAT_GRADIENTS, HEAT_DOT_COLOR } from "@/lib/constants";
+import { chipCls, chipActiveCls } from "@/lib/ui";
 
 interface MapViewProps {
   bars: Bar[];
@@ -254,23 +255,15 @@ export default function MapView({ bars }: MapViewProps) {
   if (geoBars.length === 0) {
     return (
       <div>
-        <div className="mb-4 inline-flex overflow-hidden rounded-full border border-line2">
+        <div className="mb-4 inline-flex gap-1.5">
           <button
-            className={`px-3.5 py-1.5 font-mono text-[0.72rem] ${
-              mode === "visited"
-                ? "bg-brass font-semibold text-deep"
-                : "bg-transparent text-mist"
-            }`}
+            className={`${chipCls} ${mode === "visited" ? chipActiveCls : ""}`}
             onClick={() => setMode("visited")}
           >
             Visited
           </button>
           <button
-            className={`px-3.5 py-1.5 font-mono text-[0.72rem] ${
-              mode === "wishlist"
-                ? "bg-brass font-semibold text-deep"
-                : "bg-transparent text-mist"
-            }`}
+            className={`${chipCls} ${mode === "wishlist" ? chipActiveCls : ""}`}
             onClick={() => setMode("wishlist")}
           >
             Wishlist
@@ -289,26 +282,15 @@ export default function MapView({ bars }: MapViewProps) {
     <div>
       <div className="relative">
         <div ref={mapNodeRef} className="tda-heatmap-container" />
-        <div
-          className="absolute right-3 top-3 z-[1000] inline-flex overflow-hidden rounded-full border border-line2 shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
-          style={{ background: "rgba(23,20,27,0.9)", backdropFilter: "blur(4px)" }}
-        >
+        <div className="absolute right-3 top-3 z-[1000] inline-flex gap-1 rounded-full border border-line2 bg-[rgba(23,20,27,0.9)] p-1 shadow-[0_2px_10px_rgba(0,0,0,0.35)] backdrop-blur-sm">
           <button
-            className={`px-3.5 py-1.5 font-mono text-[0.72rem] ${
-              mode === "visited"
-                ? "bg-brass font-semibold text-deep"
-                : "bg-transparent text-mist"
-            }`}
+            className={`${chipCls} !px-2.5 !py-1 ${mode === "visited" ? chipActiveCls : ""}`}
             onClick={() => setMode("visited")}
           >
             Visited
           </button>
           <button
-            className={`px-3.5 py-1.5 font-mono text-[0.72rem] ${
-              mode === "wishlist"
-                ? "bg-brass font-semibold text-deep"
-                : "bg-transparent text-mist"
-            }`}
+            className={`${chipCls} !px-2.5 !py-1 ${mode === "wishlist" ? chipActiveCls : ""}`}
             onClick={() => setMode("wishlist")}
           >
             Wishlist

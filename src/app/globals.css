@@ -13,7 +13,42 @@ body {
 }
 
 body {
-  background: #0e0d10;
+  /* Pre-hydration/no-JS fallback that matches .tda-atmosphere's base tone
+     (Shell's root div carries the real layered environment once rendered). */
+  background: #12100f;
+}
+
+/* ---------- the room: a dark, quiet environment ----------
+   An almost-black charcoal base with a barely-there warm undertone.
+   Depth comes from darkness alone: a wide vignette letting the outer
+   edges and corners fall away, and two very broad, low-opacity shadow
+   areas that keep the large canvas from being a flat field. No texture,
+   no grain, no turbulence, no lighting effects — the background stays
+   nearly boring on its own, and typography, brass, and the cards carry
+   the room. */
+.tda-atmosphere {
+  background-color: #12100f;
+  background-image:
+    /* edge vignette on top: outer frame and corners recede, center calm */
+    radial-gradient(
+      130% 110% at 50% 42%,
+      rgba(0, 0, 0, 0) 58%,
+      rgba(0, 0, 0, 0.42) 100%
+    ),
+    /* broad, soft shadow area, low-left — dark, not a shape */
+    radial-gradient(
+      90% 70% at 16% 80%,
+      rgba(0, 0, 0, 0.09),
+      rgba(0, 0, 0, 0) 72%
+    ),
+    /* broad, soft shadow area, upper-right — offsets the first */
+    radial-gradient(
+      85% 65% at 84% 10%,
+      rgba(0, 0, 0, 0.08),
+      rgba(0, 0, 0, 0) 72%
+    );
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
 }
 
 /* ---------- pulse animation (skeleton / loading text) ---------- */
@@ -39,14 +74,14 @@ body {
 
 /* ---------- Leaflet popup theming ---------- */
 .tda-heatmap-container .leaflet-popup-content-wrapper {
-  background: #17141b;
+  background: #1a1714;
   color: #ede6d9;
   border-radius: 8px;
   border: 1px solid #302938;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 .tda-heatmap-container .leaflet-popup-tip {
-  background: #17141b;
+  background: #1a1714;
   border: 1px solid #302938;
 }
 .tda-heatmap-container .leaflet-popup-close-button {
@@ -76,4 +111,21 @@ body {
   .tda-select {
     font-size: 16px;
   }
+}
+
+/* ---------- accessible focus ring for the dark theme (default outline is invisible) ---------- */
+:focus-visible {
+  outline: 2px solid #c9a876;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- horizontal-scrolling nav / chip rows: hide scrollbar, keep scroll ---------- */
+.tda-scroll-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tda-scroll-x::-webkit-scrollbar {
+  display: none;
 }

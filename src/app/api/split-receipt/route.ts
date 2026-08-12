@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
-// Takes one or more base64-encoded receipt screenshots for a SINGLE place
-// and asks Gemini to extract itemized line items, tax, tip, and the
-// place name. Multiple screenshots are sent in one call so Gemini can see
-// them together and avoid re-listing a line that appears in more than one
-// (e.g. when a receipt didn't fit in a single screenshot and the shots
-// overlap). No Firestore involved — this is a stateless parse.
+// Takes one or more base64-encoded receipt images for a SINGLE place and
+// asks Gemini to extract itemized line items, tax, tip, and the place name.
+// The images may be screenshots of a digital receipt OR photographs of a
+// physical paper receipt — both feed the same pipeline. Multiple images are
+// sent in one call so Gemini can see them together and avoid re-listing a
+// line that appears in more than one (e.g. a long receipt that didn't fit in
+// a single image, with shots/photos that overlap). No Firestore involved —
+// this is a stateless parse.
 
 interface ReceiptItem {
   name: string;
@@ -90,19 +92,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing images" }, { status: 400 });
     }
 
-    const prompt = `You are reading one or more screenshots of the SAME itemized restaurant/bar receipt. Sometimes a receipt doesn't fit in a single screenshot, so multiple screenshots may cover overlapping or continuing sections of the same receipt.
+    const prompt = `You are reading one or more images of the SAME itemized restaurant/bar receipt. Each image may be EITHER a screenshot of a digital receipt OR a photograph of a physical paper receipt — treat both the same way.
+
+Photographs can be imperfect: slightly angled, long and narrow, shadowed, unevenly lit, a little blurry, crumpled, or showing the table/background/edges around the receipt. Ignore all of that. Sometimes a long receipt doesn't fit in a single image, so multiple images may cover overlapping or continuing sections of the same receipt.
 
 Return ONLY JSON in this exact shape, nothing else:
 
 {"placeName":"string or null","items":[{"name":"string","price":0.00,"quantity":1}],"tax":0.00,"tip":0.00}
 
 Rules:
-- "placeName" is the bar/restaurant name if it's visible anywhere in the screenshots, otherwise null.
+- Extract every purchasable line item (food, drink, etc.) as an item with its name and price.
+- "placeName" is the bar/restaurant name if it's visible anywhere in the images, otherwise null.
 - "price" is the line's total price (already multiplied by quantity if the receipt shows it that way) — do not double-count quantity.
-- If the same line item appears in more than one screenshot because they overlap, only include it ONCE in the result.
+- If the same line item appears in more than one image because they overlap, only include it ONCE in the result.
 - If quantity isn't shown, use 1.
 - If tax or tip aren't visible, use 0.
-- Do not include subtotal or total as items.
+- Do NOT list subtotal, tax, tip, total, discounts, or payment information as items — only actual purchasable items.
+- If the image is too blurry or unreadable to extract any items confidently, return an empty items list.
 - Do not invent items that aren't in the images.`;
 
     const controller = new AbortController();
@@ -164,7 +170,7 @@ Rules:
       return NextResponse.json(
         {
           error:
-            "Couldn't read any items from those screenshots. Try clearer images, or add items manually.",
+            "Couldn't read that receipt. Try a clearer photo with the entire receipt visible, or add items manually.",
         },
         { status: 422 },
       );

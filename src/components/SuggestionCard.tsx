@@ -2,7 +2,14 @@
 
 import type { PlaceResult } from "@/lib/types";
 import { displayDescription } from "@/lib/parse";
-import { linkBtnCls } from "@/lib/ui";
+import {
+  linkBtnCls,
+  tagCls,
+  cardHoverCls,
+  cardBaseShadowCls,
+  cardWarmSurfaceCls,
+} from "@/lib/ui";
+import Icon from "./Icon";
 
 interface SuggestionCardProps {
   s: PlaceResult;
@@ -26,7 +33,7 @@ export default function SuggestionCard({
   const desc = displayDescription(s.description);
 
   return (
-    <div className="rounded-lg border border-line2 bg-ink p-3.5">
+    <div className={`rounded-lg border border-line bg-panel p-3.5 ${cardBaseShadowCls} ${cardWarmSurfaceCls} ${cardHoverCls}`}>
       <div className="font-serif text-[1.05rem] font-medium text-cream">
         {s.name}
       </div>
@@ -36,12 +43,9 @@ export default function SuggestionCard({
         </div>
       )}
       {s.tags && s.tags.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1">
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {s.tags.map((t) => (
-            <span
-              key={t}
-              className="rounded-full bg-line px-2 py-0.5 font-mono text-[0.66rem] text-mist"
-            >
+            <span key={t} className={tagCls}>
               {t}
             </span>
           ))}
@@ -76,18 +80,19 @@ export default function SuggestionCard({
         )
       )}
       {s.happyHour && (
-        <div className="mt-2 text-[0.82rem] leading-[1.4]" style={{ color: "#C9A876" }}>
-          🕔 {s.happyHour}
+        <div className="mt-2 flex items-center gap-1.5 text-[0.82rem] leading-[1.4] text-gold">
+          <Icon name="clock" size={12} />
+          {s.happyHour}
         </div>
       )}
       {s.mapsLink && (
         <a
-          className={`${linkBtnCls} mt-2.5 inline-block`}
+          className={`${linkBtnCls} mt-2.5 inline-flex`}
           href={s.mapsLink}
           target="_blank"
           rel="noreferrer"
         >
-          Map ↗
+          <Icon name="external" size={12} /> Map
         </a>
       )}
       <div className="mt-2.5 flex flex-wrap gap-2">
@@ -98,18 +103,24 @@ export default function SuggestionCard({
           + Wishlist
         </button>
         <button
-          className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream"
+          className="cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream"
           onClick={onVisited}
         >
           I visited
         </button>
         {showCrawlActions && onReplace && (
           <button
-            className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-50"
             disabled={replacing}
             onClick={onReplace}
           >
-            {replacing ? "Finding…" : "↺ Replace"}
+            {replacing ? (
+              "Finding…"
+            ) : (
+              <>
+                <Icon name="refresh" size={11} /> Replace
+              </>
+            )}
           </button>
         )}
       </div>
