@@ -80,7 +80,7 @@ export const chipCls =
 /** Utility filter chip (Fits Our Group) — squared rather than pill, so
  *  plain filters read differently from the playful mode toggles below. */
 export const filterChipCls =
-  "inline-flex flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3.5 py-1.5 font-mono text-[0.72rem] uppercase tracking-[0.03em] text-mist transition-colors duration-150 hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-40";
+  "inline-flex flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.72rem] uppercase tracking-[0.03em] text-mist transition-colors duration-150 hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-40 sm:px-3.5";
 
 /** Active state for filterChipCls — same important-modifier caveat as chipActiveCls. */
 export const filterChipActiveCls =
