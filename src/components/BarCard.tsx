@@ -71,8 +71,8 @@ export default function BarCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border border-line bg-panel py-5 pl-6 pr-5 ${cardBaseShadowCls} ${cardWarmSurfaceCls} ${cardHoverCls} ${
-        b.disqualified ? "opacity-70" : ""
+      className={`relative overflow-hidden rounded-lg border bg-panel py-5 pl-6 pr-5 ${cardBaseShadowCls} ${cardWarmSurfaceCls} ${cardHoverCls} ${
+        b.disqualified ? "border-line/60" : "border-line"
       } ${rank === 1 ? "border-gold/30" : ""}`}
     >
       <span
@@ -80,11 +80,18 @@ export default function BarCard({
         aria-hidden="true"
       />
 
+      {b.disqualified && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-lg bg-[#12100F]/60"
+        />
+      )}
+
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {rank ? (
             <span
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[0.85rem] font-semibold ${
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[1.05rem] font-semibold ${
                 rank === 1
                   ? "border-gold bg-gold text-deep shadow-lift"
                   : rank === 2
@@ -97,7 +104,7 @@ export default function BarCard({
               {rank}
             </span>
           ) : b.disqualified ? (
-            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] border-line2 font-mono text-[0.6rem] text-mute">
+            <span className="relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] border-line2 font-mono text-[0.75rem] text-mute">
               N/A
             </span>
           ) : null}
@@ -105,7 +112,7 @@ export default function BarCard({
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-2">
               <div
-                className="min-w-0 cursor-pointer truncate font-serif text-title-sm font-medium underline decoration-brass/40 decoration-[3px] underline-offset-[3px] hover:text-gold hover:decoration-gold"
+                className="min-w-0 cursor-pointer truncate font-serif text-[1.2rem] font-medium underline decoration-brass/40 decoration-[3px] underline-offset-[3px] hover:text-gold hover:decoration-gold"
                 onClick={onNameClick}
               >
                 {b.mapsLink ? (
@@ -131,7 +138,7 @@ export default function BarCard({
             </div>
 
             {b.neighborhood && (
-              <div className="mt-0.5 font-mono text-[0.68rem] text-gold">
+              <div className="mt-0.5 font-mono text-[0.8rem] text-gold">
                 {b.neighborhood}
               </div>
             )}
@@ -255,7 +262,7 @@ export default function BarCard({
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-2 border-t border-[rgba(184,150,95,0.14)] pt-3">
+      <div className="relative z-10 mt-4 flex flex-wrap items-center gap-x-1 gap-y-2 border-t border-[rgba(184,150,95,0.14)] pt-3">
         {b.mapsLink && (
           <a
             className={ghostBtnCls}

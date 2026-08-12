@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import type { SplitPerson, SplitPlace, SplitTotals } from "@/lib/types";
 import type { SplitStep } from "@/app/split/SplitClient";
@@ -23,7 +24,8 @@ interface SplitBillViewProps {
   people: SplitPerson[];
   nameInput: string;
   setNameInput: (s: string) => void;
-  onAddPerson: () => void;
+  /** Adds the trimmed input to the roster; returns a validation message or null. */
+  onAddPerson: () => string | null;
   onRemovePerson: (id: string) => void;
 
   placesCount: number;
@@ -116,6 +118,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
     onReset,
   } = props;
 
+  // Roster-add validation feedback — cleared as soon as the user types again.
+  const [nameError, setNameError] = useState<string | null>(null);
+
   // ---------------- names ----------------
   if (step === "names") {
     return (
@@ -123,48 +128,64 @@ export default function SplitBillView(props: SplitBillViewProps) {
         className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
       >
         <PanelHeading>Who&apos;s splitting the bill?</PanelHeading>
-        <div className="mb-3.5 font-mono text-[0.68rem] text-mute">
-          Add names one at a time — press Enter or tap + Add after each one.
-        </div>
+        {people.length > 0 && (
+          <div className="mb-3.5">
+            <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+              People
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {people.map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-2.5 py-1.5"
+                >
+                  <span className="font-serif text-[0.88rem] font-medium leading-tight text-cream">
+                    {p.name}
+                  </span>
+                  <button
+                    onClick={() => onRemovePerson(p.id)}
+                    title={`Remove ${p.name}`}
+                    className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/75 transition-colors hover:border-red/40 hover:bg-[rgba(199,118,118,0.12)] hover:text-red"
+                  >
+                    <Icon name="x" size={9} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <form
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
-            onAddPerson();
+            setNameError(onAddPerson());
           }}
-          className="mb-4 flex flex-wrap items-center gap-2.5"
+          className="mb-2.5 flex flex-wrap items-center gap-2.5"
         >
           <input
             className={`${inputCls} min-w-0 flex-[1_1_200px]`}
             placeholder="Enter a name"
             value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
+            onChange={(e) => {
+              setNameInput(e.target.value);
+              if (nameError) setNameError(null);
+            }}
             autoFocus
           />
-          <button type="submit" className={btnPrimaryCls}>
-            + Add
+          <button
+            type="submit"
+            className="cursor-pointer rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-transparent px-4 py-2.5 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.04em] text-mist transition-all duration-150 hover:-translate-y-px hover:border-brass hover:text-cream"
+          >
+            Add
           </button>
         </form>
-        {people.length > 0 && (
-          <div className="mb-5 flex flex-wrap gap-1.5">
-            {people.map((p) => (
-              <span
-                key={p.id}
-                className="inline-flex items-center gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-2.5 py-1.5"
-              >
-                <span className="font-serif text-[0.88rem] font-medium leading-tight text-cream">
-                  {p.name}
-                </span>
-                <button
-                  onClick={() => onRemovePerson(p.id)}
-                  title={`Remove ${p.name}`}
-                  className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/75 transition-colors hover:border-red/40 hover:bg-[rgba(199,118,118,0.12)] hover:text-red"
-                >
-                  <Icon name="x" size={9} />
-                </button>
-              </span>
-            ))}
+        {nameError && (
+          <div className="mb-2.5 font-mono text-[0.72rem] text-red">
+            {nameError}
           </div>
         )}
+        <div className="mb-4 font-mono text-[0.68rem] text-mute">
+          Press Enter to add · Names must be unique
+        </div>
         <div className="mt-2.5 flex justify-end">
           <button
             className={btnPrimaryCls}
@@ -247,7 +268,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
 
             <label
               htmlFor={`tda-receipt-upload-${place.id}`}
-              className="mb-3 flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[10px] border-[1.5px] border-dashed border-line2 bg-ink p-6 text-center transition-colors duration-150 hover:border-brass hover:bg-panelHover"
+              className="mb-3 flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[10px] border-[1.5px] border-dashed border-[rgba(184,150,95,0.3)] bg-[#171310] p-6 text-center transition-colors duration-150 hover:border-brass hover:bg-panelHover"
             >
               <Icon name="receipt" size={26} className="text-brass/80" />
               <div className="font-serif text-[1rem] font-medium text-cream">
@@ -278,11 +299,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
                   <div key={shot.id} className="relative">
                     <img
                       src={shot.previewUrl}
-                      className="block h-[90px] w-[70px] rounded-md border border-line2 object-cover"
+                      className="block h-[90px] w-[70px] rounded-md border border-[rgba(184,150,95,0.22)] object-cover"
                     />
                     <button
                       onClick={() => onRemoveScreenshot(i, shot.id)}
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-line2 bg-ink font-mono text-[0.65rem] text-red"
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-[rgba(184,150,95,0.22)] bg-[#171310] font-mono text-[0.65rem] text-red"
                     >
                       ✕
                     </button>
@@ -367,12 +388,12 @@ export default function SplitBillView(props: SplitBillViewProps) {
           <PanelHeading>{placeLabel(place, activePlaceIndex)}</PanelHeading>
 
           {place.parseError && (
-            <div className="mb-3 rounded-lg border border-redDeep bg-ink px-3 py-2.5 font-mono text-[0.72rem] text-red">
+            <div className="mb-3 rounded-lg border border-redDeep bg-[#171310] px-3 py-2.5 font-mono text-[0.72rem] text-red">
               Couldn&apos;t read this receipt: {place.parseError}
             </div>
           )}
           {place.items.length === 0 && !place.parseError && (
-            <div className="mb-3 rounded-lg border border-line2 bg-ink px-3 py-2.5 font-mono text-[0.72rem] text-mute">
+            <div className="mb-3 rounded-lg border border-[rgba(184,150,95,0.22)] bg-[#171310] px-3 py-2.5 font-mono text-[0.72rem] text-mute">
               No items yet — tap + Add item to enter them by hand, or go back
               to try the receipt again.
             </div>
@@ -386,14 +407,20 @@ export default function SplitBillView(props: SplitBillViewProps) {
               {crew.map((p) => (
                 <span
                   key={p.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-greenLight bg-ink px-3 py-1.5 font-mono text-[0.72rem] text-greenLight"
+                  className="inline-flex items-center gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-2.5 py-1.5"
                 >
-                  {p.name}
+                  <span
+                    className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-greenLight"
+                    aria-hidden="true"
+                  />
+                  <span className="font-serif text-[0.85rem] font-medium leading-tight text-cream">
+                    {p.name}
+                  </span>
                   <button
                     onClick={() =>
                       onRemovePersonFromPlace(activePlaceIndex, p.id)
                     }
-                    className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-red/75 transition-colors hover:bg-[rgba(199,118,118,0.15)] hover:text-red"
+                    className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/75 transition-colors hover:border-red/40 hover:bg-[rgba(199,118,118,0.12)] hover:text-red"
                     title="Remove from this place"
                   >
                     <Icon name="x" size={9} />
@@ -403,6 +430,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
               <AddPersonToPlaceButton
                 placeIndex={activePlaceIndex}
                 onAdd={onAddPersonToPlace}
+                crewNames={crew.map((p) => p.name)}
               />
             </div>
           ) : (
@@ -413,6 +441,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
               <AddPersonToPlaceButton
                 placeIndex={activePlaceIndex}
                 onAdd={onAddPersonToPlace}
+                crewNames={crew.map((p) => p.name)}
               />
             </div>
           )}
@@ -476,7 +505,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                       )}
                     </div>
                     <button
-                      className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist hover:border-redDeep hover:text-red"
+                      className="cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist hover:border-redDeep hover:text-red"
                       onClick={() => onRemoveItem(activePlaceIndex, it.id)}
                     >
                       Remove
@@ -497,7 +526,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                           className={`cursor-pointer rounded-full border px-3 py-1.5 font-mono text-[0.72rem] ${
                             included
                               ? "border-greenLight text-greenLight"
-                              : "border-line2 text-mist disabled:opacity-40"
+                              : "border-[rgba(184,150,95,0.28)] text-mist disabled:opacity-40"
                           }`}
                           onClick={() =>
                             onToggleIncluded(activePlaceIndex, it.id, p.id)
@@ -511,7 +540,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                       className={`cursor-pointer rounded-full border px-3 py-1.5 font-mono text-[0.72rem] ${
                         isEvenlySplit
                           ? "border-goldDeep bg-goldDeep text-cream"
-                          : "border-line2 text-mist"
+                          : "border-[rgba(184,150,95,0.28)] text-mist"
                       }`}
                       onClick={() =>
                         onSplitEvenly(activePlaceIndex, it.id, splitTargetIds)
@@ -534,7 +563,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                         flexDirection: "column",
                         gap: "0.4rem",
                       }}
-                      className="border-t border-dashed border-line2"
+                      className="border-t border-dashed border-[rgba(184,150,95,0.22)]"
                     >
                       {crew
                         .filter((p) => includedIds.includes(p.id))
@@ -665,7 +694,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
           )}
 
           {crew.length > 0 && (
-            <div className="mt-4 flex flex-col gap-1.5 rounded-lg border border-line2 bg-ink p-3">
+            <div className="mt-4 flex flex-col gap-1.5 rounded-lg border border-[rgba(184,150,95,0.22)] bg-[#171310] p-3">
               {crew.map((p) => (
                 <div
                   key={p.id}
@@ -796,28 +825,57 @@ export default function SplitBillView(props: SplitBillViewProps) {
 function AddPersonToPlaceButton({
   placeIndex,
   onAdd,
+  crewNames,
 }: {
   placeIndex: number;
   onAdd: (placeIndex: number, name: string) => void;
+  crewNames: string[];
 }) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const name = value.trim();
+    if (!name) return;
+    const duplicate = crewNames.find(
+      (n) => n.toLowerCase() === name.toLowerCase(),
+    );
+    if (duplicate) {
+      setError(`${name} is already here.`);
+      return;
+    }
+    onAdd(placeIndex, name);
+    setValue("");
+    setError(null);
+  };
+
   return (
     <form
-      onSubmit={(e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const input = e.currentTarget.elements.namedItem(
-          "newPerson",
-        ) as HTMLInputElement;
-        if (!input.value.trim()) return;
-        onAdd(placeIndex, input.value);
-        input.value = "";
-      }}
-      className="inline-flex items-center gap-1"
+      onSubmit={submit}
+      className="flex max-w-full flex-wrap items-center gap-1.5"
     >
       <input
-        name="newPerson"
-        placeholder="+ add someone"
-        className="w-[130px] rounded-full border border-dashed border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-mist focus:border-brass focus:outline-none"
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          if (error) setError(null);
+        }}
+        placeholder="Enter a name"
+        aria-label="Add a person to this place"
+        className={`${inputCls} min-w-0 flex-[1_1_150px] !px-3 !py-1.5 !text-[0.78rem]`}
       />
+      <button
+        type="submit"
+        className="inline-flex cursor-pointer items-center gap-1 rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.04em] text-brass transition-colors hover:border-brass hover:bg-[rgba(184,150,95,0.08)] hover:text-cream"
+      >
+        Add
+      </button>
+      {error && (
+        <span className="w-full font-mono text-[0.68rem] text-red">
+          {error}
+        </span>
+      )}
     </form>
   );
 }

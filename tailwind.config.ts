@@ -36,7 +36,7 @@ const config: Config = {
         silver: "#B9B6BC",
         silverLight: "#C9C6CE",
         creamSoft: "#D8D1C4",
-        skeleton: "#1E1A24",
+        skeleton: "#221C17",
       },
       fontFamily: {
         sans: ["Inter", "sans-serif"],

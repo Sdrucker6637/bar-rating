@@ -74,11 +74,20 @@ export default function SplitClient() {
   }
 
   // ---------------- names step ----------------
-  function addSplitPerson() {
+  // Returns a validation message (or null) so the UI can surface feedback.
+  // The roster must never contain two people with the same name — that would
+  // make item assignment ambiguous. Empty/whitespace-only names are silently
+  // ignored (nothing to add, nothing to say).
+  function addSplitPerson(): string | null {
     const name = splitNameInput.trim();
-    if (!name) return;
+    if (!name) return null;
+    const duplicate = splitPeople.find(
+      (p) => p.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (duplicate) return `${name} is already in the group.`;
     setSplitPeople((prev) => [...prev, { id: newPersonId(), name }]);
     setSplitNameInput("");
+    return null;
   }
 
   function removeSplitPerson(id: string) {
