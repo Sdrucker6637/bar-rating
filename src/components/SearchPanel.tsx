@@ -46,8 +46,8 @@ export default function SearchPanel() {
         onChange={(e) => setVibeQuery(e.target.value)}
       />
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-        <span className={`${kickerCls} mr-0.5`}>Filters</span>
+      <div className="mt-3.5 flex flex-wrap items-center gap-2 sm:gap-2.5">
+        <span className={`${kickerCls} mr-0.5 w-full sm:w-auto`}>Filters</span>
         <button
           className={`${filterChipCls} ${fitsGroupOnly ? filterChipActiveCls : ""}`}
           aria-pressed={fitsGroupOnly}
@@ -78,7 +78,7 @@ export default function SearchPanel() {
       </div>
 
       <div className="mt-3.5 flex flex-wrap items-center gap-2.5 border-t border-line pt-3.5">
-        <span className="mr-0.5 font-serif text-[0.82rem] italic text-mist">
+        <span className="mr-0.5 w-full font-serif text-[0.82rem] italic text-mist sm:w-auto">
           House Rules
         </span>
         <button
@@ -95,13 +95,13 @@ export default function SearchPanel() {
         >
           <Icon name="compass" size={13} /> Explore mode
         </button>
-        <span className="font-mono text-[0.62rem] text-dim">
+        <span className="w-full font-mono text-[0.62rem] text-dim sm:w-auto">
           — applies to Find Bars &amp; Surprise Us
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-3 sm:flex sm:flex-wrap sm:items-start">
-        <div className="col-span-2 flex flex-col gap-1 sm:col-span-1 sm:flex-1">
+      <div className="mt-4 flex flex-col gap-y-3 sm:flex sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-2.5 sm:gap-y-3">
+        <div className="flex flex-col gap-1 sm:flex-1">
           <button
             className={findBtnCls}
             onClick={runSearch}
@@ -115,7 +115,11 @@ export default function SearchPanel() {
           </span>
         </div>
         <div className="flex flex-col gap-1 sm:flex-1">
-          <button className={altBtnCls} onClick={runRandomSearch} disabled={searching}>
+          <button
+            className={altBtnCls}
+            onClick={runRandomSearch}
+            disabled={searching}
+          >
             <Icon name="dice" size={14} /> Surprise Us
           </button>
           <span className="text-center font-serif text-[0.72rem] italic text-dim">
@@ -123,7 +127,11 @@ export default function SearchPanel() {
           </span>
         </div>
         <div className="flex flex-col gap-1 sm:flex-1">
-          <button className={altBtnCls} onClick={runNearbySearch} disabled={searching}>
+          <button
+            className={altBtnCls}
+            onClick={runNearbySearch}
+            disabled={searching}
+          >
             <Icon name="pin" size={14} /> Nearby
           </button>
           <span className="text-center font-serif text-[0.72rem] italic text-dim">

@@ -58,7 +58,7 @@ export default function LeaderboardView() {
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_120%_at_15%_-10%,rgba(184,150,95,0.1),transparent_60%)]"
           />
-          <div className="relative flex flex-wrap items-center justify-between gap-5 px-6 py-6 sm:px-8 sm:py-7">
+          <div className="relative flex flex-col gap-5 px-6 py-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-8 sm:py-7">
             <div className="min-w-0">
               <div className="flex items-center gap-2 font-mono text-kicker uppercase text-gold">
                 <Icon name="trophy" size={13} />
@@ -76,7 +76,7 @@ export default function LeaderboardView() {
                 </div>
               )}
             </div>
-            <div className="flex-shrink-0 self-center">
+            <div className="flex-shrink-0 sm:self-center">
               <div className="min-w-[136px] rounded-[6px] border border-brass/30 bg-ink/70 px-5 py-4 text-center shadow-[inset_0_1px_0_rgba(237,230,217,0.04)]">
                 <div className="font-mono text-[0.6rem] uppercase tracking-[0.16em] text-mute">
                   House average
