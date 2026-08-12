@@ -115,7 +115,11 @@ export default function SearchPanel() {
           </span>
         </div>
         <div className="flex flex-col gap-1 sm:flex-1">
-          <button className={altBtnCls} onClick={runRandomSearch} disabled={searching}>
+          <button
+            className={altBtnCls}
+            onClick={runRandomSearch}
+            disabled={searching}
+          >
             <Icon name="dice" size={14} /> Surprise Us
           </button>
           <span className="text-center font-serif text-[0.72rem] italic text-dim">
@@ -123,7 +127,11 @@ export default function SearchPanel() {
           </span>
         </div>
         <div className="flex flex-col gap-1 sm:flex-1">
-          <button className={altBtnCls} onClick={runNearbySearch} disabled={searching}>
+          <button
+            className={altBtnCls}
+            onClick={runNearbySearch}
+            disabled={searching}
+          >
             <Icon name="pin" size={14} /> Nearby
           </button>
           <span className="text-center font-serif text-[0.72rem] italic text-dim">
