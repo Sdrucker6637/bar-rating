@@ -452,16 +452,22 @@ export default function SplitBillView(props: SplitBillViewProps) {
               const includedIds = crew
                 .filter((p) => (it.assignedTo[p.id] || 0) > 0)
                 .map((p) => p.id);
-              const splitTargetIds =
-                includedIds.length > 0 ? includedIds : crew.map((p) => p.id);
+              // "Split evenly" always targets the whole crew for this place —
+              // clicking it resets the item to every current member.
+              const splitTargetIds = crew.map((p) => p.id);
               const assignedSum = Object.values(it.assignedTo).reduce(
                 (a, c) => a + c,
                 0,
               );
               const remaining = q - assignedSum;
               const assignedShares = Object.values(it.assignedTo);
+              // Active only when the item is currently split evenly across
+              // EVERY member of the crew — derived from the live assignment
+              // state, so unchecking even one person deactivates it and there
+              // is no stale boolean to go stale.
               const isEvenlySplit =
-                assignedShares.length > 1 &&
+                crew.length > 0 &&
+                includedIds.length === crew.length &&
                 Math.abs(assignedSum - q) < 0.001 &&
                 assignedShares.every(
                   (s) => Math.abs(s - assignedShares[0]) < 0.001,
@@ -492,7 +498,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                       flexWrap: "wrap",
                     }}
                   >
-                    <div className="cursor-pointer font-serif text-[1.1rem] font-medium text-cream">
+                    <div className="font-serif text-[1.1rem] font-medium text-cream">
                       {it.name || "(unnamed item)"}
                     </div>
                     <div className="flex items-baseline gap-1.5 font-mono text-[0.8rem] text-mist">
@@ -545,11 +551,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                       onClick={() =>
                         onSplitEvenly(activePlaceIndex, it.id, splitTargetIds)
                       }
-                      title={
-                        includedIds.length > 0
-                          ? "Divide this item evenly among the people selected above"
-                          : "Divide this item evenly among everyone at this place"
-                      }
+                      title="Divide this item evenly among everyone at this place"
                     >
                       Split evenly
                     </button>
@@ -585,7 +587,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                                   minWidth: "90px",
                                   fontFamily: "'IBM Plex Mono', monospace",
                                   fontSize: "0.78rem",
-                                  color: "#A79EB2",
+                                  color: "#BDB3A4",
                                 }}
                               >
                                 {p.name}
@@ -671,7 +673,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
               marginTop: "1rem",
               fontFamily: "'IBM Plex Mono', monospace",
               fontSize: "0.85rem",
-              color: "#A79EB2",
+              color: "#BDB3A4",
               display: "flex",
               gap: "1.5rem",
             }}
