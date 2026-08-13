@@ -133,6 +133,28 @@ export function useTour(): TourContextValue {
   return ctx;
 }
 
+/** Legacy leaderboard records predate the mapsLink field (added with the
+ *  Places flow), so they load with an empty string and the card's Map action
+ *  silently disappears. Backfill a Google Maps search link from the name and
+ *  whatever location the record has — the same fallback the app already uses
+ *  for new bars that Places returns without a mapsLink. Only fills EMPTY
+ *  links; never overwrites an existing one. */
+function healMissingMapsLinks(raw: Bar[]): { bars: Bar[]; changed: boolean } {
+  let changed = false;
+  const bars = raw.map((b) => {
+    if (b.mapsLink) return b;
+    changed = true;
+    const location = b.address || b.neighborhood || "New York City";
+    return {
+      ...b,
+      mapsLink: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        `${b.name}, ${location}`,
+      )}`,
+    };
+  });
+  return { bars, changed };
+}
+
 export function TourProvider({ children }: { children: ReactNode }) {
   const [bars, setBars] = useState<Bar[] | null>(null);
   const barsRef = useRef<Bar[] | null>(null);
@@ -195,7 +217,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
       (snap) => {
         if (snap.exists) {
           const data = snap.data() || {};
-          setBars((data.bars as Bar[]) || []);
+          const healed = healMissingMapsLinks((data.bars as Bar[]) || []);
+          setBars(healed.bars);
+          // One-time heal: legacy bars load with an empty mapsLink, which hides
+          // the card's Map action. Write the backfilled links back so the
+          // stored copy is fixed too — idempotent, so the follow-up snapshot
+          // finds nothing to change and the loop stops.
+          if (healed.changed) {
+            docRef.set({ bars: healed.bars }, { merge: true }).catch(() => {});
+          }
           const stored = Number(data.groupSize);
           if (Number.isFinite(stored)) {
             if (stored >= 1 && stored <= 20) {

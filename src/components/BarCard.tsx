@@ -285,7 +285,7 @@ export default function BarCard({
           </button>
         )}
 
-        {isWishlist && (
+        {(isWishlist || b.status === "visited") && (
           <button className={`${removeBtnCls} ml-auto`} onClick={onDelete}>
             <Icon name="x" size={11} /> Remove
           </button>
