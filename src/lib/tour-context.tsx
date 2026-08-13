@@ -244,9 +244,22 @@ export function TourProvider({ children }: { children: ReactNode }) {
           // One-time heal: legacy bars load with an empty mapsLink, which hides
           // the card's Map action. Write the backfilled links back so the
           // stored copy is fixed too — idempotent, so the follow-up snapshot
-          // finds nothing to change and the loop stops.
+          // finds nothing to change and the loop stops. Runs inside a
+          // transaction that re-reads the LATEST bars, so the heal can never
+          // clobber an edit another client made after this snapshot arrived.
+          // It only ever fills EMPTY links (existing ones are left untouched),
+          // so the write is idempotent and safe under transaction retry.
           if (healed.changed) {
-            docRef.set({ bars: healed.bars }, { merge: true }).catch(() => {});
+            db.runTransaction(async (tx) => {
+              const snap = await tx.get(docRef);
+              if (!snap.exists) return;
+              const healedFresh = healMissingMapsLinks(
+                (snap.data()?.bars as Bar[]) || [],
+              );
+              if (healedFresh.changed) {
+                tx.update(docRef, { bars: healedFresh.bars });
+              }
+            }).catch(() => {});
           }
           const stored = Number(data.groupSize);
           if (Number.isFinite(stored)) {
@@ -263,9 +276,16 @@ export function TourProvider({ children }: { children: ReactNode }) {
             }
           }
         } else {
-          docRef
-            .set({ bars: seedBars, groupSize: DEFAULT_GROUP_SIZE })
-            .catch(() => setConnError(true));
+          // Doc missing — seed it inside a transaction that re-checks
+          // existence, so two clients seeing "missing" can't race each other:
+          // only the first to commit actually creates the document, and a doc
+          // created by someone else moments ago is never overwritten by seeds.
+          db.runTransaction(async (tx) => {
+            const snap = await tx.get(docRef);
+            if (!snap.exists) {
+              tx.set(docRef, { bars: seedBars, groupSize: DEFAULT_GROUP_SIZE });
+            }
+          }).catch(() => setConnError(true));
           setBars(seedBars);
         }
         setLoading(false);
@@ -283,12 +303,34 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback(
     (updater: Bar[] | ((prev: Bar[]) => Bar[])): Promise<void> => {
+      // Optimistic local update so the UI responds instantly (unchanged).
       const prevBars = barsRef.current || [];
-      const next = typeof updater === "function" ? updater(prevBars) : updater;
-      barsRef.current = next;
-      setBars(next);
-      return docRef
-        .set({ bars: next }, { merge: true })
+      const optimistic =
+        typeof updater === "function" ? updater(prevBars) : updater;
+      barsRef.current = optimistic;
+      setBars(optimistic);
+      // Commit inside a transaction that re-reads the LATEST bars from
+      // Firestore and applies the SAME updater to that fresh state — never to
+      // this client's (possibly stale) copy. A stale array therefore can't
+      // overwrite another client's newer edits: the transaction serializes
+      // concurrent writers, and Firestore auto-retries it if it loses a race.
+      // The updaters are pure functions of their input array (append/filter/
+      // map by id), so re-running them against fresh state is deterministic
+      // and safe under retry.
+      return db
+        .runTransaction(async (tx) => {
+          const snap = await tx.get(docRef);
+          const freshBars = (snap.data()?.bars as Bar[]) || [];
+          const next =
+            typeof updater === "function" ? updater(freshBars) : updater;
+          if (snap.exists) {
+            tx.update(docRef, { bars: next });
+          } else {
+            // Defensive: doc missing (shouldn't happen — onSnapshot seeds it).
+            tx.set(docRef, { bars: next }, { merge: true });
+          }
+          return next;
+        })
         .then(() => setSaveError(false))
         .catch(() => setSaveError(true));
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -308,16 +350,34 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const updateBar = useCallback(
     (id: string, patch: Partial<Bar>) => {
+      // Optimistic local update so the UI responds instantly (unchanged).
       setBars((prev) => {
         const next = (prev || []).map((b) =>
           b.id === id ? { ...b, ...patch } : b,
         );
         barsRef.current = next;
-        docRef
-          .set({ bars: next }, { merge: true })
-          .catch(() => setSaveError(true));
         return next;
       });
+      // Commit inside a transaction that re-reads the LATEST bars and patches
+      // only this bar against that fresh state, so a concurrent edit from
+      // another client is preserved rather than clobbered by a stale copy.
+      // If the bar was removed concurrently, the map is a no-op on the fresh
+      // array — the write then just persists the current state, never
+      // resurrecting the deleted bar.
+      db.runTransaction(async (tx) => {
+        const snap = await tx.get(docRef);
+        const freshBars = (snap.data()?.bars as Bar[]) || [];
+        const next = freshBars.map((b) =>
+          b.id === id ? { ...b, ...patch } : b,
+        );
+        if (snap.exists) {
+          tx.update(docRef, { bars: next });
+        } else {
+          // Defensive: doc missing (shouldn't happen — onSnapshot seeds it).
+          tx.set(docRef, { bars: next }, { merge: true });
+        }
+        return next;
+      }).catch(() => setSaveError(true));
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [],
