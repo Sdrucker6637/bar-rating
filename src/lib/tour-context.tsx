@@ -139,6 +139,24 @@ export function useTour(): TourContextValue {
  *  whatever location the record has — the same fallback the app already uses
  *  for new bars that Places returns without a mapsLink. Only fills EMPTY
  *  links; never overwrites an existing one. */
+/** Returns true when a geocoder result's name plausibly matches the bar being
+ *  resolved — case/punctuation-insensitive exact match or one name containing
+ *  the other. Guards the coordinate backfill against fuzzy matches silently
+ *  writing wrong coordinates (e.g. "Angels Share" resolving to an unrelated
+ *  business that shares no name words). */
+function nameMatches(resultName: string, barName: string): boolean {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+  const a = norm(resultName);
+  const b = norm(barName);
+  if (!a || !b) return true; // nothing to compare — don't block
+  return a.includes(b) || b.includes(a);
+}
+
 function healMissingMapsLinks(raw: Bar[]): { bars: Bar[]; changed: boolean } {
   let changed = false;
   const bars = raw.map((b) => {
@@ -161,6 +179,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     barsRef.current = bars;
   }, [bars]);
+  // Bars whose coordinate backfill already ran this session (success or
+  // failure) — a bar that failed gets one fresh attempt on the next full page
+  // load, matching the failedIds details-fetch pattern.
+  const coordAttemptedRef = useRef<Set<string>>(new Set());
   // Every bar name shown as a search/surprise result this session, whether or
   // not it was saved — kept out of future results so retrying a search or
   // hitting Surprise Us repeatedly doesn't just replay what you already saw.
@@ -300,6 +322,97 @@ export function TourProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  // Legacy bars (seeded or pre-Places) carry no coordinates, which the Tour
+  // Map and crawl planning require. Backfill them through the same Google
+  // Places exact-lookup the add-bar flow uses; when that's unavailable (no
+  // GOOGLE_PLACES_API_KEY, or no result) fall back to OpenStreetMap's free
+  // geocoder bounded to NYC so a fuzzy match can't land in another city.
+  // The found coordinates are persisted once via updateBar, so every device
+  // and the map pick them up without repeating the lookup.
+  const healBarCoordinates = useCallback(
+    async (bar: Bar) => {
+      const results = await fetchPlaces(bar.name, {
+        neighborhood: bar.neighborhood || "",
+        address: bar.address || "",
+        limit: 1,
+        exactLookup: true,
+      });
+      const hit = results.find(
+        (r) =>
+          Number.isFinite(r.latitude) &&
+          Number.isFinite(r.longitude) &&
+          nameMatches(r.name, bar.name),
+      );
+      if (hit) {
+        updateBar(bar.id, {
+          latitude: hit.latitude ?? null,
+          longitude: hit.longitude ?? null,
+          placeId: hit.placeId || bar.placeId,
+          address: hit.address || bar.address,
+          mapsLink: hit.mapsLink || bar.mapsLink,
+        });
+        return;
+      }
+      try {
+        // Nominatim's usage policy allows ~1 request/second — space fallback
+        // lookups out so a batch heal doesn't get throttled.
+        await new Promise((r) => setTimeout(r, 1100));
+        const q = encodeURIComponent(
+          `${bar.name}, ${bar.address || bar.neighborhood || "New York City, NY"}`,
+        );
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&viewbox=-74.26,40.92,-73.70,40.70&bounded=1&accept-language=en`,
+        );
+        const list = (await res.json()) as Array<{
+          lat: string;
+          lon: string;
+          display_name?: string;
+        }>;
+        const first = Array.isArray(list) ? list[0] : null;
+        const resultName = first?.display_name
+          ? first.display_name.split(",")[0].trim()
+          : "";
+        if (
+          first &&
+          Number.isFinite(Number(first.lat)) &&
+          Number.isFinite(Number(first.lon)) &&
+          nameMatches(resultName, bar.name)
+        ) {
+          updateBar(bar.id, {
+            latitude: Number(first.lat),
+            longitude: Number(first.lon),
+          });
+        }
+      } catch {
+        // Leave the bar without coordinates — a future load retries it.
+      }
+    },
+    [updateBar],
+  );
+
+  // Kick off the coordinate backfill once bars load. Idempotent: bars that
+  // already have finite coordinates are skipped, and every bar is attempted
+  // at most once per session, so a successful heal can't loop or re-call.
+  useEffect(() => {
+    if (!bars || connError) return;
+    const missing = bars.filter(
+      (b) =>
+        !(Number.isFinite(b.latitude) && Number.isFinite(b.longitude)) &&
+        !coordAttemptedRef.current.has(b.id),
+    );
+    if (missing.length === 0) return;
+    missing.forEach((b) => coordAttemptedRef.current.add(b.id));
+    // Sequential, not parallel: the Nominatim fallback paces itself at ~1
+    // request/second, so a batch of legacy bars must be resolved one at a
+    // time or the geocoder would throttle the whole heal.
+    (async () => {
+      for (const b of missing) {
+        await healBarCoordinates(b);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bars, connError]);
 
   const runDetailsFetch = useCallback((bar: Bar, forceRefresh?: boolean) => {
     setFetchingIds((s) => new Set(s).add(bar.id));
