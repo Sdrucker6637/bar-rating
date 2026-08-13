@@ -75,7 +75,11 @@ export async function fetchPlaces(
     });
     const results = await response.json();
     const safe = Array.isArray(results) ? (results as PlaceResult[]) : [];
-    if (!noCache) placesCache.set(cacheKey, { time: Date.now(), results: safe });
+    // Never memoize an empty result: like the server-side cache, the session
+    // cache must not become proof that a place doesn't exist. Only non-empty
+    // results are worth reusing within the session.
+    if (!noCache && safe.length > 0)
+      placesCache.set(cacheKey, { time: Date.now(), results: safe });
     return safe;
   } catch (e) {
     return [];
