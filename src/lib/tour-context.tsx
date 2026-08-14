@@ -14,11 +14,18 @@ import { db } from "./firebase";
 import { base, DOC_PATH, emptyVisitedForm, emptyWishForm } from "./constants";
 import { seedBars } from "./seed";
 import { avgWithFood, avgWithoutFood, haversineMeters } from "./scoring";
+import { rankEntries } from "./ranking";
 import { displayDescription } from "./parse";
 import { callGemini } from "./gemini";
 import { fetchPlaces, fetchBarSuggestions, fetchRandomBar } from "./places";
 import { SURPRISE_VIBES } from "./constants";
-import type { Bar, PlaceResult, VisitedForm, WishForm } from "./types";
+import type {
+  Bar,
+  PlaceResult,
+  RankingBattle,
+  VisitedForm,
+  WishForm,
+} from "./types";
 
 export type CrawlStop = PlaceResult & { distanceMeters?: number };
 
@@ -39,6 +46,11 @@ const clampGroupSize = (n: number) =>
 const newBarId = () =>
   `b${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+// Ranking battle ids follow the same client-generated, collision-resistant
+// convention as bar ids.
+const newBattleId = () =>
+  `battle${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 export interface PlacesModalState {
   suggestion: PlaceResult;
   results: PlaceResult[];
@@ -58,6 +70,15 @@ interface TourContextValue {
   filteredVisited: Bar[];
   filteredToTry: Bar[];
   fetchingIds: Set<string>;
+
+  // ---- global Bar Battle tiebreaks ----
+  rankingBattles: RankingBattle[];
+  /** Record (or replace) a pairwise tiebreak. Resolves to true on success. */
+  recordBattle: (
+    bar1Id: string,
+    bar2Id: string,
+    winnerId: string,
+  ) => Promise<boolean>;
 
   // ---- leaderboard filters ----
   search: string;
@@ -185,6 +206,12 @@ function healMissingMapsLinks(raw: Bar[]): { bars: Bar[]; changed: boolean } {
 export function TourProvider({ children }: { children: ReactNode }) {
   const [bars, setBars] = useState<Bar[] | null>(null);
   const barsRef = useRef<Bar[] | null>(null);
+  // Global Bar Battle tiebreaks, loaded from the same shared document.
+  const [rankingBattles, setRankingBattles] = useState<RankingBattle[]>([]);
+  const rankingBattlesRef = useRef<RankingBattle[]>([]);
+  useEffect(() => {
+    rankingBattlesRef.current = rankingBattles;
+  }, [rankingBattles]);
   useEffect(() => {
     barsRef.current = bars;
   }, [bars]);
@@ -250,6 +277,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
           const data = snap.data() || {};
           const healed = healMissingMapsLinks((data.bars as Bar[]) || []);
           setBars(healed.bars);
+          setRankingBattles((data.rankingBattles as RankingBattle[]) || []);
           // One-time heal: legacy bars load with an empty mapsLink, which hides
           // the card's Map action. Write the backfilled links back so the
           // stored copy is fixed too — idempotent, so the follow-up snapshot
@@ -292,7 +320,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
           db.runTransaction(async (tx) => {
             const snap = await tx.get(docRef);
             if (!snap.exists) {
-              tx.set(docRef, { bars: seedBars, groupSize: DEFAULT_GROUP_SIZE });
+              tx.set(docRef, {
+                bars: seedBars,
+                groupSize: DEFAULT_GROUP_SIZE,
+                rankingBattles: [],
+              });
             }
           }).catch(() => setConnError(true));
           setBars(seedBars);
@@ -387,6 +419,67 @@ export function TourProvider({ children }: { children: ReactNode }) {
         }
         return next;
       }).catch(() => setSaveError(true));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
+
+  // Record (or replace) a global Bar Battle tiebreak. Runs inside a
+  // transaction that re-reads the LATEST document: it validates both bars
+  // still exist, and dedupes by unordered pair — at most one battle per pair
+  // is ever stored, so a re-battle updates the record instead of creating
+  // duplicate or conflicting entries. The battle only ever affects ORDERING
+  // within a score tie; it never touches `bars` or any score, and the
+  // transaction writes only the `rankingBattles` field, so it can't clobber
+  // a concurrent bar edit (the same field-scoped guarantee as updateBar).
+  // Optimistic local state keeps the leaderboard re-ranking instantly; the
+  // dedup by pair makes re-applying the same battle idempotent under retry.
+  const recordBattle = useCallback(
+    async (bar1Id: string, bar2Id: string, winnerId: string) => {
+      const pairKey = (a: string, b: string) => [a, b].sort().join("|");
+      const mk = (base: RankingBattle[]): RankingBattle[] => {
+        const next = base.filter(
+          (x) => pairKey(x.bar1Id, x.bar2Id) !== pairKey(bar1Id, bar2Id),
+        );
+        next.push({
+          id: newBattleId(),
+          bar1Id,
+          bar2Id,
+          winnerId,
+          type: "score_tiebreak",
+          createdAt: Date.now(),
+        });
+        return next;
+      };
+      setRankingBattles(mk(rankingBattlesRef.current));
+      try {
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(docRef);
+          if (!snap.exists) return;
+          const freshBars = (snap.data()?.bars as Bar[]) || [];
+          const freshBattles =
+            (snap.data()?.rankingBattles as RankingBattle[]) || [];
+          if (
+            !freshBars.some((b) => b.id === bar1Id) ||
+            !freshBars.some((b) => b.id === bar2Id)
+          ) {
+            return; // one of the bars was removed — nothing to record
+          }
+          tx.update(docRef, { rankingBattles: mk(freshBattles) });
+        });
+        setSaveError(false);
+        return true;
+      } catch {
+        // Revert the optimistic entry so local state stays in sync with the
+        // server (the battle was not recorded).
+        setRankingBattles((prev) =>
+          prev.filter(
+            (x) => pairKey(x.bar1Id, x.bar2Id) !== pairKey(bar1Id, bar2Id),
+          ),
+        );
+        setSaveError(true);
+        return false;
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [],
@@ -886,14 +979,27 @@ export function TourProvider({ children }: { children: ReactNode }) {
         (b.tags || []).some((t) => t.toLowerCase().includes(q))
       );
     });
-    list.sort((a, b) => {
-      if (!!a.disqualified !== !!b.disqualified) return a.disqualified ? 1 : -1;
-      const av = foodMode === "with" ? avgWithFood(a) : avgWithoutFood(a);
-      const bv = foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
-      return (bv || 0) - (av || 0);
-    });
-    return list;
-  }, [visited, search, foodMode]);
+    // Ranked bars first: score desc, exact ties broken by global Bar Battle
+    // results (then a deterministic name/id fallback). Disqualified bars
+    // stay at the bottom, ordered among themselves by score — the exact
+    // behavior the old comparator produced.
+    const ranked = list.filter((b) => !b.disqualified);
+    const dq = list.filter((b) => b.disqualified);
+    const ordered = rankEntries(
+      ranked.map((b) => ({
+        item: b,
+        score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b),
+      })),
+      rankingBattles,
+    );
+    dq.sort(
+      (a, b) =>
+        (foodMode === "with" ? avgWithFood(b) || 0 : avgWithoutFood(b) || 0) -
+        (foodMode === "with" ? avgWithFood(a) || 0 : avgWithoutFood(a) || 0) ||
+        a.name.localeCompare(b.name),
+    );
+    return [...ordered, ...dq];
+  }, [visited, search, foodMode, rankingBattles]);
 
   const filteredToTry = useMemo(() => {
     return toTry.filter((b) => {
@@ -1202,6 +1308,9 @@ export function TourProvider({ children }: { children: ReactNode }) {
     filteredVisited,
     filteredToTry,
     fetchingIds,
+
+    rankingBattles,
+    recordBattle,
 
     search,
     setSearch,

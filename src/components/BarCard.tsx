@@ -53,6 +53,12 @@ export default function BarCard({
   const cleanDesc = displayDescription(b.description);
   const isLong = !!cleanDesc && cleanDesc.length > 140;
   const [expanded, setExpanded] = useState(false);
+  // Mobile-only overflow menu holding the destructive Remove action, so the
+  // card's action row never wraps into a stranded lone button on narrow
+  // screens. Desktop keeps Remove inline, exactly as before.
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const showRemove = isWishlist || b.status === "visited";
 
   const descText =
     isLong && !expanded ? cleanDesc.slice(0, 140) + "…" : cleanDesc;
@@ -285,10 +291,51 @@ export default function BarCard({
           </button>
         )}
 
-        {(isWishlist || b.status === "visited") && (
-          <button className={`${removeBtnCls} ml-auto`} onClick={onDelete}>
+        {showRemove && (
+          <button
+            className={`${removeBtnCls} ml-auto hidden sm:inline-flex`}
+            onClick={onDelete}
+          >
             <Icon name="x" size={11} /> Remove
           </button>
+        )}
+
+        {showRemove && (
+          <div className="relative ml-auto sm:hidden">
+            <button
+              className={ghostBtnCls}
+              onClick={() => setMoreOpen((o) => !o)}
+              aria-label="More actions"
+              aria-expanded={moreOpen}
+              aria-haspopup="menu"
+            >
+              <Icon name="more" size={14} />
+            </button>
+            {moreOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setMoreOpen(false)}
+                  aria-hidden="true"
+                />
+                <div
+                  role="menu"
+                  className="absolute right-0 z-40 mt-1.5 min-w-[132px] rounded-[8px] border border-line2 bg-panel p-1.5 shadow-panel"
+                >
+                  <button
+                    role="menuitem"
+                    className={`${removeBtnCls} w-full justify-start`}
+                    onClick={() => {
+                      setMoreOpen(false);
+                      onDelete();
+                    }}
+                  >
+                    <Icon name="x" size={11} /> Remove
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>

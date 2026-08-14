@@ -31,7 +31,7 @@ export default function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative max-h-[85vh] w-full overflow-y-auto rounded-[10px] border border-line2 bg-panel p-6 shadow-panel"
+        className="relative max-h-[85vh] w-full overflow-y-auto rounded-[10px] border border-line2 bg-panel p-5 shadow-panel sm:p-6"
         style={{ maxWidth }}
         onClick={(e) => e.stopPropagation()}
       >

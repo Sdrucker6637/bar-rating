@@ -176,6 +176,27 @@ const GLYPHS: Record<string, ReactNode> = {
       <polyline points="11 6 5 12 11 18" />
     </>
   ),
+  // crossed swords (Bar Battle tiebreak)
+  swords: (
+    <>
+      <path d="M14.5 17.5 3 6V3h3l11.5 11.5" />
+      <path d="M13 19l6-6" />
+      <path d="M16 16l4 4" />
+      <path d="M19 21l2-2" />
+      <path d="M6.5 3.5 3 7l4 4" />
+      <path d="M8 8l4-4" />
+      <path d="M21 17l-4-4" />
+      <path d="M19 19l-2 2" />
+    </>
+  ),
+  // vertical ellipsis (more actions)
+  more: (
+    <>
+      <circle cx="12" cy="5" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="19" r="1.1" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof GLYPHS;

@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useTour } from "@/lib/tour-context";
 import { avgWithFood, avgWithoutFood, fmt } from "@/lib/scoring";
+import { pendingBattlePairs } from "@/lib/ranking";
 import BarCard from "./BarCard";
 import TabIntro from "./TabIntro";
 import EmptyState from "./EmptyState";
+import BattleModal from "./modals/BattleModal";
 import {
   addBtnCls,
   inputCls,
@@ -15,6 +18,11 @@ import {
   cardWarmSurfaceCls,
 } from "@/lib/ui";
 import Icon from "./Icon";
+
+// Session-scoped (module-level, survives tab switches): the Bar Battle modal
+// auto-opens the first time an unresolved tie is seen, but never re-pops on
+// its own after the user dismisses it.
+let autoBattlePrompted = false;
 
 export default function LeaderboardView() {
   const {
@@ -28,7 +36,37 @@ export default function LeaderboardView() {
     editVisited,
     removeBar,
     toggleDisqualify,
+    rankingBattles,
+    recordBattle,
   } = useTour();
+
+  // Pairs of bars that share a score and still need a global Bar Battle to
+  // decide their order. Derived from the live shared state, so recording a
+  // battle shrinks this list immediately.
+  const rankedEntries = useMemo(
+    () =>
+      filteredVisited.map((b) => ({
+        item: b,
+        score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b),
+      })),
+    [filteredVisited, foodMode],
+  );
+  const pendingPairs = useMemo(
+    () => pendingBattlePairs(rankedEntries, rankingBattles),
+    [rankedEntries, rankingBattles],
+  );
+
+  const [battleOpen, setBattleOpen] = useState(false);
+
+  // When the leaderboard first shows an unresolved tie, surface the Bar
+  // Battle once per browser session (dismissing it leaves the "Settle ties"
+  // button in place — the user decides when to continue).
+  useEffect(() => {
+    if (pendingPairs.length > 0 && !autoBattlePrompted) {
+      autoBattlePrompted = true;
+      setBattleOpen(true);
+    }
+  }, [pendingPairs.length]);
 
   const champ = filteredVisited.length > 0 ? filteredVisited[0] : null;
   const champScore = champ
@@ -125,6 +163,16 @@ export default function LeaderboardView() {
             Without food
           </button>
         </div>
+        {pendingPairs.length > 0 && (
+          <button
+            className={`${chipCls} !border-goldDeep/60 !text-gold hover:!border-gold`}
+            onClick={() => setBattleOpen(true)}
+          >
+            <Icon name="swords" size={12} />
+            Settle {pendingPairs.length} tie
+            {pendingPairs.length === 1 ? "" : "s"}
+          </button>
+        )}
       </div>
 
       <div className="mt-4 flex flex-col gap-2.5">
@@ -159,6 +207,14 @@ export default function LeaderboardView() {
           });
         })()}
       </div>
+
+      {battleOpen && (
+        <BattleModal
+          pairs={pendingPairs}
+          onResolve={recordBattle}
+          onClose={() => setBattleOpen(false)}
+        />
+      )}
     </div>
   );
 }

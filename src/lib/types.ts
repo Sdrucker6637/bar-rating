@@ -1,5 +1,24 @@
 export type BarStatus = "visited" | "to-try";
 
+/** One global Bar Battle — a pairwise tiebreak decision between two bars that
+ *  finished with the same score. Shared by everyone (not per-user); the
+ *  winner only affects ORDERING within a score tie, never the scores
+ *  themselves. Stored on the shared document as `rankingBattles`.
+ *
+ *  At most one battle exists per unordered pair — recording a new one
+ *  replaces the old, so there are never duplicate or conflicting records.
+ *  `bar1Id`/`bar2Id` are the two contenders and `winnerId` is one of them.
+ *  `createdAt` is a client timestamp (the app has no auth, matching the
+ *  existing bar records, which carry no createdBy either). */
+export interface RankingBattle {
+  id: string;
+  bar1Id: string;
+  bar2Id: string;
+  winnerId: string;
+  type: "score_tiebreak";
+  createdAt: number;
+}
+
 export interface Bar {
   id: string;
   name: string;
