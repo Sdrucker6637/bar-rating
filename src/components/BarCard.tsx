@@ -21,6 +21,9 @@ interface BarCardProps {
   rank?: number | null;
   score?: number | null;
   scoreLabel?: string;
+  /** True when this bar's position in a score tie was decided by a Bar
+   *  Battle — shows a small ⚔️ immediately left of the score. */
+  battleDecided?: boolean;
   isFetching?: boolean;
   onNameClick?: () => void;
   onEdit: () => void;
@@ -42,6 +45,7 @@ export default function BarCard({
   rank,
   score,
   scoreLabel,
+  battleDecided,
   isFetching,
   onNameClick,
   onEdit,
@@ -53,11 +57,12 @@ export default function BarCard({
   const cleanDesc = displayDescription(b.description);
   const isLong = !!cleanDesc && cleanDesc.length > 140;
   const [expanded, setExpanded] = useState(false);
-  // Mobile-only overflow menu holding the destructive Remove action, so the
-  // card's action row never wraps into a stranded lone button on narrow
-  // screens. Desktop keeps Remove inline, exactly as before.
-  const [moreOpen, setMoreOpen] = useState(false);
-
+  // Remove stays a one-tap action on every breakpoint: on mobile the card
+  // footer shows a compact icon-only ✕ (kept in the corner via ml-auto, same
+  // spot the ⋯ used to occupy), and on sm+ the labeled "Remove" renders
+  // inline — no overflow menu, no hidden second step. The icon-only form is
+  // compact enough that [Map] [Edit] [Disqualify] [✕] fits without wrapping
+  // even on narrow/folded screens.
   const showRemove = isWishlist || b.status === "visited";
 
   const descText =
@@ -153,8 +158,19 @@ export default function BarCard({
 
         {score !== undefined && score !== null && (
           <div className="flex-shrink-0 rounded-[6px] border border-line2 bg-ink px-3.5 py-2 text-right shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
-            <div className="font-serif text-[1.3rem] font-medium leading-none text-gold">
-              {b.disqualified ? "N/A" : fmt(score)}
+            <div className="flex items-center justify-end gap-1.5">
+              {battleDecided && !b.disqualified && (
+                <span
+                  title="Position determined by Bar Battle"
+                  aria-label="Position determined by Bar Battle"
+                  className="inline-flex"
+                >
+                  <Icon name="swords" size={12} className="text-gold/70" />
+                </span>
+              )}
+              <span className="font-serif text-[1.3rem] font-medium leading-none text-gold">
+                {b.disqualified ? "N/A" : fmt(score)}
+              </span>
             </div>
             <div
               className="ml-auto mt-1.5 h-px w-6 bg-brass/30"
@@ -293,49 +309,13 @@ export default function BarCard({
 
         {showRemove && (
           <button
-            className={`${removeBtnCls} ml-auto hidden sm:inline-flex`}
+            className={`${removeBtnCls} ml-auto`}
             onClick={onDelete}
+            aria-label="Remove"
           >
-            <Icon name="x" size={11} /> Remove
+            <Icon name="x" size={11} />
+            <span className="hidden sm:inline">Remove</span>
           </button>
-        )}
-
-        {showRemove && (
-          <div className="relative ml-auto sm:hidden">
-            <button
-              className={ghostBtnCls}
-              onClick={() => setMoreOpen((o) => !o)}
-              aria-label="More actions"
-              aria-expanded={moreOpen}
-              aria-haspopup="menu"
-            >
-              <Icon name="more" size={14} />
-            </button>
-            {moreOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={() => setMoreOpen(false)}
-                  aria-hidden="true"
-                />
-                <div
-                  role="menu"
-                  className="absolute right-0 z-40 mt-1.5 min-w-[132px] rounded-[8px] border border-line2 bg-panel p-1.5 shadow-panel"
-                >
-                  <button
-                    role="menuitem"
-                    className={`${removeBtnCls} w-full justify-start`}
-                    onClick={() => {
-                      setMoreOpen(false);
-                      onDelete();
-                    }}
-                  >
-                    <Icon name="x" size={11} /> Remove
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
         )}
       </div>
     </div>

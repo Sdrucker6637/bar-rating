@@ -189,14 +189,6 @@ const GLYPHS: Record<string, ReactNode> = {
       <path d="M19 19l-2 2" />
     </>
   ),
-  // vertical ellipsis (more actions)
-  more: (
-    <>
-      <circle cx="12" cy="5" r="1.1" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="19" r="1.1" fill="currentColor" stroke="none" />
-    </>
-  ),
 };
 
 export type IconName = keyof typeof GLYPHS;

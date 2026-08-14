@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTour } from "@/lib/tour-context";
 import { avgWithFood, avgWithoutFood, fmt } from "@/lib/scoring";
-import { pendingBattlePairs } from "@/lib/ranking";
+import { battleDecidedBarIds, pendingBattlePairs } from "@/lib/ranking";
 import BarCard from "./BarCard";
 import TabIntro from "./TabIntro";
 import EmptyState from "./EmptyState";
@@ -53,6 +53,12 @@ export default function LeaderboardView() {
   );
   const pendingPairs = useMemo(
     () => pendingBattlePairs(rankedEntries, rankingBattles),
+    [rankedEntries, rankingBattles],
+  );
+  // Bars whose position in a score tie was decided by a Bar Battle — they
+  // get a small ⚔️ next to their score so the tiebreak is legible.
+  const battleDecidedIds = useMemo(
+    () => battleDecidedBarIds(rankedEntries, rankingBattles),
     [rankedEntries, rankingBattles],
   );
 
@@ -195,6 +201,7 @@ export default function LeaderboardView() {
                 rank={ranked ? rankCounter : null}
                 score={foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b)}
                 scoreLabel={foodMode === "with" ? "with food" : "no food"}
+                battleDecided={battleDecidedIds.has(b.id)}
                 isFetching={fetchingIds.has(b.id)}
                 onNameClick={() => {
                   if (b.mapsLink) window.open(b.mapsLink, "_blank");

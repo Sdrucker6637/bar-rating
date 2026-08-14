@@ -147,3 +147,43 @@ export function pendingBattlePairs(
   }
   return pairs;
 }
+
+/**
+ * Which bars' ranking positions are (at least partly) decided by a Bar
+ * Battle — i.e. the bar shares its exact score with another bar AND a
+ * recorded battle exists between two members of that same score group. Used
+ * by the leaderboard to show a small ⚔️ indicator. Bars with a unique score
+ * or tied-but-never-battled bars get nothing: their order comes from the
+ * score or the deterministic fallback, not a battle.
+ */
+export function battleDecidedBarIds(
+  entries: RankedEntry<Bar>[],
+  battles: RankingBattle[],
+): Set<string> {
+  const groups = new Map<string, Bar[]>();
+  for (const e of entries) {
+    if (
+      e.item.disqualified ||
+      e.score === null ||
+      e.score === undefined ||
+      isNaN(e.score)
+    ) {
+      continue;
+    }
+    const key = e.score.toFixed(9);
+    const group = groups.get(key);
+    if (group) group.push(e.item);
+    else groups.set(key, [e.item]);
+  }
+  const decided = new Set<string>();
+  for (const group of groups.values()) {
+    const ids = new Set(group.map((b) => b.id));
+    for (const btl of battles) {
+      if (ids.has(btl.bar1Id) && ids.has(btl.bar2Id)) {
+        decided.add(btl.bar1Id);
+        decided.add(btl.bar2Id);
+      }
+    }
+  }
+  return decided;
+}
