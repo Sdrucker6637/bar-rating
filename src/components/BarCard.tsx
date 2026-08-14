@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import type { Bar } from "@/lib/types";
 import { fmt } from "@/lib/scoring";
 import { displayDescription } from "@/lib/parse";
@@ -9,11 +10,13 @@ import {
   ghostBtnGreenCls,
   dqBtnCls,
   removeBtnCls,
+  secondaryBtnCls,
   tagCls,
   cardHoverCls,
   cardBaseShadowCls,
   cardWarmSurfaceCls,
 } from "@/lib/ui";
+import Modal from "./modals/Modal";
 import Icon from "./Icon";
 
 interface BarCardProps {
@@ -64,6 +67,11 @@ export default function BarCard({
   // compact enough that [Map] [Edit] [Disqualify] [✕] fits without wrapping
   // even on narrow/folded screens.
   const showRemove = isWishlist || b.status === "visited";
+
+  // Confirmation safeguard before removing — the one-tap ✕ shouldn't destroy
+  // a shared-list entry on a mis-tap. Rendered through a portal because the
+  // card clips fixed/absolute descendants (overflow-hidden).
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const descText =
     isLong && !expanded ? cleanDesc.slice(0, 140) + "…" : cleanDesc;
@@ -310,7 +318,7 @@ export default function BarCard({
         {showRemove && (
           <button
             className={`${removeBtnCls} ml-auto`}
-            onClick={onDelete}
+            onClick={() => setConfirmingRemove(true)}
             aria-label="Remove"
           >
             <Icon name="x" size={11} />
@@ -318,6 +326,38 @@ export default function BarCard({
           </button>
         )}
       </div>
+
+      {confirmingRemove &&
+        createPortal(
+          <Modal onClose={() => setConfirmingRemove(false)}>
+            <h3 className="mt-0 font-serif font-medium text-cream">
+              Remove {b.name}?
+            </h3>
+            <p className="mt-2 text-[0.85rem] leading-relaxed text-mist">
+              Are you sure you want to remove {b.name} from the{" "}
+              {isWishlist ? "wishlist" : "leaderboard"}?
+            </p>
+            <div className="mt-5 flex gap-2.5">
+              <button
+                autoFocus
+                className={secondaryBtnCls}
+                onClick={() => setConfirmingRemove(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 cursor-pointer rounded-full bg-redDeep px-4 py-2.5 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.04em] text-cream shadow-lift transition-all duration-150 hover:bg-red active:scale-[0.98]"
+                onClick={() => {
+                  setConfirmingRemove(false);
+                  onDelete();
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          </Modal>,
+          document.body,
+        )}
     </div>
   );
 }
