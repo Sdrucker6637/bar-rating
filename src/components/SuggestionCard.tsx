@@ -85,17 +85,17 @@ export default function SuggestionCard({
           {s.happyHour}
         </div>
       )}
-      {s.mapsLink && (
-        <a
-          className={`${linkBtnCls} mt-2.5 inline-flex`}
-          href={s.mapsLink}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <Icon name="external" size={12} /> Map
-        </a>
-      )}
-      <div className="mt-2.5 flex flex-wrap gap-2">
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {s.mapsLink && (
+          <a
+            className={linkBtnCls}
+            href={s.mapsLink}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Icon name="external" size={12} /> Map
+          </a>
+        )}
         <button
           className="flex-1 cursor-pointer rounded-[5px] border border-green bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-greenLight hover:bg-green hover:text-cream"
           onClick={onWishlist}
