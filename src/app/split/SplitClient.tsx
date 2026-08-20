@@ -36,7 +36,23 @@ function emptyPlace(id: string, crewIds: string[]): SplitPlace {
     parsing: false,
     parseError: null,
     parsedShotCount: 0,
+    splitMethod: "item",
+    evenRounds: {},
+    evenExcluded: [],
+    evenMaxRounds: 1,
   };
+}
+
+// A "round" isn't stored anywhere in the receipt data, so when a place first
+// enters Even Split mode we derive a sensible starting round count from its
+// items (the largest quantity — e.g. a receipt line of 6 beers implies 6
+// rounds). Falls back to 1 for empty/unknown bills; the user can adjust it.
+function deriveMaxRounds(place: SplitPlace): number {
+  const maxQty = place.items.reduce(
+    (m, it) => Math.max(m, it.quantity || 1),
+    1,
+  );
+  return Math.max(1, maxQty);
 }
 
 function normName(n: string): string {
@@ -93,16 +109,22 @@ export default function SplitClient() {
   function removeSplitPerson(id: string) {
     setSplitPeople((prev) => prev.filter((p) => p.id !== id));
     setSplitPlaces((prev) =>
-      prev.map((place) => ({
-        ...place,
-        crewIds: place.crewIds.filter((cid) => cid !== id),
-        items: place.items.map((it) => {
-          if (!(id in it.assignedTo)) return it;
-          const nextAssigned = { ...it.assignedTo };
-          delete nextAssigned[id];
-          return { ...it, assignedTo: nextAssigned };
-        }),
-      })),
+      prev.map((place) => {
+        const nextRounds = { ...place.evenRounds };
+        delete nextRounds[id];
+        return {
+          ...place,
+          crewIds: place.crewIds.filter((cid) => cid !== id),
+          evenExcluded: place.evenExcluded.filter((cid) => cid !== id),
+          evenRounds: nextRounds,
+          items: place.items.map((it) => {
+            if (!(id in it.assignedTo)) return it;
+            const nextAssigned = { ...it.assignedTo };
+            delete nextAssigned[id];
+            return { ...it, assignedTo: nextAssigned };
+          }),
+        };
+      }),
     );
   }
 
@@ -386,14 +408,19 @@ export default function SplitClient() {
   }
 
   // ---------------- tabs step: items ----------------
-  function addManualItemToPlace(placeIndex: number) {
-    const name = window.prompt("Item name?", "");
-    if (!name || !name.trim()) return;
-    const priceInput = window.prompt(`Total price for "${name.trim()}"?`, "");
-    const price = Number(priceInput);
+  // Called from the inline Add-item form (SplitBillView) — no window.prompt,
+  // which is blocked in embedded webviews and some mobile browsers. The form
+  // collects name/price/quantity in real inputs instead.
+  function addManualItemToPlace(
+    placeIndex: number,
+    name: string,
+    price: number,
+    quantity: number,
+  ) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
     if (!Number.isFinite(price) || price < 0) return;
-    const qtyInput = window.prompt("Quantity? (leave blank for 1)", "1");
-    const quantity = Math.max(1, Number(qtyInput) || 1);
+    const qty = Math.max(1, quantity || 1);
     setSplitPlaces((prev) =>
       prev.map((pl, i) =>
         i === placeIndex
@@ -402,10 +429,10 @@ export default function SplitClient() {
               items: [
                 ...pl.items,
                 {
-                  id: `item${Date.now()}`,
-                  name: name.trim(),
+                  id: `item${Date.now()}${Math.random()}`,
+                  name: trimmed,
                   price,
-                  quantity,
+                  quantity: qty,
                   assignedTo: {},
                 },
               ],
@@ -562,7 +589,14 @@ export default function SplitClient() {
     setSplitPlaces((prev) =>
       prev.map((pl, i) =>
         i === placeIndex && !pl.crewIds.includes(person.id)
-          ? { ...pl, crewIds: [...pl.crewIds, person.id] }
+          ? {
+              ...pl,
+              crewIds: [...pl.crewIds, person.id],
+              evenRounds:
+                pl.splitMethod === "even"
+                  ? { ...pl.evenRounds, [person.id]: pl.evenMaxRounds || 1 }
+                  : pl.evenRounds,
+            }
           : pl,
       ),
     );
@@ -576,9 +610,13 @@ export default function SplitClient() {
     setSplitPlaces((prev) =>
       prev.map((pl, i) => {
         if (i !== placeIndex) return pl;
+        const nextRounds = { ...pl.evenRounds };
+        delete nextRounds[personId];
         return {
           ...pl,
           crewIds: pl.crewIds.filter((id) => id !== personId),
+          evenExcluded: pl.evenExcluded.filter((id) => id !== personId),
+          evenRounds: nextRounds,
           items: pl.items.map((it) => {
             if (!(personId in it.assignedTo)) return it;
             const nextAssigned = { ...it.assignedTo };
@@ -596,8 +634,125 @@ export default function SplitClient() {
     }
   }
 
+  // ---------------- even split ----------------
+  // Switching methods is non-destructive: items, tax, tip and crew are all
+  // kept. Entering even mode seeds everyone at full participation so the
+  // bill starts off evenly divided.
+  function setSplitMethod(placeIndex: number, method: "item" | "even") {
+    setSplitPlaces((prev) =>
+      prev.map((pl, i) => {
+        if (i !== placeIndex || pl.splitMethod === method) return pl;
+        if (method === "item") return { ...pl, splitMethod: method };
+        // First entry into even mode seeds everyone at full participation;
+        // later re-entries keep whatever rounds the user already adjusted.
+        const firstEntry = Object.keys(pl.evenRounds).length === 0;
+        const max = firstEntry ? deriveMaxRounds(pl) : pl.evenMaxRounds || 1;
+        const rounds: Record<string, number> = { ...pl.evenRounds };
+        pl.crewIds.forEach((id) => {
+          if (!(id in rounds)) rounds[id] = max;
+        });
+        return {
+          ...pl,
+          splitMethod: method,
+          evenMaxRounds: max,
+          evenRounds: rounds,
+        };
+      }),
+    );
+  }
+
+  function adjustEvenRounds(placeIndex: number, personId: string, delta: number) {
+    setSplitPlaces((prev) =>
+      prev.map((pl, i) => {
+        if (i !== placeIndex) return pl;
+        const max = pl.evenMaxRounds || 1;
+        const current = pl.evenRounds[personId] ?? max;
+        const next = Math.max(0, Math.min(max, current + delta));
+        return { ...pl, evenRounds: { ...pl.evenRounds, [personId]: next } };
+      }),
+    );
+  }
+
+  // Changes the bill's round count. People at full participation (their
+  // rounds equal the old max) follow it, so raising "6 rounds" keeps the
+  // default even split; people who left early keep their lower count.
+  function setEvenMaxRounds(placeIndex: number, n: number) {
+    const nextMax = Math.max(1, n);
+    setSplitPlaces((prev) =>
+      prev.map((pl, i) => {
+        if (i !== placeIndex) return pl;
+        const oldMax = pl.evenMaxRounds || 1;
+        const rounds: Record<string, number> = {};
+        pl.crewIds.forEach((id) => {
+          const cur = pl.evenRounds[id] ?? oldMax;
+          rounds[id] = cur === oldMax ? nextMax : Math.min(cur, nextMax);
+        });
+        return { ...pl, evenMaxRounds: nextMax, evenRounds: rounds };
+      }),
+    );
+  }
+
+  function toggleEvenExcluded(placeIndex: number, personId: string) {
+    setSplitPlaces((prev) =>
+      prev.map((pl, i) => {
+        if (i !== placeIndex) return pl;
+        const excluded = pl.evenExcluded.includes(personId)
+          ? pl.evenExcluded.filter((id) => id !== personId)
+          : [...pl.evenExcluded, personId];
+        return { ...pl, evenExcluded: excluded };
+      }),
+    );
+  }
+
   // ---------------- totals ----------------
+  // Even-split math: the WHOLE bill (every item at full price, plus tax and
+  // tip) is divided among non-excluded crew proportionally to rounds, using
+  // the same largest-remainder splitter as item mode so shares always sum to
+  // the exact total. Excluded people and 0-round people owe nothing.
+  function evenPlaceTotals(place: SplitPlace): SplitTotals {
+    const perPersonSubtotal: Record<string, number> = {};
+    const perPersonTotal: Record<string, number> = {};
+    place.crewIds.forEach((id) => {
+      perPersonSubtotal[id] = 0;
+      perPersonTotal[id] = 0;
+    });
+
+    const itemsCents = place.items.reduce(
+      (sum, it) => sum + Math.round((it.price || 0) * 100),
+      0,
+    );
+    const extraCents = Math.round(
+      (Number(place.tax || 0) + Number(place.tip || 0)) * 100,
+    );
+    const fullCents = itemsCents + extraCents;
+
+    // Only people with a positive round count take a share; weight-0 entries
+    // are left out entirely so they can never absorb a leftover cent.
+    const entries = place.crewIds
+      .filter((id) => !place.evenExcluded.includes(id))
+      .map((id) => ({ id, weight: Math.max(0, place.evenRounds[id] ?? 0) }))
+      .filter((e) => e.weight > 0);
+    const totalWeight = entries.reduce((sum, e) => sum + e.weight, 0);
+
+    if (totalWeight > 0) {
+      const fullShares = distributeCents(fullCents, entries);
+      const subShares = distributeCents(itemsCents, entries);
+      entries.forEach((e) => {
+        perPersonTotal[e.id] = (fullShares[e.id] || 0) / 100;
+        perPersonSubtotal[e.id] = (subShares[e.id] || 0) / 100;
+      });
+    }
+
+    return {
+      perPersonSubtotal,
+      perPersonTotal,
+      assignedSubtotal: itemsCents / 100,
+      unassignedUnitsCount: 0,
+    };
+  }
+
   function placeTotals(place: SplitPlace): SplitTotals {
+    if (place.splitMethod === "even") return evenPlaceTotals(place);
     const perPersonSubtotal: Record<string, number> = {};
     place.crewIds.forEach((id) => (perPersonSubtotal[id] = 0));
 
@@ -723,6 +878,10 @@ export default function SplitClient() {
         onSplitEvenly={splitItemEvenly}
         onToggleIncluded={toggleItemPersonIncluded}
         onAddPersonToPlace={addPersonToPlace}
+        onSetSplitMethod={setSplitMethod}
+        onAdjustEvenRounds={adjustEvenRounds}
+        onSetEvenMaxRounds={setEvenMaxRounds}
+        onToggleEvenExcluded={toggleEvenExcluded}
         placeTotalsList={placeTotalsList}
         grandTotals={grandTotals}
         onSendPlaceText={sendPlaceText}

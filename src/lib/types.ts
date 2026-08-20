@@ -123,6 +123,18 @@ export interface SplitPlace {
   /** How many screenshots were included in the last successful parse — used
    *  to skip re-reading receipts that haven't changed. */
   parsedShotCount: number;
+  /** How this place's bill is divided: "item" = assign items to people,
+   *  "even" = split the whole bill proportionally by rounds. */
+  splitMethod: "item" | "even";
+  /** Even-split participation, personId -> rounds they were present for.
+   *  Only meaningful when `splitMethod === "even"`. */
+  evenRounds: Record<string, number>;
+  /** People explicitly excluded from paying (their share is covered by the
+   *  rest of the crew). Distinct from a person with 0 rounds. */
+  evenExcluded: string[];
+  /** The bill's total round count — full participation equals this number.
+   *  People are capped at it and new crew members default to it. */
+  evenMaxRounds: number;
 }
 
 export interface SplitTotals {

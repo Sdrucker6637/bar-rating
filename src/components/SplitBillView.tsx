@@ -45,7 +45,12 @@ interface SplitBillViewProps {
   activePlaceIndex: number;
   setActivePlaceIndex: (i: number) => void;
   onRemovePersonFromPlace: (placeIndex: number, personId: string) => void;
-  onAddItem: (placeIndex: number) => void;
+  onAddItem: (
+    placeIndex: number,
+    name: string,
+    price: number,
+    quantity: number,
+  ) => void;
   onRemoveItem: (placeIndex: number, itemId: string) => void;
   onAdjustUnits: (
     placeIndex: number,
@@ -64,6 +69,14 @@ interface SplitBillViewProps {
     personId: string,
   ) => void;
   onAddPersonToPlace: (placeIndex: number, name: string) => void;
+  onSetSplitMethod: (placeIndex: number, method: "item" | "even") => void;
+  onAdjustEvenRounds: (
+    placeIndex: number,
+    personId: string,
+    delta: number,
+  ) => void;
+  onSetEvenMaxRounds: (placeIndex: number, n: number) => void;
+  onToggleEvenExcluded: (placeIndex: number, personId: string) => void;
 
   placeTotalsList: SplitTotals[];
   grandTotals: { perPersonTotal: Record<string, number> };
@@ -121,6 +134,10 @@ export default function SplitBillView(props: SplitBillViewProps) {
     onSplitEvenly,
     onToggleIncluded,
     onAddPersonToPlace,
+    onSetSplitMethod,
+    onAdjustEvenRounds,
+    onSetEvenMaxRounds,
+    onToggleEvenExcluded,
     placeTotalsList,
     grandTotals,
     onSendPlaceText,
@@ -381,6 +398,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
     if (!place || !totals) return null;
 
     const crew = people.filter((p) => place.crewIds.includes(p.id));
+    const isEven = place.splitMethod === "even";
 
     return (
       <div className="my-4">
@@ -402,6 +420,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
           className={`rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
         >
           <PanelHeading>{placeLabel(place, activePlaceIndex)}</PanelHeading>
+
+          <SplitMethodToggle
+            method={place.splitMethod}
+            onChange={(m) => onSetSplitMethod(activePlaceIndex, m)}
+          />
 
           {place.parseError && (
             <div className="mb-3 rounded-lg border border-redDeep bg-[#171310] px-3 py-2.5 font-mono text-[0.72rem] text-red">
@@ -462,6 +485,23 @@ export default function SplitBillView(props: SplitBillViewProps) {
             </div>
           )}
 
+          {isEven && (
+            <EvenSplitSection
+              place={place}
+              crew={crew}
+              totals={totals}
+              activePlaceIndex={activePlaceIndex}
+              onAddItem={onAddItem}
+              onRemoveItem={onRemoveItem}
+              onSetPlaceTax={onSetPlaceTax}
+              onSetPlaceTip={onSetPlaceTip}
+              onAdjustEvenRounds={onAdjustEvenRounds}
+              onSetEvenMaxRounds={onSetEvenMaxRounds}
+              onToggleEvenExcluded={onToggleEvenExcluded}
+            />
+          )}
+          {!isEven && (
+            <>
           <div className="mt-2 flex flex-col gap-2.5">
             {place.items.map((it) => {
               const q = it.quantity || 1;
@@ -690,12 +730,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
             })}
           </div>
 
-          <button
-            className={`${addBtnCls} w-full`}
-            onClick={() => onAddItem(activePlaceIndex)}
-          >
-            + Add item
-          </button>
+          <AddItemControl placeIndex={activePlaceIndex} onAdd={onAddItem} />
 
           <div
             style={{
@@ -762,6 +797,8 @@ export default function SplitBillView(props: SplitBillViewProps) {
                 </div>
               ))}
             </div>
+          )}
+            </>
           )}
 
           <div className="mt-5 border-t border-line pt-4">
@@ -871,6 +908,440 @@ export default function SplitBillView(props: SplitBillViewProps) {
           >
             Start over
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The dashed "+ Add item" button becomes an inline form when clicked, so
+// adding an item never relies on window.prompt (blocked in embedded webviews
+// and some mobile browsers). Price is the TOTAL for the item (all units).
+function AddItemControl({
+  placeIndex,
+  onAdd,
+}: {
+  placeIndex: number;
+  onAdd: (
+    placeIndex: number,
+    name: string,
+    price: number,
+    quantity: number,
+  ) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Enter an item name.");
+      return;
+    }
+    const p = Number(price);
+    if (!Number.isFinite(p) || p < 0) {
+      setError("Enter a valid total price.");
+      return;
+    }
+    const q = Math.max(1, Number(quantity) || 1);
+    onAdd(placeIndex, trimmed, p, q);
+    setName("");
+    setPrice("");
+    setQuantity("1");
+    setError(null);
+    setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <button className={addBtnCls} onClick={() => setOpen(true)}>
+        + Add item
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="mt-3 rounded-lg border border-[rgba(184,150,95,0.28)] bg-[#171310] p-3"
+    >
+      <div className="mb-2 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        Add item
+      </div>
+      <div className="flex flex-col gap-2">
+        <input
+          className={inputCls}
+          placeholder="Item name"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (error) setError(null);
+          }}
+          autoFocus
+        />
+        <div className="flex flex-wrap gap-2">
+          <input
+            className={`${inputCls} min-w-0 flex-[1_1_140px]`}
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            placeholder="Total price ($)"
+            value={price}
+            onChange={(e) => {
+              setPrice(e.target.value);
+              if (error) setError(null);
+            }}
+          />
+          <input
+            className={`${taxTipInputCls} w-24`}
+            type="number"
+            min="1"
+            step="1"
+            inputMode="numeric"
+            placeholder="Qty"
+            value={quantity}
+            onChange={(e) => {
+              setQuantity(e.target.value);
+              if (error) setError(null);
+            }}
+          />
+        </div>
+      </div>
+      {error && (
+        <div className="mt-2 font-mono text-[0.68rem] text-red">{error}</div>
+      )}
+      <div className="mt-3 flex gap-2.5">
+        <button type="submit" className={`${btnPrimaryCls} flex-1`}>
+          Add
+        </button>
+        <button
+          type="button"
+          className={`${btnSecondaryCls} flex-1`}
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function SplitMethodToggle({
+  method,
+  onChange,
+}: {
+  method: "item" | "even";
+  onChange: (m: "item" | "even") => void;
+}) {
+  const segBase =
+    "inline-flex flex-1 cursor-pointer items-center justify-center rounded-[5px] px-3 py-1.5 font-mono text-[0.7rem] font-semibold uppercase tracking-[0.04em] transition-colors";
+  return (
+    <div className="mb-3.5">
+      <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        Split method
+      </div>
+      <div
+        role="group"
+        aria-label="Split method"
+        className="inline-flex w-full rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-[#141110] p-0.5 sm:w-auto"
+      >
+        <button
+          type="button"
+          aria-pressed={method === "item"}
+          onClick={() => onChange("item")}
+          className={`${segBase} ${
+            method === "item" ? "bg-brass text-deep" : "text-mist hover:text-cream"
+          }`}
+        >
+          Item by item
+        </button>
+        <button
+          type="button"
+          aria-pressed={method === "even"}
+          onClick={() => onChange("even")}
+          className={`${segBase} ${
+            method === "even" ? "bg-brass text-deep" : "text-mist hover:text-cream"
+          }`}
+        >
+          Even split
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EvenSplitSection({
+  place,
+  crew,
+  totals,
+  activePlaceIndex,
+  onAddItem,
+  onRemoveItem,
+  onSetPlaceTax,
+  onSetPlaceTip,
+  onAdjustEvenRounds,
+  onSetEvenMaxRounds,
+  onToggleEvenExcluded,
+}: {
+  place: SplitPlace;
+  crew: SplitPerson[];
+  totals: SplitTotals;
+  activePlaceIndex: number;
+  onAddItem: (
+    placeIndex: number,
+    name: string,
+    price: number,
+    quantity: number,
+  ) => void;
+  onRemoveItem: (placeIndex: number, itemId: string) => void;
+  onSetPlaceTax: (placeIndex: number, raw: string) => void;
+  onSetPlaceTip: (placeIndex: number, raw: string) => void;
+  onAdjustEvenRounds: (
+    placeIndex: number,
+    personId: string,
+    delta: number,
+  ) => void;
+  onSetEvenMaxRounds: (placeIndex: number, n: number) => void;
+  onToggleEvenExcluded: (placeIndex: number, personId: string) => void;
+}) {
+  const maxRounds = place.evenMaxRounds || 1;
+  const billTotalCents =
+    place.items.reduce((s, it) => s + Math.round((it.price || 0) * 100), 0) +
+    Math.round((Number(place.tax || 0) + Number(place.tip || 0)) * 100);
+  const allocatedCents = crew.reduce(
+    (s, p) => s + Math.round((totals.perPersonTotal[p.id] || 0) * 100),
+    0,
+  );
+  const hasPayingParticipant = crew.some(
+    (p) =>
+      !place.evenExcluded.includes(p.id) &&
+      (place.evenRounds[p.id] ?? 0) > 0,
+  );
+
+  return (
+    <div className="mt-2">
+      <div className="mb-3.5">
+        <div className="mb-1.5 flex items-center justify-between">
+          <div className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+            Bill items
+          </div>
+          <div className="font-mono text-[0.68rem] text-mute">
+            ${place.items.reduce((s, it) => s + (it.price || 0), 0).toFixed(2)}
+          </div>
+        </div>
+        {place.items.length === 0 ? (
+          <div className="rounded-lg border border-[rgba(184,150,95,0.22)] bg-[#141110] px-3 py-2.5 font-mono text-[0.72rem] text-mute">
+            No items yet — add the bill&apos;s total as one item below.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {place.items.map((it) => (
+              <div
+                key={it.id}
+                className="flex items-center justify-between gap-2 font-mono text-[0.78rem]"
+              >
+                <span className="min-w-0 truncate text-mist">
+                  {it.name || "(unnamed item)"}
+                  {it.quantity > 1 ? ` ×${it.quantity}` : ""}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="text-cream">${(it.price || 0).toFixed(2)}</span>
+                  <button
+                    onClick={() => onRemoveItem(activePlaceIndex, it.id)}
+                    className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/70 transition-colors hover:border-red/40 hover:text-red"
+                    title="Remove item"
+                  >
+                    <Icon name="x" size={10} />
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <AddItemControl placeIndex={activePlaceIndex} onAdd={onAddItem} />
+      </div>
+
+      <div
+        style={{
+          marginBottom: "1rem",
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: "0.85rem",
+          color: "#BDB3A4",
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "1.5rem",
+        }}
+      >
+        <label className="flex items-center gap-1.5">
+          <span>Tax:</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            aria-label={`Tax for ${placeLabel(place, activePlaceIndex)}`}
+            className={taxTipInputCls}
+            value={Number(place.tax || 0)}
+            onChange={(e) => onSetPlaceTax(activePlaceIndex, e.target.value)}
+          />
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span>Tip:</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            aria-label={`Tip for ${placeLabel(place, activePlaceIndex)}`}
+            className={taxTipInputCls}
+            value={Number(place.tip || 0)}
+            onChange={(e) => onSetPlaceTip(activePlaceIndex, e.target.value)}
+          />
+        </label>
+      </div>
+
+      <div className="mb-2.5 flex items-center justify-between gap-2.5">
+        <div className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+          Rounds in this bill
+        </div>
+        <div className="flex items-center gap-2 font-mono text-[0.9rem]">
+          <button
+            className={groupBtnCls}
+            disabled={maxRounds <= 1}
+            onClick={() => onSetEvenMaxRounds(activePlaceIndex, maxRounds - 1)}
+          >
+            −
+          </button>
+          <b className="min-w-[1.75rem] text-center text-cream">
+            {maxRounds}
+          </b>
+          <button
+            className={groupBtnCls}
+            onClick={() => onSetEvenMaxRounds(activePlaceIndex, maxRounds + 1)}
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-[rgba(184,150,95,0.22)]">
+        {crew.map((p) => {
+          const excluded = place.evenExcluded.includes(p.id);
+          const rounds = place.evenRounds[p.id] ?? maxRounds;
+          const share = totals.perPersonTotal[p.id] || 0;
+          const status = excluded
+            ? "Excluded"
+            : rounds === 0
+              ? "0 rounds — pays $0"
+              : rounds === maxRounds
+                ? "Full participation"
+                : `${rounds} of ${maxRounds} rounds`;
+          return (
+            <div
+              key={p.id}
+              className="border-b border-[rgba(184,150,95,0.12)] bg-[#171310] px-3 py-2.5 last:border-b-0"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-serif text-[0.9rem] font-medium text-cream">
+                    {p.name}
+                  </div>
+                  <div
+                    className={`font-mono text-[0.66rem] uppercase tracking-[0.04em] ${
+                      excluded ? "text-red" : "text-mute"
+                    }`}
+                  >
+                    {status}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono text-[0.85rem] text-gold">
+                    ${share.toFixed(2)}
+                  </div>
+                  <div className="font-mono text-[0.62rem] uppercase tracking-[0.04em] text-mute">
+                    share
+                  </div>
+                </div>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                {excluded ? (
+                  <span className="font-mono text-[0.72rem] text-red">
+                    Covered by the group
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      className={groupBtnCls}
+                      disabled={rounds <= 0}
+                      onClick={() =>
+                        onAdjustEvenRounds(activePlaceIndex, p.id, -1)
+                      }
+                    >
+                      −
+                    </button>
+                    <b className="min-w-[1.5rem] text-center font-mono text-[0.8rem] text-cream">
+                      {rounds}
+                    </b>
+                    <button
+                      className={groupBtnCls}
+                      disabled={rounds >= maxRounds}
+                      onClick={() =>
+                        onAdjustEvenRounds(activePlaceIndex, p.id, 1)
+                      }
+                    >
+                      +
+                    </button>
+                    <span className="ml-1 font-mono text-[0.66rem] text-mute">
+                      rounds
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={() => onToggleEvenExcluded(activePlaceIndex, p.id)}
+                  className={`inline-flex cursor-pointer items-center rounded-[5px] border px-2 py-1 font-mono text-[0.66rem] uppercase tracking-[0.03em] transition-colors ${
+                    excluded
+                      ? "border-greenLight/60 text-greenLight hover:border-greenLight"
+                      : "border-[rgba(184,150,95,0.28)] text-mute hover:border-redDeep hover:text-red"
+                  }`}
+                >
+                  {excluded ? "Include" : "Exclude"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {!hasPayingParticipant && (
+        <div className="mt-2.5 rounded-lg border border-redDeep bg-[#171310] px-3 py-2.5 font-mono text-[0.72rem] text-red">
+          At least one person needs participation — raise a round count or
+          include someone.
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between rounded-lg border border-[rgba(184,150,95,0.22)] bg-[#141110] px-3 py-2.5">
+        <div className="font-mono text-[0.72rem] uppercase tracking-[0.05em] text-mute">
+          Total
+        </div>
+        <div className="font-mono text-[0.85rem] text-cream">
+          ${(billTotalCents / 100).toFixed(2)}
+        </div>
+      </div>
+      <div className="mt-1.5 flex items-center justify-between rounded-lg border border-brass/40 bg-[#141110] px-3 py-2.5">
+        <div className="font-mono text-[0.72rem] uppercase tracking-[0.05em] text-brass">
+          Total allocated
+        </div>
+        <div className="font-mono text-[0.85rem] font-semibold text-gold">
+          ${(allocatedCents / 100).toFixed(2)}
         </div>
       </div>
     </div>
