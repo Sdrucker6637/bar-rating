@@ -9,6 +9,8 @@ import type {
   SplitPerson,
   SplitPlace,
   SplitScreenshot,
+  SplitShareMessage,
+  SplitShareResults,
   SplitTotals,
 } from "@/lib/types";
 
@@ -43,18 +45,10 @@ function emptyPlace(id: string, crewIds: string[]): SplitPlace {
   };
 }
 
-// A "round" isn't stored anywhere in the receipt data, so when a place first
-// enters Even Split mode we derive a sensible starting round count from its
-// items (the largest quantity — e.g. a receipt line of 6 beers implies 6
-// rounds). Falls back to 1 for empty/unknown bills; the user can adjust it.
-function deriveMaxRounds(place: SplitPlace): number {
-  const maxQty = place.items.reduce(
-    (m, it) => Math.max(m, it.quantity || 1),
-    1,
-  );
-  return Math.max(1, maxQty);
-}
-
+// A receipt cannot tell us how many drinking rounds occurred — 19 line items
+// does not mean 19 rounds. The TOTAL ROUNDS value is always user-controlled;
+// when a place first enters Even Split mode it starts at a neutral 1 and the
+// user raises it to the real count.
 function normName(n: string): string {
   return n.toLowerCase().replace(/\s+/g, " ").trim();
 }
@@ -643,10 +637,11 @@ export default function SplitClient() {
       prev.map((pl, i) => {
         if (i !== placeIndex || pl.splitMethod === method) return pl;
         if (method === "item") return { ...pl, splitMethod: method };
-        // First entry into even mode seeds everyone at full participation;
-        // later re-entries keep whatever rounds the user already adjusted.
+        // First entry into even mode seeds everyone at full participation of
+        // a neutral 1 round (never derived from receipt items); later
+        // re-entries keep whatever rounds the user already adjusted.
         const firstEntry = Object.keys(pl.evenRounds).length === 0;
-        const max = firstEntry ? deriveMaxRounds(pl) : pl.evenMaxRounds || 1;
+        const max = firstEntry ? 1 : pl.evenMaxRounds || 1;
         const rounds: Record<string, number> = { ...pl.evenRounds };
         pl.crewIds.forEach((id) => {
           if (!(id in rounds)) rounds[id] = max;
@@ -813,35 +808,152 @@ export default function SplitClient() {
     return { perPersonTotal };
   }, [placeTotalsList, splitPeople]);
 
+  const placeShareList = useMemo(
+    () => splitPlaces.map((_, i) => buildPlaceShareResults(i)),
+    [splitPlaces, placeTotalsList, splitPeople],
+  );
+
+  const grandShare = useMemo(
+    () => buildGrandShareResults(),
+    [splitPlaces, placeTotalsList, splitPeople, grandTotals],
+  );
+
   function placeLabel(place: SplitPlace, index: number) {
     return place.name.trim() || `Place ${index + 1}`;
   }
 
-  function buildPlaceMessage(placeIndex: number) {
+  // One shared messaging system for BOTH split methods. The split method only
+  // decides what goes INTO each message — Even Split adds round accounting,
+  // Item by Item adds that person's assigned items. Whether the user sends
+  // individually or to the group is a separate choice layered on top.
+  function buildPlaceShareResults(placeIndex: number): SplitShareResults {
     const place = splitPlaces[placeIndex];
     const totals = placeTotalsList[placeIndex];
+    const label = placeLabel(place, placeIndex);
+    const isEven = place.splitMethod === "even";
+    const maxRounds = place.evenMaxRounds || 1;
+    const groupTotal = place.crewIds.reduce(
+      (s, id) => s + (totals.perPersonTotal[id] || 0),
+      0,
+    );
+
+    const individuals: SplitShareMessage[] = place.crewIds.map((id) => {
+      const person = splitPeople.find((p) => p.id === id);
+      const name = person ? person.name : "?";
+      const amount = totals.perPersonTotal[id] || 0;
+      if (isEven) {
+        const excluded = place.evenExcluded.includes(id);
+        if (excluded) {
+          return {
+            personId: id,
+            name,
+            excluded: true,
+            message: `${label} — Bill Split\n\nHey ${name}! You're all covered on this tab (excluded from the split) — nothing owed.`,
+          };
+        }
+        const rounds = place.evenRounds[id] ?? maxRounds;
+        return {
+          personId: id,
+          name,
+          excluded: false,
+          message: `Hey ${name}! Your share at ${label} is $${amount.toFixed(2)} — accounted for ${rounds}/${maxRounds} rounds.`,
+        };
+      }
+      // Item by item — this person's assigned items and their cost.
+      const itemLines: string[] = [];
+      place.items.forEach((it) => {
+        const units = it.assignedTo[id] || 0;
+        if (units <= 0) return;
+        const centsByPerson = distributeCents(
+          Math.round((it.price || 0) * 100),
+          Object.entries(it.assignedTo)
+            .filter(([, u]) => (u || 0) > 0)
+            .map(([pid, u]) => ({ id: pid, weight: u })),
+        );
+        const cost = (centsByPerson[id] || 0) / 100;
+        itemLines.push(`- ${it.name || "(unnamed item)"} — $${cost.toFixed(2)}`);
+      });
+      const extraPerPerson =
+        place.crewIds.length > 0
+          ? (Number(place.tax || 0) + Number(place.tip || 0)) /
+            place.crewIds.length
+          : 0;
+      if (extraPerPerson > 0) {
+        itemLines.push(`- Tax/tip — $${extraPerPerson.toFixed(2)}`);
+      }
+      const message = [
+        `${label} — Bill Split`,
+        "",
+        `Your share: $${amount.toFixed(2)}`,
+        ...(itemLines.length > 0 ? ["", "Items:", ...itemLines] : []),
+        "",
+        `Total: $${amount.toFixed(2)}`,
+      ].join("\n");
+      return { personId: id, name, excluded: false, message };
+    });
+
     const lines = place.crewIds.map((id) => {
       const person = splitPeople.find((p) => p.id === id);
-      return `${person ? person.name : "?"}: $${(totals.perPersonTotal[id] || 0).toFixed(2)}`;
+      const name = person ? person.name : "?";
+      const amount = totals.perPersonTotal[id] || 0;
+      if (isEven) {
+        const excluded = place.evenExcluded.includes(id);
+        if (excluded) return `${name} — $0.00 (excluded)`;
+        const rounds = place.evenRounds[id] ?? maxRounds;
+        return `${name} — $${amount.toFixed(2)} (${rounds}/${maxRounds} rounds)`;
+      }
+      return `${name} — $${amount.toFixed(2)}`;
     });
-    return `${placeLabel(place, placeIndex)}:\n${lines.join("\n")}`;
+
+    return {
+      group: [
+        `${label} — Bill Split`,
+        "",
+        ...lines,
+        "",
+        `Total: $${groupTotal.toFixed(2)}`,
+      ].join("\n"),
+      individuals,
+    };
   }
 
-  function buildGrandMessage() {
-    const perPlaceLines = splitPlaces.map((_, i) => buildPlaceMessage(i));
-    const totalLines = splitPeople.map(
-      (p) =>
-        `${p.name}: $${(grandTotals.perPersonTotal[p.id] || 0).toFixed(2)}`,
-    );
-    return `${perPlaceLines.join("\n\n")}\n\nGrand total:\n${totalLines.join("\n")}`;
+  function buildGrandShareResults(): SplitShareResults {
+    const group = [
+      splitPlaces.map((_, i) => buildPlaceShareResults(i).group).join("\n\n"),
+      "",
+      "Grand total:",
+      ...splitPeople.map(
+        (p) =>
+          `${p.name} — $${(grandTotals.perPersonTotal[p.id] || 0).toFixed(2)}`,
+      ),
+    ].join("\n");
+
+    const individuals: SplitShareMessage[] = splitPeople.map((p) => {
+      const amount = grandTotals.perPersonTotal[p.id] || 0;
+      const perPlaceLines: string[] = [];
+      splitPlaces.forEach((place, i) => {
+        if (!place.crewIds.includes(p.id)) return;
+        const t = placeTotalsList[i];
+        perPlaceLines.push(
+          `- ${placeLabel(place, i)} — $${(t.perPersonTotal[p.id] || 0).toFixed(2)}`,
+        );
+      });
+      return {
+        personId: p.id,
+        name: p.name,
+        excluded: false,
+        message: [
+          `Hey ${p.name}! Your total for the night is $${amount.toFixed(2)}.`,
+          ...(perPlaceLines.length > 0 ? ["", ...perPlaceLines] : []),
+        ].join("\n"),
+      };
+    });
+
+    return { group, individuals };
   }
 
-  function sendPlaceText(placeIndex: number) {
-    window.location.href = `sms:?&body=${encodeURIComponent(buildPlaceMessage(placeIndex))}`;
-  }
-
-  function sendGrandText() {
-    window.location.href = `sms:?&body=${encodeURIComponent(buildGrandMessage())}`;
+  function sendSms(message: string) {
+    window.location.href = `sms:?&body=${encodeURIComponent(message)}`;
   }
 
   return (
@@ -884,8 +996,9 @@ export default function SplitClient() {
         onToggleEvenExcluded={toggleEvenExcluded}
         placeTotalsList={placeTotalsList}
         grandTotals={grandTotals}
-        onSendPlaceText={sendPlaceText}
-        onSendGrandText={sendGrandText}
+        placeShareList={placeShareList}
+        grandShare={grandShare}
+        onSendSms={sendSms}
         onReset={resetSplitBill}
       />
     </div>

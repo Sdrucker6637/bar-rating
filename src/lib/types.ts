@@ -149,6 +149,24 @@ export interface SplitGrandTotals {
   perPersonTotal: Record<string, number>;
 }
 
+/** One personalized share message for a participant. Excluded people get a
+ *  message too, but `excluded` tells the UI not to offer a payment request. */
+export interface SplitShareMessage {
+  personId: string;
+  name: string;
+  message: string;
+  excluded: boolean;
+}
+
+/** The sharing payload for one split (a place or the whole trip): a single
+ *  group message plus one personalized message per participant. Used by both
+ *  split methods — Even Split messages carry round accounting, Item by Item
+ *  messages carry that person's assigned items. */
+export interface SplitShareResults {
+  group: string;
+  individuals: SplitShareMessage[];
+}
+
 export interface PlacesModalState {
   suggestion: PlaceResult;
   results: PlaceResult[];

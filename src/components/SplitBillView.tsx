@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import type { SplitPerson, SplitPlace, SplitTotals } from "@/lib/types";
+import type {
+  SplitPerson,
+  SplitPlace,
+  SplitShareResults,
+  SplitTotals,
+} from "@/lib/types";
 import type { SplitStep } from "@/app/split/SplitClient";
 import { distributeCents } from "@/lib/splitMath";
 import {
@@ -80,8 +85,11 @@ interface SplitBillViewProps {
 
   placeTotalsList: SplitTotals[];
   grandTotals: { perPersonTotal: Record<string, number> };
-  onSendPlaceText: (placeIndex: number) => void;
-  onSendGrandText: () => void;
+  /** Precomputed share messages (group + individual) for every place. */
+  placeShareList: SplitShareResults[];
+  /** Precomputed share messages for the whole trip. */
+  grandShare: SplitShareResults;
+  onSendSms: (message: string) => void;
   onReset: () => void;
 }
 
@@ -140,8 +148,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
     onToggleEvenExcluded,
     placeTotalsList,
     grandTotals,
-    onSendPlaceText,
-    onSendGrandText,
+    placeShareList,
+    grandShare,
+    onSendSms,
     onReset,
   } = props;
 
@@ -802,18 +811,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
           )}
 
           <div className="mt-5 border-t border-line pt-4">
-            <button
-              className={`${btnPrimaryCls} w-full`}
-              disabled={crew.length === 0}
-              onClick={() => onSendPlaceText(activePlaceIndex)}
-            >
-              <Icon name="message" size={13} /> Send text for this place
-            </button>
-            <div className="mt-2 text-center font-mono text-[0.68rem] text-mute">
-              Opens your messaging app with each person&apos;s total for this
-              place.
-            </div>
-            <div className="mt-2.5 flex flex-wrap gap-2.5">
+            <ShareResults
+              results={placeShareList[activePlaceIndex]}
+              onSendSms={onSendSms}
+            />
+            <div className="mt-3 flex flex-wrap gap-2.5">
               <button
                 className={`${btnSecondaryCls} flex-1`}
                 onClick={() => setStep("receipts")}
@@ -885,16 +887,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
       </div>
 
       <div className="flex flex-col gap-2.5">
-        <button
-          className={`${btnPrimaryCls} w-full`}
-          onClick={onSendGrandText}
-        >
-          <Icon name="message" size={13} /> Send full summary as text
-        </button>
-        <div className="text-center font-mono text-[0.68rem] text-mute">
-          Opens your messaging app with each place&apos;s totals and the grand
-          total per person.
-        </div>
+        <ShareResults results={grandShare} onSendSms={onSendSms} />
         <div className="flex flex-wrap gap-2.5">
           <button
             className={`${btnSecondaryCls} flex-1`}
@@ -1211,7 +1204,7 @@ function EvenSplitSection({
 
       <div className="mb-2.5 flex items-center justify-between gap-2.5">
         <div className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
-          Rounds in this bill
+          Total rounds
         </div>
         <div className="flex items-center gap-2 font-mono text-[0.9rem]">
           <button
@@ -1240,11 +1233,9 @@ function EvenSplitSection({
           const share = totals.perPersonTotal[p.id] || 0;
           const status = excluded
             ? "Excluded"
-            : rounds === 0
-              ? "0 rounds — pays $0"
-              : rounds === maxRounds
-                ? "Full participation"
-                : `${rounds} of ${maxRounds} rounds`;
+            : `${rounds}/${maxRounds} rounds${
+                rounds === 0 ? " — pays $0" : ""
+              }`;
           return (
             <div
               key={p.id}
@@ -1343,6 +1334,125 @@ function EvenSplitSection({
         <div className="font-mono text-[0.85rem] font-semibold text-gold">
           ${(allocatedCents / 100).toFixed(2)}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// One sharing control for BOTH split methods. The message content is already
+// built (split-method-aware) in SplitClient; this component only offers the
+// explicit individual-vs-group choice and hands the chosen message to sms.
+function ShareResults({
+  results,
+  onSendSms,
+}: {
+  results: SplitShareResults;
+  onSendSms: (message: string) => void;
+}) {
+  // One mode selector, not two buttons: the gold fill tracks which share
+  // method is active, and the content below follows it. Selecting a segment
+  // only picks the mode; the actual send happens on the per-message Send
+  // buttons below — one "Send" for the group message, one per person.
+  const [mode, setMode] = useState<"individual" | "group">("group");
+  const hasPeople = results.individuals.length > 0;
+  const segBase =
+    "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 font-mono text-[0.7rem] font-semibold uppercase tracking-[0.04em] transition-colors disabled:cursor-default disabled:opacity-40";
+
+  return (
+    <div>
+      <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        Share results
+      </div>
+      <div
+        role="group"
+        aria-label="Share results"
+        className="inline-flex w-full rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-[#141110] p-0.5"
+      >
+        <button
+          type="button"
+          aria-pressed={mode === "individual"}
+          disabled={!hasPeople}
+          onClick={() => setMode("individual")}
+          className={`${segBase} ${
+            mode === "individual"
+              ? "bg-brass text-deep"
+              : "text-mist hover:text-cream"
+          }`}
+        >
+          <Icon name="users" size={13} /> Send individually
+        </button>
+        <button
+          type="button"
+          aria-pressed={mode === "group"}
+          disabled={!hasPeople}
+          onClick={() => setMode("group")}
+          className={`${segBase} ${
+            mode === "group"
+              ? "bg-brass text-deep"
+              : "text-mist hover:text-cream"
+          }`}
+        >
+          <Icon name="message" size={13} /> Send to group
+        </button>
+      </div>
+      {hasPeople && (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {mode === "group" ? (
+            <div className="flex items-center justify-between gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-serif text-[0.85rem] font-medium text-cream">
+                  Group
+                </div>
+                <div className="truncate font-mono text-[0.68rem] text-mute">
+                  One message with the whole split
+                </div>
+              </div>
+              <button
+                type="button"
+                className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                onClick={() => onSendSms(results.group)}
+              >
+                <Icon name="message" size={11} /> Send
+              </button>
+            </div>
+          ) : (
+            results.individuals.map((m) => (
+              <div
+                key={m.personId}
+                className="flex items-center justify-between gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-serif text-[0.85rem] font-medium text-cream">
+                    {m.name}
+                  </div>
+                  <div
+                    className={`truncate font-mono text-[0.68rem] ${
+                      m.excluded ? "text-red" : "text-mute"
+                    }`}
+                  >
+                    {m.excluded
+                      ? "Excluded — no payment needed"
+                      : "Personal message ready"}
+                  </div>
+                </div>
+                {!m.excluded && (
+                  <button
+                    type="button"
+                    className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                    onClick={() => onSendSms(m.message)}
+                  >
+                    <Icon name="message" size={11} /> Send
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+      <div className="mt-2 text-center font-mono text-[0.68rem] text-dim">
+        {mode === "individual"
+          ? "Individually opens each person's message."
+          : "Group opens one message with the whole split."}
       </div>
     </div>
   );
