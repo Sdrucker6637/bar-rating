@@ -34,6 +34,9 @@ interface SplitBillViewProps {
 
   places: SplitPlace[];
   onSetPlaceName: (placeIndex: number, name: string) => void;
+  /** Manual tax/tip entry (used when a place has no receipt photo to parse). */
+  onSetPlaceTax: (placeIndex: number, raw: string) => void;
+  onSetPlaceTip: (placeIndex: number, raw: string) => void;
   onAddScreenshots: (placeIndex: number, files: FileList) => void;
   onRemoveScreenshot: (placeIndex: number, shotId: string) => void;
   readingAll: boolean;
@@ -69,6 +72,11 @@ interface SplitBillViewProps {
   onReset: () => void;
 }
 
+/** Compact inline number input for manual tax/tip entry — the app's dark
+ *  input treatment at a small size so it sits naturally in the totals row. */
+const taxTipInputCls =
+  "w-20 rounded-[5px] border border-[rgba(184,150,95,0.25)] bg-[#141110] px-2 py-1 font-mono text-[0.85rem] text-cream shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass/20";
+
 function PanelHeading({ children }: { children: React.ReactNode }) {
   return (
     <h2
@@ -98,6 +106,8 @@ export default function SplitBillView(props: SplitBillViewProps) {
     onConfirmPlacesCount,
     places,
     onSetPlaceName,
+    onSetPlaceTax,
+    onSetPlaceTip,
     onAddScreenshots,
     onRemoveScreenshot,
     readingAll,
@@ -291,6 +301,13 @@ export default function SplitBillView(props: SplitBillViewProps) {
               }}
               style={{ display: "none" }}
             />
+
+            {place.screenshots.length === 0 && (
+              <div className="mb-3 text-center font-mono text-[0.68rem] text-mute">
+                No receipt photo? No problem — skip the photo and add every
+                item by hand on the next step.
+              </div>
+            )}
 
             {place.screenshots.length > 0 && (
               <div className="mb-3 flex flex-wrap gap-2">
@@ -687,17 +704,41 @@ export default function SplitBillView(props: SplitBillViewProps) {
               fontSize: "0.85rem",
               color: "#BDB3A4",
               display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
               gap: "1.5rem",
             }}
           >
-            <span>
-              Tax:{" "}
-              <b className="text-cream">${Number(place.tax || 0).toFixed(2)}</b>
-            </span>
-            <span>
-              Tip:{" "}
-              <b className="text-cream">${Number(place.tip || 0).toFixed(2)}</b>
-            </span>
+            <label className="flex items-center gap-1.5">
+              <span>Tax:</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                aria-label={`Tax for ${placeLabel(place, activePlaceIndex)}`}
+                className={taxTipInputCls}
+                value={Number(place.tax || 0)}
+                onChange={(e) =>
+                  onSetPlaceTax(activePlaceIndex, e.target.value)
+                }
+              />
+            </label>
+            <label className="flex items-center gap-1.5">
+              <span>Tip:</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                aria-label={`Tip for ${placeLabel(place, activePlaceIndex)}`}
+                className={taxTipInputCls}
+                value={Number(place.tip || 0)}
+                onChange={(e) =>
+                  onSetPlaceTip(activePlaceIndex, e.target.value)
+                }
+              />
+            </label>
           </div>
           {totals.unassignedUnitsCount > 0 && (
             <div className="mt-2.5 font-mono text-[0.68rem] text-mute">

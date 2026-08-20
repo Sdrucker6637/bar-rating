@@ -189,6 +189,10 @@ const GLYPHS: Record<string, ReactNode> = {
       <path d="M19 19l-2 2" />
     </>
   ),
+  // chevron down (select controls)
+  chevronDown: <polyline points="6 9 12 15 18 9" />,
+  // check (selected state)
+  check: <polyline points="20 6 9 17 4 12" />,
 };
 
 export type IconName = keyof typeof GLYPHS;

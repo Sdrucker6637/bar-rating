@@ -127,6 +127,29 @@ export default function SplitClient() {
     );
   }
 
+  // Manual tax/tip entry — the path for places with no receipt photo (or
+  // where the parse missed them). Non-negative numbers only; empty or
+  // unparsable input resolves to 0.
+  function setPlaceTax(placeIndex: number, raw: string) {
+    setSplitPlaces((prev) =>
+      prev.map((pl, i) => {
+        if (i !== placeIndex) return pl;
+        const n = Number(raw);
+        return { ...pl, tax: Number.isFinite(n) && n >= 0 ? n : 0 };
+      }),
+    );
+  }
+
+  function setPlaceTip(placeIndex: number, raw: string) {
+    setSplitPlaces((prev) =>
+      prev.map((pl, i) => {
+        if (i !== placeIndex) return pl;
+        const n = Number(raw);
+        return { ...pl, tip: Number.isFinite(n) && n >= 0 ? n : 0 };
+      }),
+    );
+  }
+
   // Some phones/browsers report an empty mime type for HEIC/HEIF camera
   // photos (and a few other formats). Sniff the image's magic bytes from the
   // base64 payload so receipt photos still reach the parser with a type
@@ -151,16 +174,66 @@ export default function SplitClient() {
     return "";
   }
 
+  // Normalizes a receipt image before it's sent to the parser: downscales to
+  // a max ~1600px long edge and re-encodes as 8-bit JPEG. Modern phone
+  // screenshots — especially iPhone wide-color — are 16-bit PNGs that can be
+  // 6MB+, far too large for a serverless JSON request body, and the
+  // full-resolution pixels aren't needed for OCR anyway. The browser bakes in
+  // EXIF rotation during decode, so sideways photos also come out upright.
+  // Returns null when the image can't be decoded/downscaled (the caller keeps
+  // the original bytes in that case — e.g. HEIC on a browser that can't
+  // render it to a canvas).
+  function normalizeReceiptImage(
+    dataUrl: string,
+  ): Promise<{ base64: string; mimeType: string } | null> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const MAX_EDGE = 1600;
+          const scale = Math.min(
+            1,
+            MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight),
+          );
+          const w = Math.max(1, Math.round(img.naturalWidth * scale));
+          const h = Math.max(1, Math.round(img.naturalHeight * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(null);
+          ctx.drawImage(img, 0, 0, w, h);
+          const out = canvas.toDataURL("image/jpeg", 0.9);
+          resolve({ base64: out.split(",")[1], mimeType: "image/jpeg" });
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }
+
   function addScreenshotsToPlace(placeIndex: number, files: FileList) {
     Array.from(files).forEach((file) => {
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         const dataUrl = reader.result as string;
         const base64 = dataUrl.split(",")[1];
+        // Re-encode to a small 8-bit image for the API call, but keep the
+        // original bytes for the preview so the user sees the true photo.
+        let normalized: { base64: string; mimeType: string } | null = null;
+        try {
+          normalized = await normalizeReceiptImage(dataUrl);
+        } catch {
+          normalized = null;
+        }
         const shot: SplitScreenshot = {
           id: `shot${Date.now()}${Math.random()}`,
-          base64,
-          mimeType: file.type || sniffImageMime(base64) || "image/jpeg",
+          base64: normalized ? normalized.base64 : base64,
+          mimeType: normalized
+            ? normalized.mimeType
+            : file.type || sniffImageMime(base64) || "image/jpeg",
           previewUrl: dataUrl,
         };
         setSplitPlaces((prev) =>
@@ -635,6 +708,8 @@ export default function SplitClient() {
         onConfirmPlacesCount={confirmPlacesCount}
         places={splitPlaces}
         onSetPlaceName={setPlaceName}
+        onSetPlaceTax={setPlaceTax}
+        onSetPlaceTip={setPlaceTip}
         onAddScreenshots={addScreenshotsToPlace}
         onRemoveScreenshot={removeScreenshotFromPlace}
         onRemovePersonFromPlace={removePersonFromPlace}
