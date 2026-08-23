@@ -14,42 +14,13 @@ import { db } from "./firebase";
 import { base, DOC_PATH, emptyVisitedForm, emptyWishForm } from "./constants";
 import { seedBars } from "./seed";
 import { avgWithFood, avgWithoutFood, haversineMeters } from "./scoring";
-import { rankEntries } from "./ranking";
 import { displayDescription } from "./parse";
 import { callGemini } from "./gemini";
 import { fetchPlaces, fetchBarSuggestions, fetchRandomBar } from "./places";
 import { SURPRISE_VIBES } from "./constants";
-import type {
-  Bar,
-  PlaceResult,
-  RankingBattle,
-  VisitedForm,
-  WishForm,
-} from "./types";
+import type { Bar, PlaceResult, VisitedForm, WishForm } from "./types";
 
 export type CrawlStop = PlaceResult & { distanceMeters?: number };
-
-// House rules for the "Fits our group" size: default 6, valid range 1–20.
-// Every read of the stored value (Firestore snapshot, seed) and every write
-// clamps through here, so a stale/out-of-range value can never surface in
-// the UI or leak into filtering.
-const DEFAULT_GROUP_SIZE = 6;
-const clampGroupSize = (n: number) =>
-  Math.min(20, Math.max(1, Math.round(n)));
-
-// Bar ids are client-generated and opaque (only ever compared for equality),
-// but they must be unique across concurrent clients: a bare Date.now() can
-// collide when two users add bars in the same millisecond, and two records
-// sharing an id would make later per-id updates/removals hit BOTH bars — one
-// user's addition could silently overwrite or delete the other's. Appending a
-// random suffix keeps ids collision-resistant even under concurrent adds.
-const newBarId = () =>
-  `b${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-// Ranking battle ids follow the same client-generated, collision-resistant
-// convention as bar ids.
-const newBattleId = () =>
-  `battle${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 export interface PlacesModalState {
   suggestion: PlaceResult;
@@ -70,15 +41,6 @@ interface TourContextValue {
   filteredVisited: Bar[];
   filteredToTry: Bar[];
   fetchingIds: Set<string>;
-
-  // ---- global Bar Battle tiebreaks ----
-  rankingBattles: RankingBattle[];
-  /** Record (or replace) a pairwise tiebreak. Resolves to true on success. */
-  recordBattle: (
-    bar1Id: string,
-    bar2Id: string,
-    winnerId: string,
-  ) => Promise<boolean>;
 
   // ---- leaderboard filters ----
   search: string;
@@ -163,67 +125,17 @@ export function useTour(): TourContextValue {
   return ctx;
 }
 
-/** Legacy leaderboard records predate the mapsLink field (added with the
- *  Places flow), so they load with an empty string and the card's Map action
- *  silently disappears. Backfill a Google Maps search link from the name and
- *  whatever location the record has — the same fallback the app already uses
- *  for new bars that Places returns without a mapsLink. Only fills EMPTY
- *  links; never overwrites an existing one. */
-/** Returns true when a geocoder result's name plausibly matches the bar being
- *  resolved — case/punctuation-insensitive exact match or one name containing
- *  the other. Guards the coordinate backfill against fuzzy matches silently
- *  writing wrong coordinates (e.g. "Angels Share" resolving to an unrelated
- *  business that shares no name words). */
-function nameMatches(resultName: string, barName: string): boolean {
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim()
-      .replace(/\s+/g, " ");
-  const a = norm(resultName);
-  const b = norm(barName);
-  if (!a || !b) return true; // nothing to compare — don't block
-  return a.includes(b) || b.includes(a);
-}
-
-function healMissingMapsLinks(raw: Bar[]): { bars: Bar[]; changed: boolean } {
-  let changed = false;
-  const bars = raw.map((b) => {
-    if (b.mapsLink) return b;
-    changed = true;
-    const location = b.address || b.neighborhood || "New York City";
-    return {
-      ...b,
-      mapsLink: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        `${b.name}, ${location}`,
-      )}`,
-    };
-  });
-  return { bars, changed };
-}
-
 export function TourProvider({ children }: { children: ReactNode }) {
   const [bars, setBars] = useState<Bar[] | null>(null);
   const barsRef = useRef<Bar[] | null>(null);
-  // Global Bar Battle tiebreaks, loaded from the same shared document.
-  const [rankingBattles, setRankingBattles] = useState<RankingBattle[]>([]);
-  const rankingBattlesRef = useRef<RankingBattle[]>([]);
-  useEffect(() => {
-    rankingBattlesRef.current = rankingBattles;
-  }, [rankingBattles]);
   useEffect(() => {
     barsRef.current = bars;
   }, [bars]);
-  // Bars whose coordinate backfill already ran this session (success or
-  // failure) — a bar that failed gets one fresh attempt on the next full page
-  // load, matching the failedIds details-fetch pattern.
-  const coordAttemptedRef = useRef<Set<string>>(new Set());
   // Every bar name shown as a search/surprise result this session, whether or
   // not it was saved — kept out of future results so retrying a search or
   // hitting Surprise Us repeatedly doesn't just replay what you already saw.
   const [seenNames, setSeenNames] = useState<Set<string>>(() => new Set());
-  const [groupSize, setGroupSizeState] = useState(DEFAULT_GROUP_SIZE);
+  const [groupSize, setGroupSizeState] = useState(4);
   const [loading, setLoading] = useState(true);
   const [connError, setConnError] = useState(false);
   const [search, setSearch] = useState("");
@@ -275,58 +187,12 @@ export function TourProvider({ children }: { children: ReactNode }) {
       (snap) => {
         if (snap.exists) {
           const data = snap.data() || {};
-          const healed = healMissingMapsLinks((data.bars as Bar[]) || []);
-          setBars(healed.bars);
-          setRankingBattles((data.rankingBattles as RankingBattle[]) || []);
-          // One-time heal: legacy bars load with an empty mapsLink, which hides
-          // the card's Map action. Write the backfilled links back so the
-          // stored copy is fixed too — idempotent, so the follow-up snapshot
-          // finds nothing to change and the loop stops. Runs inside a
-          // transaction that re-reads the LATEST bars, so the heal can never
-          // clobber an edit another client made after this snapshot arrived.
-          // It only ever fills EMPTY links (existing ones are left untouched),
-          // so the write is idempotent and safe under transaction retry.
-          if (healed.changed) {
-            db.runTransaction(async (tx) => {
-              const snap = await tx.get(docRef);
-              if (!snap.exists) return;
-              const healedFresh = healMissingMapsLinks(
-                (snap.data()?.bars as Bar[]) || [],
-              );
-              if (healedFresh.changed) {
-                tx.update(docRef, { bars: healedFresh.bars });
-              }
-            }).catch(() => {});
-          }
-          const stored = Number(data.groupSize);
-          if (Number.isFinite(stored)) {
-            if (stored >= 1 && stored <= 20) {
-              setGroupSizeState(stored);
-            } else {
-              // Out-of-range legacy value (e.g. 29 from an old version) —
-              // reset to the house default and correct the stored copy so
-              // it doesn't keep winning on every reload.
-              setGroupSizeState(DEFAULT_GROUP_SIZE);
-              docRef
-                .set({ groupSize: DEFAULT_GROUP_SIZE }, { merge: true })
-                .catch(() => {});
-            }
-          }
+          setBars((data.bars as Bar[]) || []);
+          if (data.groupSize) setGroupSizeState(data.groupSize as number);
         } else {
-          // Doc missing — seed it inside a transaction that re-checks
-          // existence, so two clients seeing "missing" can't race each other:
-          // only the first to commit actually creates the document, and a doc
-          // created by someone else moments ago is never overwritten by seeds.
-          db.runTransaction(async (tx) => {
-            const snap = await tx.get(docRef);
-            if (!snap.exists) {
-              tx.set(docRef, {
-                bars: seedBars,
-                groupSize: DEFAULT_GROUP_SIZE,
-                rankingBattles: [],
-              });
-            }
-          }).catch(() => setConnError(true));
+          docRef
+            .set({ bars: seedBars, groupSize: 4 })
+            .catch(() => setConnError(true));
           setBars(seedBars);
         }
         setLoading(false);
@@ -344,34 +210,12 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback(
     (updater: Bar[] | ((prev: Bar[]) => Bar[])): Promise<void> => {
-      // Optimistic local update so the UI responds instantly (unchanged).
       const prevBars = barsRef.current || [];
-      const optimistic =
-        typeof updater === "function" ? updater(prevBars) : updater;
-      barsRef.current = optimistic;
-      setBars(optimistic);
-      // Commit inside a transaction that re-reads the LATEST bars from
-      // Firestore and applies the SAME updater to that fresh state — never to
-      // this client's (possibly stale) copy. A stale array therefore can't
-      // overwrite another client's newer edits: the transaction serializes
-      // concurrent writers, and Firestore auto-retries it if it loses a race.
-      // The updaters are pure functions of their input array (append/filter/
-      // map by id), so re-running them against fresh state is deterministic
-      // and safe under retry.
-      return db
-        .runTransaction(async (tx) => {
-          const snap = await tx.get(docRef);
-          const freshBars = (snap.data()?.bars as Bar[]) || [];
-          const next =
-            typeof updater === "function" ? updater(freshBars) : updater;
-          if (snap.exists) {
-            tx.update(docRef, { bars: next });
-          } else {
-            // Defensive: doc missing (shouldn't happen — onSnapshot seeds it).
-            tx.set(docRef, { bars: next }, { merge: true });
-          }
-          return next;
-        })
+      const next = typeof updater === "function" ? updater(prevBars) : updater;
+      barsRef.current = next;
+      setBars(next);
+      return docRef
+        .set({ bars: next }, { merge: true })
         .then(() => setSaveError(false))
         .catch(() => setSaveError(true));
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -381,9 +225,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const setGroupSize = useCallback(
     (n: number) => {
-      const clamped = clampGroupSize(n);
-      setGroupSizeState(clamped);
-      docRef.set({ groupSize: clamped }, { merge: true }).catch(() => {});
+      setGroupSizeState(n);
+      docRef.set({ groupSize: n }, { merge: true }).catch(() => {});
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [],
@@ -391,190 +234,20 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const updateBar = useCallback(
     (id: string, patch: Partial<Bar>) => {
-      // Optimistic local update so the UI responds instantly (unchanged).
       setBars((prev) => {
         const next = (prev || []).map((b) =>
           b.id === id ? { ...b, ...patch } : b,
         );
         barsRef.current = next;
+        docRef
+          .set({ bars: next }, { merge: true })
+          .catch(() => setSaveError(true));
         return next;
       });
-      // Commit inside a transaction that re-reads the LATEST bars and patches
-      // only this bar against that fresh state, so a concurrent edit from
-      // another client is preserved rather than clobbered by a stale copy.
-      // If the bar was removed concurrently, the map is a no-op on the fresh
-      // array — the write then just persists the current state, never
-      // resurrecting the deleted bar.
-      db.runTransaction(async (tx) => {
-        const snap = await tx.get(docRef);
-        const freshBars = (snap.data()?.bars as Bar[]) || [];
-        const next = freshBars.map((b) =>
-          b.id === id ? { ...b, ...patch } : b,
-        );
-        if (snap.exists) {
-          tx.update(docRef, { bars: next });
-        } else {
-          // Defensive: doc missing (shouldn't happen — onSnapshot seeds it).
-          tx.set(docRef, { bars: next }, { merge: true });
-        }
-        return next;
-      }).catch(() => setSaveError(true));
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [],
   );
-
-  // Record (or replace) a global Bar Battle tiebreak. Runs inside a
-  // transaction that re-reads the LATEST document: it validates both bars
-  // still exist, and dedupes by unordered pair — at most one battle per pair
-  // is ever stored, so a re-battle updates the record instead of creating
-  // duplicate or conflicting entries. The battle only ever affects ORDERING
-  // within a score tie; it never touches `bars` or any score, and the
-  // transaction writes only the `rankingBattles` field, so it can't clobber
-  // a concurrent bar edit (the same field-scoped guarantee as updateBar).
-  // Optimistic local state keeps the leaderboard re-ranking instantly; the
-  // dedup by pair makes re-applying the same battle idempotent under retry.
-  const recordBattle = useCallback(
-    async (bar1Id: string, bar2Id: string, winnerId: string) => {
-      const pairKey = (a: string, b: string) => [a, b].sort().join("|");
-      const mk = (base: RankingBattle[]): RankingBattle[] => {
-        const next = base.filter(
-          (x) => pairKey(x.bar1Id, x.bar2Id) !== pairKey(bar1Id, bar2Id),
-        );
-        next.push({
-          id: newBattleId(),
-          bar1Id,
-          bar2Id,
-          winnerId,
-          type: "score_tiebreak",
-          createdAt: Date.now(),
-        });
-        return next;
-      };
-      setRankingBattles(mk(rankingBattlesRef.current));
-      try {
-        await db.runTransaction(async (tx) => {
-          const snap = await tx.get(docRef);
-          if (!snap.exists) return;
-          const freshBars = (snap.data()?.bars as Bar[]) || [];
-          const freshBattles =
-            (snap.data()?.rankingBattles as RankingBattle[]) || [];
-          if (
-            !freshBars.some((b) => b.id === bar1Id) ||
-            !freshBars.some((b) => b.id === bar2Id)
-          ) {
-            return; // one of the bars was removed — nothing to record
-          }
-          tx.update(docRef, { rankingBattles: mk(freshBattles) });
-        });
-        setSaveError(false);
-        return true;
-      } catch {
-        // Revert the optimistic entry so local state stays in sync with the
-        // server (the battle was not recorded).
-        setRankingBattles((prev) =>
-          prev.filter(
-            (x) => pairKey(x.bar1Id, x.bar2Id) !== pairKey(bar1Id, bar2Id),
-          ),
-        );
-        setSaveError(true);
-        return false;
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    },
-    [],
-  );
-
-  // Legacy bars (seeded or pre-Places) carry no coordinates, which the Tour
-  // Map and crawl planning require. Backfill them through the same Google
-  // Places exact-lookup the add-bar flow uses; when that's unavailable (no
-  // GOOGLE_PLACES_API_KEY, or no result) fall back to OpenStreetMap's free
-  // geocoder bounded to NYC so a fuzzy match can't land in another city.
-  // The found coordinates are persisted once via updateBar, so every device
-  // and the map pick them up without repeating the lookup.
-  const healBarCoordinates = useCallback(
-    async (bar: Bar) => {
-      const results = await fetchPlaces(bar.name, {
-        neighborhood: bar.neighborhood || "",
-        address: bar.address || "",
-        limit: 1,
-        exactLookup: true,
-      });
-      const hit = results.find(
-        (r) =>
-          Number.isFinite(r.latitude) &&
-          Number.isFinite(r.longitude) &&
-          nameMatches(r.name, bar.name),
-      );
-      if (hit) {
-        updateBar(bar.id, {
-          latitude: hit.latitude ?? null,
-          longitude: hit.longitude ?? null,
-          placeId: hit.placeId || bar.placeId,
-          address: hit.address || bar.address,
-          mapsLink: hit.mapsLink || bar.mapsLink,
-        });
-        return;
-      }
-      try {
-        // Nominatim's usage policy allows ~1 request/second — space fallback
-        // lookups out so a batch heal doesn't get throttled.
-        await new Promise((r) => setTimeout(r, 1100));
-        const q = encodeURIComponent(
-          `${bar.name}, ${bar.address || bar.neighborhood || "New York City, NY"}`,
-        );
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&viewbox=-74.26,40.92,-73.70,40.70&bounded=1&accept-language=en`,
-        );
-        const list = (await res.json()) as Array<{
-          lat: string;
-          lon: string;
-          display_name?: string;
-        }>;
-        const first = Array.isArray(list) ? list[0] : null;
-        const resultName = first?.display_name
-          ? first.display_name.split(",")[0].trim()
-          : "";
-        if (
-          first &&
-          Number.isFinite(Number(first.lat)) &&
-          Number.isFinite(Number(first.lon)) &&
-          nameMatches(resultName, bar.name)
-        ) {
-          updateBar(bar.id, {
-            latitude: Number(first.lat),
-            longitude: Number(first.lon),
-          });
-        }
-      } catch {
-        // Leave the bar without coordinates — a future load retries it.
-      }
-    },
-    [updateBar],
-  );
-
-  // Kick off the coordinate backfill once bars load. Idempotent: bars that
-  // already have finite coordinates are skipped, and every bar is attempted
-  // at most once per session, so a successful heal can't loop or re-call.
-  useEffect(() => {
-    if (!bars || connError) return;
-    const missing = bars.filter(
-      (b) =>
-        !(Number.isFinite(b.latitude) && Number.isFinite(b.longitude)) &&
-        !coordAttemptedRef.current.has(b.id),
-    );
-    if (missing.length === 0) return;
-    missing.forEach((b) => coordAttemptedRef.current.add(b.id));
-    // Sequential, not parallel: the Nominatim fallback paces itself at ~1
-    // request/second, so a batch of legacy bars must be resolved one at a
-    // time or the geocoder would throttle the whole heal.
-    (async () => {
-      for (const b of missing) {
-        await healBarCoordinates(b);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bars, connError]);
 
   const runDetailsFetch = useCallback((bar: Bar, forceRefresh?: boolean) => {
     setFetchingIds((s) => new Set(s).add(bar.id));
@@ -657,7 +330,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
           s.name + (s.address ? ", " + s.address : ", New York City"),
         )}`;
       const isEdit = s._wishFormId;
-      const id = isEdit ? s._wishFormId : newBarId();
+      const id = isEdit ? s._wishFormId : `b${Date.now()}`;
       const hasDescription =
         typeof s.description === "string" && s.description.trim().length > 10;
       const record: Bar = {
@@ -979,27 +652,14 @@ export function TourProvider({ children }: { children: ReactNode }) {
         (b.tags || []).some((t) => t.toLowerCase().includes(q))
       );
     });
-    // Ranked bars first: score desc, exact ties broken by global Bar Battle
-    // results (then a deterministic name/id fallback). Disqualified bars
-    // stay at the bottom, ordered among themselves by score — the exact
-    // behavior the old comparator produced.
-    const ranked = list.filter((b) => !b.disqualified);
-    const dq = list.filter((b) => b.disqualified);
-    const ordered = rankEntries(
-      ranked.map((b) => ({
-        item: b,
-        score: foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b),
-      })),
-      rankingBattles,
-    );
-    dq.sort(
-      (a, b) =>
-        (foodMode === "with" ? avgWithFood(b) || 0 : avgWithoutFood(b) || 0) -
-        (foodMode === "with" ? avgWithFood(a) || 0 : avgWithoutFood(a) || 0) ||
-        a.name.localeCompare(b.name),
-    );
-    return [...ordered, ...dq];
-  }, [visited, search, foodMode, rankingBattles]);
+    list.sort((a, b) => {
+      if (!!a.disqualified !== !!b.disqualified) return a.disqualified ? 1 : -1;
+      const av = foodMode === "with" ? avgWithFood(a) : avgWithoutFood(a);
+      const bv = foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
+      return (bv || 0) - (av || 0);
+    });
+    return list;
+  }, [visited, search, foodMode]);
 
   const filteredToTry = useMemo(() => {
     return toTry.filter((b) => {
@@ -1157,7 +817,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
       const cleanNum = (v: string): number | null =>
         v === "" || v === null ? null : Number(v);
       const isNew = !visitedForm.id;
-      const id = visitedForm.id || newBarId();
+      const id = visitedForm.id || `b${Date.now()}`;
       const patch = {
         name: visitedForm.name.trim(),
         status: "visited" as const,
@@ -1200,7 +860,18 @@ export function TourProvider({ children }: { children: ReactNode }) {
                 detailsFetched: false,
               }
             : { ...base, ...patch, id, tags: [] };
-          next = [...prev, record];
+          // If this exact bar is already sitting on the wishlist, drop that
+          // wishlist entry so adding it to the leaderboard doesn't leave a
+          // duplicate behind.
+          const normalizedName = record.name.trim().toLowerCase();
+          const withoutWishlistDuplicate = prev.filter(
+            (b) =>
+              !(
+                b.status === "to-try" &&
+                b.name.trim().toLowerCase() === normalizedName
+              ),
+          );
+          next = [...withoutWishlistDuplicate, record];
         } else {
           next = prev.map((b) => (b.id === id ? { ...b, ...patch } : b));
           record = next.find((b) => b.id === id);
@@ -1308,9 +979,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
     filteredVisited,
     filteredToTry,
     fetchingIds,
-
-    rankingBattles,
-    recordBattle,
 
     search,
     setSearch,
