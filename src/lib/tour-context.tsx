@@ -187,6 +187,31 @@ function nameMatches(resultName: string, barName: string): boolean {
   return a.includes(b) || b.includes(a);
 }
 
+/** Normalized venue-name comparison for wishlist/leaderboard deduping:
+ *  lowercase, punctuation/apostrophe-insensitive, whitespace-collapsed.
+ *  "Angel's Share", "Angel’s Share", and "Angels Share" all compare equal,
+ *  while genuinely different names stay distinct. */
+const normalizeVenueName = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+
+/** True when two records refer to the same venue: same Google placeId, or
+ *  equal normalized names. Keeps the wishlist and leaderboard consistent —
+ *  adding a bar to the leaderboard removes its wishlist twin in the same
+ *  write (see saveVisitedForm). */
+function sameVenue(
+  a: { name: string; placeId?: string | null },
+  b: { name: string; placeId?: string | null },
+): boolean {
+  if (a.placeId && b.placeId && a.placeId === b.placeId) return true;
+  const na = normalizeVenueName(a.name);
+  const nb = normalizeVenueName(b.name);
+  return na.length > 0 && na === nb;
+}
+
 function healMissingMapsLinks(raw: Bar[]): { bars: Bar[]; changed: boolean } {
   let changed = false;
   const bars = raw.map((b) => {
@@ -576,34 +601,135 @@ export function TourProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bars, connError]);
 
-  const runDetailsFetch = useCallback((bar: Bar, forceRefresh?: boolean) => {
-    setFetchingIds((s) => new Set(s).add(bar.id));
-    const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || bar.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
-    callGemini(prompt, bar.id, !!forceRefresh).then((data) => {
-      // No client-side write here on purpose: the API route now persists this
-      // bar's details itself inside a Firestore transaction. Writing it again
-      // from here, based on this client's local (possibly a beat stale) copy
-      // of `bars`, would risk silently reverting someone else's concurrent
-      // edit — the live onSnapshot listener will pick up the server's write.
-      if (!data) setFailedIds((s) => new Set(s).add(bar.id));
+  // ---- details / vibe-tag enrichment (bounded queue + retry) ----
+  // Details come from the Gemini route, which persists the result itself
+  // inside a Firestore transaction (the client never writes them — the live
+  // onSnapshot listener surfaces the server's write). Enrichment used to fire
+  // one parallel request per un-enriched bar the moment bars loaded: a burst
+  // of bars could trip the provider's rate limit, and a single failure (429,
+  // 5xx, 10s timeout) permanently marked the bar as failed for the whole
+  // session — details and vibe tags then stayed missing until a page refresh
+  // re-ran the pass with a clean `failedIds`. The queue below caps how many
+  // requests are in flight at once and retries transient failures with
+  // backoff a bounded number of times before a bar is written off for the
+  // session, so temporary provider hiccups no longer leave bars permanently
+  // un-enriched.
+  const DETAIL_FETCH_CONCURRENCY = 2;
+  const MAX_DETAIL_ATTEMPTS = 4;
+  const DETAIL_RETRY_DELAYS = [5000, 15000, 30000];
+  const detailsQueueRef = useRef<
+    Array<{ bar: Bar; attempt: number; forceRefresh: boolean }>
+  >([]);
+  const detailsQueuedIdsRef = useRef<Set<string>>(new Set());
+  const detailsInFlightRef = useRef(0);
+  const failedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    failedIdsRef.current = failedIds;
+  }, [failedIds]);
+
+  // Pulls the next bars off the queue while under the concurrency cap. Skips
+  // entries whose bar was removed, already enriched by another client, or
+  // written off since they were queued.
+  const pumpDetailsQueue = useCallback(() => {
+    while (
+      detailsInFlightRef.current < DETAIL_FETCH_CONCURRENCY &&
+      detailsQueueRef.current.length > 0
+    ) {
+      const entry = detailsQueueRef.current.shift();
+      if (!entry) break;
+      detailsQueuedIdsRef.current.delete(entry.bar.id);
+      const current = barsRef.current?.find((b) => b.id === entry.bar.id);
+      if (
+        !current ||
+        failedIdsRef.current.has(entry.bar.id) ||
+        (!entry.forceRefresh && current.detailsFetched)
+      ) {
+        continue;
+      }
+      detailsInFlightRef.current += 1;
+      void fetchBarDetails(current, entry.forceRefresh, entry.attempt).finally(
+        () => {
+          detailsInFlightRef.current -= 1;
+          pumpDetailsQueue();
+        },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // One enrichment attempt for a bar. On success the bar's details arrive via
+  // the Firestore snapshot; on failure, retry with backoff (the retry
+  // re-checks the latest bars state, so a bar enriched by another client in
+  // the meantime is skipped) before the bar is written off for the session.
+  const fetchBarDetails = useCallback(
+    async (bar: Bar, forceRefresh: boolean, attempt: number): Promise<void> => {
+      setFetchingIds((s) => new Set(s).add(bar.id));
+      const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || bar.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
+      const data = await callGemini(prompt, bar.id, forceRefresh);
       setFetchingIds((s) => {
         const n = new Set(s);
         n.delete(bar.id);
         return n;
       });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      if (data) return;
+      if (attempt >= MAX_DETAIL_ATTEMPTS) {
+        setFailedIds((s) => new Set(s).add(bar.id));
+        return;
+      }
+      const delayMs = DETAIL_RETRY_DELAYS[attempt - 1] ?? 30000;
+      // Reserve the bar while it waits so the auto-fetch pass (which re-runs
+      // on every bars change) can't re-enqueue it as a fresh attempt and
+      // defeat the backoff. The reservation is released when the retry fires.
+      detailsQueuedIdsRef.current.add(bar.id);
+      setTimeout(() => {
+        const current = barsRef.current?.find((b) => b.id === bar.id);
+        if (!current || failedIdsRef.current.has(bar.id)) return;
+        detailsQueuedIdsRef.current.delete(bar.id);
+        detailsQueueRef.current.push({
+          bar: current,
+          attempt: attempt + 1,
+          forceRefresh,
+        });
+        pumpDetailsQueue();
+      }, delayMs);
+    },
+    [pumpDetailsQueue],
+  );
+
+  // Public entry: queue a bar for enrichment (used by the auto-fetch pass
+  // below and by callers that just added a bar — addSuggestionToWishlist /
+  // saveVisitedForm). Goes through the same bounded queue so the concurrency
+  // cap and retry logic apply everywhere.
+  const runDetailsFetch = useCallback(
+    (bar: Bar, forceRefresh?: boolean) => {
+      if (
+        failedIdsRef.current.has(bar.id) ||
+        detailsQueuedIdsRef.current.has(bar.id)
+      )
+        return;
+      if (!forceRefresh && bar.detailsFetched) return;
+      detailsQueuedIdsRef.current.add(bar.id);
+      detailsQueueRef.current.push({
+        bar,
+        attempt: 1,
+        forceRefresh: !!forceRefresh,
+      });
+      pumpDetailsQueue();
+    },
+    [pumpDetailsQueue],
+  );
 
   useEffect(() => {
     if (!bars) return;
     bars.forEach((bar) => {
       if (
-        !bar.detailsFetched &&
-        !fetchingIds.has(bar.id) &&
-        !failedIds.has(bar.id)
+        bar.detailsFetched ||
+        failedIds.has(bar.id) ||
+        fetchingIds.has(bar.id) ||
+        detailsQueuedIdsRef.current.has(bar.id)
       )
-        runDetailsFetch(bar);
+        return;
+      runDetailsFetch(bar);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bars]);
@@ -1182,7 +1308,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
                     : ", New York City"),
               )}`
             : "";
-          record = visitedSuggestion
+          const baseRecord: Bar = visitedSuggestion
             ? {
                 ...base,
                 ...patch,
@@ -1200,7 +1326,49 @@ export function TourProvider({ children }: { children: ReactNode }) {
                 detailsFetched: false,
               }
             : { ...base, ...patch, id, tags: [] };
-          next = [...prev, record];
+          // Wishlist consistency, handled in ONE place for every way a bar can
+          // reach the leaderboard (manual add, Discover "I visited", crawl "I
+          // visited"): if the same venue already sits on the wishlist, this
+          // same atomic write removes it from the wishlist. Matching runs
+          // against the FRESH array the persist transaction read (never this
+          // client's possibly-stale copy), by placeId or normalized name, so
+          // "Angel's Share" vs "Angels Share" still match and a concurrent
+          // wishlist edit is never clobbered. The wishlist record's enriched
+          // details are carried into the new leaderboard entry so nothing is
+          // lost. Idempotent: no match → the write is a plain append, exactly
+          // as before.
+          const wishlistMatch = prev.find(
+            (b) => b.status === "to-try" && sameVenue(b, baseRecord),
+          );
+          const finalRecord: Bar = wishlistMatch
+            ? {
+                ...baseRecord,
+                neighborhood:
+                  baseRecord.neighborhood || wishlistMatch.neighborhood || "",
+                description:
+                  baseRecord.description || wishlistMatch.description || "",
+                tags: baseRecord.tags.length
+                  ? baseRecord.tags
+                  : wishlistMatch.tags,
+                happyHour:
+                  baseRecord.happyHour || wishlistMatch.happyHour || "",
+                capacity:
+                  baseRecord.capacity ?? wishlistMatch.capacity ?? null,
+                address: baseRecord.address || wishlistMatch.address || "",
+                latitude:
+                  baseRecord.latitude ?? wishlistMatch.latitude ?? null,
+                longitude:
+                  baseRecord.longitude ?? wishlistMatch.longitude ?? null,
+                placeId: baseRecord.placeId || wishlistMatch.placeId || null,
+                mapsLink: baseRecord.mapsLink || wishlistMatch.mapsLink || "",
+                detailsFetched:
+                  baseRecord.detailsFetched || wishlistMatch.detailsFetched,
+              }
+            : baseRecord;
+          record = finalRecord;
+          next = [...prev, finalRecord].filter(
+            (b) => !(b.status === "to-try" && sameVenue(b, finalRecord)),
+          );
         } else {
           next = prev.map((b) => (b.id === id ? { ...b, ...patch } : b));
           record = next.find((b) => b.id === id);
