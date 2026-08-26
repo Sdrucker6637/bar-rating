@@ -21,6 +21,7 @@ import {
   buildEnrichmentPrompt,
   DEFERRED_RETRY_DELAY,
   DETAIL_FETCH_CONCURRENCY,
+  isSearchEnrichmentOk,
   isUsefulDescription,
   needsEnrichment,
   nextEnrichmentStep,
@@ -941,58 +942,73 @@ export function TourProvider({ children }: { children: ReactNode }) {
     [persist, runDetailsFetch],
   );
 
+  // ---- search/surprise result enrichment (recoverable retry, no Firestore) ----
   // Fills in a search/surprise result's description, tags, happyHour, and
   // neighborhood in place via Gemini, once its existence is already confirmed
   // by Places. Ephemeral — nothing here is persisted unless the user adds the
-  // bar, at which point the same fields carry over via addSuggestionToWishlist.
-  //
-  // Deliberately called WITHOUT a barId: the API route only does its Firestore
-  // bar lookup/caching when barId is present, and 404s if that id isn't an
-  // existing saved bar — which a fresh search result never is. Omitting barId
-  // routes it through the plain "generate and return, no Firestore" path.
-  const enrichSearchResult = useCallback((result: PlaceResult) => {
-    setEnrichingNames((s) => new Set(s).add(result.name));
-    const prompt = `You are a NYC bar description writer.\n\nThe bar "${result.name}" located at "${result.address || result.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY a single JSON object (not an array):\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
-    callGemini(prompt, null, false).then((data) => {
-      // Defensive: the server returns an array for multi-suggestion calls, so
-      // unwrap just in case Gemini ever ignores the "single object" instruction.
-      const info = (Array.isArray(data) ? data[0] : data) as
-        | (PlaceResult & { description?: string })
-        | undefined;
-      if (info) {
-        setSearchResults((prev) =>
-          prev.map((r) =>
-            r.name === result.name
-              ? {
-                  ...r,
-                  description: info.description || r.description,
-                  tags: info.tags && info.tags.length ? info.tags : r.tags,
-                  happyHour: info.happyHour || r.happyHour,
-                  neighborhood: info.neighborhood || r.neighborhood,
-                }
-              : r,
-          ),
-        );
-      }
-      setEnrichingNames((s) => {
-        const n = new Set(s);
-        n.delete(result.name);
-        return n;
-      });
-    });
+  // bar, at which point the same fields carry over via addSuggestionToWishlist
+  // (and the saved-bar pipeline takes over if the description still isn't
+  // usable). Deliberately called WITHOUT a barId: the API route only does its
+  // Firestore lookup/caching when barId is present. The route 200s empty
+  // Gemini output as a valid-looking all-empty object, so a truthy response is
+  // NOT success — only a usable description is (isSearchEnrichmentOk).
+  // Failures retry with the same recoverable schedule as saved bars (standard
+  // prompt → fallback prompt → bounded stop), keeping the card in "finding
+  // details…" the whole time so a temporarily empty result never looks
+  // completed with a blank card. Results are ephemeral, so the retry stops
+  // after the fallback phase (no 10-minute deferred polling for a card the
+  // user will likely have moved past), and a new search invalidates any
+  // pending timers via the epoch.
+  const searchResultsRef = useRef<PlaceResult[]>([]);
+  useEffect(() => {
+    searchResultsRef.current = searchResults;
+  }, [searchResults]);
+  // Names currently inside a search-result enrichment cycle (in flight or
+  // waiting on a retry timer) — prevents double-enqueueing the same result.
+  const searchEnrichReservedRef = useRef<Set<string>>(new Set());
+  // Bumped at the start of every new search: retry timers capture the epoch
+  // they were scheduled under and abort if it changed, so a stale timer can
+  // never enrich a result from a later search.
+  const searchEpochRef = useRef(0);
+
+  // Called when a fresh search replaces the results — invalidates every
+  // pending enrichment cycle (timers abort via the epoch check) and clears
+  // the "finding details…" UI state for the old results.
+  const resetSearchEnrichment = useCallback(() => {
+    searchEpochRef.current += 1;
+    searchEnrichReservedRef.current.clear();
+    setEnrichingNames(new Set());
   }, []);
 
-  const enrichCrawlStop = useCallback((stop: CrawlStop) => {
-    setCrawlEnrichingNames((s) => new Set(s).add(stop.name));
-    const prompt = `You are a NYC bar description writer.\n\nThe bar "${stop.name}" located at "${stop.address || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY a single JSON object (not an array):\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
-    callGemini(prompt, null, false).then((data) => {
+  // One enrichment attempt for a search result. On success the description is
+  // merged into the in-memory result; on failure (empty/short/malformed
+  // response or a network error) the next step of the shared recoverable
+  // schedule is scheduled with a little jitter so several results that fail
+  // together don't retry as a synchronized herd. Attempt numbers and the
+  // fallback flag travel through the closure (never stored in state), and
+  // everything read inside is a ref or a module import, so this callback
+  // stays referentially stable and runSearch et al. keep their memoization.
+  const runSearchEnrichmentAttempt = useCallback(
+    async (
+      result: PlaceResult,
+      usingFallback: boolean,
+      attempt: number,
+      epoch: number,
+    ): Promise<void> => {
+      const name = result.name;
+      if (epoch !== searchEpochRef.current) return; // superseded by a new search
+      const prompt = buildEnrichmentPrompt(result, usingFallback);
+      const data = await callGemini(prompt, null, false).catch(() => null);
+      if (epoch !== searchEpochRef.current) return;
       const info = (Array.isArray(data) ? data[0] : data) as
         | (PlaceResult & { description?: string })
         | undefined;
-      if (info) {
-        setCrawlStops((prev) =>
+      // isSearchEnrichmentOk already implies info is non-null, but it's a plain
+      // boolean function, so TS needs the explicit `info &&` to narrow.
+      if (info && isSearchEnrichmentOk(info)) {
+        setSearchResults((prev) =>
           prev.map((r) =>
-            r.name === stop.name
+            r.name === name
               ? {
                   ...r,
                   description: info.description || r.description,
@@ -1003,14 +1019,258 @@ export function TourProvider({ children }: { children: ReactNode }) {
               : r,
           ),
         );
+        searchEnrichReservedRef.current.delete(name);
+        setEnrichingNames((s) => {
+          const n = new Set(s);
+          n.delete(name);
+          return n;
+        });
+        return;
       }
-      setCrawlEnrichingNames((s) => {
-        const n = new Set(s);
-        n.delete(stop.name);
-        return n;
-      });
-    });
+      // Failed (empty/short/malformed description or a network error). Plan
+      // the next retry — standard → fallback → bounded stop.
+      const step = nextEnrichmentStep(attempt);
+      if (step.deferred) {
+        // Search results are ephemeral: after the full bounded schedule the
+        // result keeps its honest state (address shown, no fake completion)
+        // instead of polling forever for a card the user will likely have
+        // moved past.
+        searchEnrichReservedRef.current.delete(name);
+        setEnrichingNames((s) => {
+          const n = new Set(s);
+          n.delete(name);
+          return n;
+        });
+        return;
+      }
+      // ±500ms jitter so concurrently-failing results don't retry in lockstep.
+      const jitter = Math.floor(Math.random() * 1000) - 500;
+      const waitMs = (step.delayMs ?? 60000) + jitter;
+      setTimeout(() => {
+        if (epoch !== searchEpochRef.current) return;
+        const current = searchResultsRef.current.find((r) => r.name === name);
+        if (!current) {
+          // Result removed (added to wishlist, or replaced by a new search).
+          searchEnrichReservedRef.current.delete(name);
+          setEnrichingNames((s) => {
+            const n = new Set(s);
+            n.delete(name);
+            return n;
+          });
+          return;
+        }
+        if (isSearchEnrichmentOk(current)) {
+          // Enriched in the meantime — done.
+          searchEnrichReservedRef.current.delete(name);
+          setEnrichingNames((s) => {
+            const n = new Set(s);
+            n.delete(name);
+            return n;
+          });
+          return;
+        }
+        void runSearchEnrichmentAttempt(
+          current,
+          step.usingFallback,
+          step.attempt,
+          epoch,
+        );
+      }, waitMs);
+    },
+    [],
+  );
+
+  const enrichSearchResult = useCallback(
+    (result: PlaceResult) => {
+      const name = result.name;
+      if (searchEnrichReservedRef.current.has(name)) return;
+      searchEnrichReservedRef.current.add(name);
+      setEnrichingNames((s) => new Set(s).add(name));
+      void runSearchEnrichmentAttempt(result, false, 1, searchEpochRef.current);
+    },
+    [runSearchEnrichmentAttempt],
+  );
+
+  // ---- crawl-stop enrichment (recoverable retry, no Firestore) ----
+  // Crawl stops are enriched in place via Gemini like search results —
+  // ephemeral, never persisted unless the user adds the stop. Same strict
+  // success gate (isSearchEnrichmentOk — a truthy object is NOT success),
+  // same recoverable schedule (standard prompt → fallback prompt → bounded
+  // stop), same reservation ref for dedup, and a crawl epoch so a stale
+  // retry timer from a previous crawl plan can never enrich a stop from a
+  // newer one. Stops are matched by name: runCrawlPlan dedupes names within
+  // a plan (usedNames) and replaceStop picks a replacement guaranteed
+  // distinct from every current stop name, so a name identifies one stop at
+  // a time.
+  const crawlStopsRef = useRef<CrawlStop[]>([]);
+  useEffect(() => {
+    crawlStopsRef.current = crawlStops;
+  }, [crawlStops]);
+  // Names inside a crawl-stop enrichment cycle (in flight or waiting on a
+  // retry timer) — prevents double-enqueueing the same stop.
+  const crawlEnrichReservedRef = useRef<Set<string>>(new Set());
+  // Bumped whenever a NEW crawl plan replaces every stop (runCrawlPlan):
+  // retry timers capture the epoch they were scheduled under and abort if it
+  // changed, so a stale timer can never touch a stop from a later plan.
+  // replaceStop / removeCrawlStop deliberately do NOT bump it — a
+  // replaced/removed stop's name vanishes from crawlStops, so its pending
+  // timers abort via the name-miss path instead.
+  const crawlEpochRef = useRef(0);
+
+  // Called when a fresh crawl plan replaces every stop — invalidates all
+  // pending enrichment cycles (timers abort via the epoch check) and clears
+  // the "finding details…" UI state for the old stops.
+  const resetCrawlEnrichment = useCallback(() => {
+    crawlEpochRef.current += 1;
+    crawlEnrichReservedRef.current.clear();
+    setCrawlEnrichingNames(new Set());
   }, []);
+
+  // One enrichment attempt for a crawl stop — mirrors
+  // runSearchEnrichmentAttempt exactly (same gate, same schedule, same
+  // reservation lifecycle). On success the description is merged into the
+  // in-memory stop; on failure (empty/short/malformed response or a network
+  // error) the next step of the shared recoverable schedule is scheduled
+  // with a little jitter so several stops that fail together don't retry in
+  // lockstep. Attempt numbers and the fallback flag travel through the
+  // closure (never stored in state), and everything read inside is a ref or
+  // a module import, so this callback stays referentially stable.
+  const runCrawlEnrichmentAttempt = useCallback(
+    async (
+      stop: CrawlStop,
+      usingFallback: boolean,
+      attempt: number,
+      epoch: number,
+    ): Promise<void> => {
+      const name = stop.name;
+      if (epoch !== crawlEpochRef.current) return; // superseded by a new plan
+      const prompt = buildEnrichmentPrompt(stop, usingFallback);
+      const data = await callGemini(prompt, null, false).catch(() => null);
+      if (epoch !== crawlEpochRef.current) return;
+      const info = (Array.isArray(data) ? data[0] : data) as
+        | (CrawlStop & { description?: string })
+        | undefined;
+      // isSearchEnrichmentOk already implies info is non-null, but it's a plain
+      // boolean function, so TS needs the explicit `info &&` to narrow.
+      if (info && isSearchEnrichmentOk(info)) {
+        setCrawlStops((prev) =>
+          prev.map((r) =>
+            r.name === name
+              ? {
+                  ...r,
+                  description: info.description || r.description,
+                  tags: info.tags && info.tags.length ? info.tags : r.tags,
+                  happyHour: info.happyHour || r.happyHour,
+                  neighborhood: info.neighborhood || r.neighborhood,
+                }
+              : r,
+          ),
+        );
+        crawlEnrichReservedRef.current.delete(name);
+        setCrawlEnrichingNames((s) => {
+          const n = new Set(s);
+          n.delete(name);
+          return n;
+        });
+        return;
+      }
+      // Failed (empty/short/malformed description or a network error). Plan
+      // the next retry — standard → fallback → bounded stop.
+      const step = nextEnrichmentStep(attempt);
+      if (step.deferred) {
+        // Crawl stops are ephemeral: after the full bounded schedule the
+        // stop keeps its honest state (address shown, no fake completion)
+        // instead of polling forever for a stop the user will likely have
+        // replaced or closed.
+        crawlEnrichReservedRef.current.delete(name);
+        setCrawlEnrichingNames((s) => {
+          const n = new Set(s);
+          n.delete(name);
+          return n;
+        });
+        return;
+      }
+      // ±500ms jitter so concurrently-failing stops don't retry in lockstep.
+      const jitter = Math.floor(Math.random() * 1000) - 500;
+      const waitMs = (step.delayMs ?? 60000) + jitter;
+      setTimeout(() => {
+        // Epoch changed (a new plan replaced every stop) — resetCrawlEnrichment
+        // already cleared the reservations and UI state at bump time, so there
+        // is nothing to release on this abort path.
+        if (epoch !== crawlEpochRef.current) return;
+        const current = crawlStopsRef.current.find((r) => r.name === name);
+        if (!current) {
+          // Stop removed (replaced, removed, or a new plan) — nothing to retry.
+          crawlEnrichReservedRef.current.delete(name);
+          setCrawlEnrichingNames((s) => {
+            const n = new Set(s);
+            n.delete(name);
+            return n;
+          });
+          return;
+        }
+        if (isSearchEnrichmentOk(current)) {
+          // Enriched in the meantime — done.
+          crawlEnrichReservedRef.current.delete(name);
+          setCrawlEnrichingNames((s) => {
+            const n = new Set(s);
+            n.delete(name);
+            return n;
+          });
+          return;
+        }
+        void runCrawlEnrichmentAttempt(
+          current,
+          step.usingFallback,
+          step.attempt,
+          epoch,
+        );
+      }, waitMs);
+    },
+    [],
+  );
+
+  const enrichCrawlStop = useCallback(
+    (stop: CrawlStop) => {
+      const name = stop.name;
+      // ---- saved-bar reuse: if this venue is already in the shared bars list
+      // with a usable description, seed the stop and skip Gemini entirely.
+      // placeId is the strongest identity signal; sameVenue handles normalized
+      // name equality (punctuation/apostrophe/case).  If a saved bar matches
+      // but has no usable description, we still fall through to Gemini.
+      const saved = (barsRef.current || []).find(
+        (b) =>
+          (stop.placeId && b.placeId && stop.placeId === b.placeId) ||
+          sameVenue(b, stop),
+      );
+      if (saved && isUsefulDescription(saved.description)) {
+        setCrawlStops((prev) =>
+          prev.map((r) =>
+            r.name === name
+              ? {
+                  ...r,
+                  description: saved.description || r.description,
+                  tags: saved.tags && saved.tags.length ? saved.tags : r.tags,
+                  happyHour: saved.happyHour || r.happyHour,
+                  neighborhood: saved.neighborhood || r.neighborhood,
+                  address: saved.address || r.address,
+                  latitude: saved.latitude ?? r.latitude,
+                  longitude: saved.longitude ?? r.longitude,
+                  mapsLink: saved.mapsLink || r.mapsLink,
+                }
+              : r,
+          ),
+        );
+        return;
+      }
+      // ---- fall through to Gemini enrichment ----
+      if (crawlEnrichReservedRef.current.has(name)) return;
+      crawlEnrichReservedRef.current.add(name);
+      setCrawlEnrichingNames((s) => new Set(s).add(name));
+      void runCrawlEnrichmentAttempt(stop, false, 1, crawlEpochRef.current);
+    },
+    [runCrawlEnrichmentAttempt],
+  );
 
   const replaceStop = useCallback(
     async (index: number) => {
@@ -1157,9 +1417,13 @@ export function TourProvider({ children }: { children: ReactNode }) {
             } within a comfortable walk — try again for a different route.`
           : null,
       );
+      // A fresh plan replaces every stop — invalidate any pending enrichment
+      // timers from a previous plan so they can't touch the new stops, then
+      // enqueue the new ones.
+      resetCrawlEnrichment();
       stops.forEach((s) => enrichCrawlStop(s));
     },
-    [crawlCount, bars, seenNames, enrichCrawlStop],
+    [crawlCount, bars, seenNames, enrichCrawlStop, resetCrawlEnrichment],
   );
 
   const confirmPlaceSelection = useCallback(
@@ -1284,6 +1548,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [crawlStartInput, bars, seenNames, startPlacesLookup, runCrawlPlan]);
 
   const runSearch = useCallback(async () => {
+    resetSearchEnrichment();
     setSearchResults([]);
     setSearching(true);
     setSearchDone(false);
@@ -1320,9 +1585,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
     exploreMode,
     fitsGroupOnly,
     enrichSearchResult,
+    resetSearchEnrichment,
   ]);
 
   const runRandomSearch = useCallback(async () => {
+    resetSearchEnrichment();
     setSearchResults([]);
     setSearching(true);
     setSearchDone(false);
@@ -1342,7 +1609,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
       setSeenNames((prev) => new Set([...prev, pick.name]));
       enrichSearchResult(pick);
     }
-  }, [bars, seenNames, groupSize, ballerMode, exploreMode, enrichSearchResult]);
+  }, [
+    bars,
+    seenNames,
+    groupSize,
+    ballerMode,
+    exploreMode,
+    enrichSearchResult,
+    resetSearchEnrichment,
+  ]);
 
   const runNearbySearch = useCallback(async () => {
     if (!navigator.geolocation) {
@@ -1352,6 +1627,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
+        resetSearchEnrichment();
         setSearchResults([]);
         setSearching(true);
         setSearchDone(false);
@@ -1385,7 +1661,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
         alert("Couldn't get your location.");
       },
     );
-  }, [bars, seenNames, enrichSearchResult]);
+  }, [bars, seenNames, enrichSearchResult, resetSearchEnrichment]);
 
   const rankSuggestion = useCallback((s: PlaceResult) => {
     setVisitedSuggestion(s);

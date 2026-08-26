@@ -1,4 +1,18 @@
+import { isUsefulDescription } from "./enrichment";
+
 const geminiCache: Record<string, unknown> = {};
+
+/** The route 200s empty Gemini output as a valid-looking all-empty object
+ *  (search/suggestion calls have no barId, so they skip the route's 422
+ *  usable-description gate). Caching that empty object would poison retries:
+ *  a re-queued attempt with the same prompt would hit the cache and "fail"
+ *  instantly without ever calling Gemini again. Only cache results that
+ *  actually carry a usable description. */
+function isCacheableResult(value: unknown): boolean {
+  if (!value || Array.isArray(value)) return false;
+  const single = value as { description?: unknown };
+  return isUsefulDescription(single.description);
+}
 
 export async function callGemini(
   prompt: string,
@@ -43,6 +57,8 @@ export async function callGemini(
   if (!data || !data.result) {
     console.warn(`[gemini] no result field for barId=${barId || "(none)"}`, data);
   }
-  if (data?.result) geminiCache[key] = data.result;
+  if (data?.result && isCacheableResult(data.result)) {
+    geminiCache[key] = data.result;
+  }
   return data?.result || null;
 }

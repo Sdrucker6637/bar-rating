@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { isUsefulDescription } from "../../../lib/enrichment";
+import {
+  isSearchEnrichmentOk,
+  isUsefulDescription,
+} from "../../../lib/enrichment";
 
 // Firebase Admin is initialized lazily so this module can be imported during
 // `next build` (where env vars are absent) without throwing. At request time
@@ -208,12 +211,37 @@ export async function POST(req: Request) {
 
     const parsed = safeParse(rawText);
 
-    // Search / random-pick calls (no barId): return suggestions array or single object
+    // Search / random-pick calls (no barId): return suggestions array or single
+    // object. Empty Gemini output must NOT come back as a 200 all-empty object
+    // — that is what let the client mistake a blank card for a completed
+    // enrichment. The same usable-description gate the client uses
+    // (isSearchEnrichmentOk) is enforced here, so empty/malformed output is a
+    // real 422 everywhere instead of a truthy-but-empty 200.
     if (!barId) {
-      const result = Array.isArray(parsed)
-        ? parsed.map(normalizeSuggestion).filter((b) => b && b.name)
-        : normalizeSuggestion(parsed);
-      return NextResponse.json({ result });
+      if (Array.isArray(parsed)) {
+        const suggestions = parsed
+          .map(normalizeSuggestion)
+          .filter((b) => b && isSearchEnrichmentOk(b));
+        if (suggestions.length === 0) {
+          return NextResponse.json(
+            {
+              error: "No usable bar description returned. Please try again.",
+            },
+            { status: 422 },
+          );
+        }
+        return NextResponse.json({ result: suggestions });
+      }
+      const suggestion = normalizeSuggestion(parsed);
+      if (!isSearchEnrichmentOk(suggestion)) {
+        return NextResponse.json(
+          {
+            error: "No usable bar description returned. Please try again.",
+          },
+          { status: 422 },
+        );
+      }
+      return NextResponse.json({ result: suggestion });
     }
 
     // Bar-details call for a specific verified bar

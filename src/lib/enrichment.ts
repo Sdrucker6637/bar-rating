@@ -35,6 +35,22 @@ export function needsEnrichment(bar: {
   return !isUsefulDescription(bar.description) || !bar.detailsFetched;
 }
 
+/** Whether a search/suggestion enrichment result counts as success. The
+ *  Gemini route 200s empty Gemini output as a valid-looking all-empty object
+ *  (normalizeSuggestion fills every field with a default), so a truthy object
+ *  must NEVER be treated as enriched — only a real, usable description is
+ *  success. This is the gate enrichSearchResult uses before merging anything
+ *  into a search result or clearing its "finding details…" state. */
+export function isSearchEnrichmentOk(
+  info: { description?: unknown } | undefined | null,
+): boolean {
+  return (
+    !!info &&
+    typeof info.description === "string" &&
+    isUsefulDescription(info.description)
+  );
+}
+
 /** Max requests in flight at once — the bounded queue cap. */
 export const DETAIL_FETCH_CONCURRENCY = 2;
 
@@ -74,10 +90,6 @@ export interface EnrichmentStep {
   deferred: boolean;
 }
 
-/** Given the attempt number that JUST failed, decide the next step. Never a
- *  dead end: attempts 1-4 retry the standard prompt, 5-7 retry the fallback
- *  prompt, and anything after that defers (re-attemptable later, starting a
- *  fresh fallback phase). */
 /** Given the attempt number that JUST failed, decide the next step. Never a
  *  dead end: attempts 1-4 retry the standard prompt (5s/15s/30s/60s), the
  *  fallback prompt takes over at attempt 5 (2m/5m/10m waits), and the last
@@ -140,7 +152,11 @@ export function buildEnrichmentPrompt(
   const location = bar.address || bar.neighborhood || "New York City";
   const head = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${location}" has already been verified as a real, currently open business via Google Places.\n\n`;
   if (usingFallback) {
-    return `${head}Using only what you know about this specific venue, return ONLY JSON:\n\n{"description":"2-3 sentence description","tags":["3-5 lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood"}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.`;
+    // The fallback prompt explicitly requires a usable description: the
+    // client gates on isUsefulDescription (>35 chars), so an empty/null/short
+    // or all-empty response is treated as a failure and retried — the prompt
+    // must not hand the model an easy empty-string escape hatch.
+    return `${head}Using only what you know about this specific venue, write a REAL description and return ONLY JSON:\n\n{"description":"a genuine 2-3 sentence write-up (at least 40 characters) of the venue's vibe, drink style, and notable characteristics","tags":["3-5 lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood"}\n\nRules:\n- Do NOT invent or rename the business.\n- The description MUST be a real, informative write-up of 40+ characters — never empty, null, or a one-word stub.\n- If you have little information, keep the description brief but real — describe the venue's style and atmosphere based only on what you actually know, never returning an empty string, null, or a stub.`;
   }
   return `${head}Using only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
 }
