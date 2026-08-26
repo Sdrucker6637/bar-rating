@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { isUsefulDescription } from "../../../lib/enrichment";
 
 // Firebase Admin is initialized lazily so this module can be imported during
 // `next build` (where env vars are absent) without throwing. At request time
@@ -62,14 +63,6 @@ function safeParse(text: string): unknown {
     }
   }
   return null;
-}
-
-function isUsefulDescription(value: unknown): boolean {
-  return (
-    typeof value === "string" &&
-    value.trim().length > 35 &&
-    !/^\s*[\[]/.test(value)
-  );
 }
 
 function normalizeDetails(parsed: unknown): Details | null {

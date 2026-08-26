@@ -17,6 +17,15 @@ import { avgWithFood, avgWithoutFood, haversineMeters } from "./scoring";
 import { rankEntries } from "./ranking";
 import { displayDescription } from "./parse";
 import { callGemini } from "./gemini";
+import {
+  buildEnrichmentPrompt,
+  DEFERRED_RETRY_DELAY,
+  DETAIL_FETCH_CONCURRENCY,
+  isUsefulDescription,
+  needsEnrichment,
+  nextEnrichmentStep,
+  shouldQueueBar,
+} from "./enrichment";
 import { fetchPlaces, fetchBarSuggestions, fetchRandomBar } from "./places";
 import { SURPRISE_VIBES } from "./constants";
 import type {
@@ -70,6 +79,12 @@ interface TourContextValue {
   filteredVisited: Bar[];
   filteredToTry: Bar[];
   fetchingIds: Set<string>;
+  /** Saved bars queued or in flight for Gemini detail enrichment — their
+   *  cards show "finding details…". */
+  detailsPendingIds: Set<string>;
+  /** Saved bars waiting on a backoff/deferred retry after a failed
+   *  enrichment attempt — their cards show a subtle "will retry" status. */
+  detailsDeferredIds: Set<string>;
 
   // ---- global Bar Battle tiebreaks ----
   rankingBattles: RankingBattle[];
@@ -242,7 +257,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [bars]);
   // Bars whose coordinate backfill already ran this session (success or
   // failure) — a bar that failed gets one fresh attempt on the next full page
-  // load, matching the failedIds details-fetch pattern.
+  // load, mirroring the enrichment pipeline's recovery model.
   const coordAttemptedRef = useRef<Set<string>>(new Set());
   // Every bar name shown as a search/surprise result this session, whether or
   // not it was saved — kept out of future results so retrying a search or
@@ -266,11 +281,19 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [searching, setSearching] = useState(false);
   const [searchDone, setSearchDone] = useState(false);
   const [fetchingIds, setFetchingIds] = useState<Set<string>>(() => new Set());
-  // Bars where the last enrichment attempt this session failed (Gemini error,
-  // timeout, or "no usable description"). Skipped by the auto-fetch effect so
-  // a permanently-stuck bar doesn't retry on every single bars-state change —
-  // it'll get one fresh attempt again on the next full page load.
-  const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set());
+  // Saved bars currently queued (waiting for a concurrency slot) for Gemini
+  // detail enrichment — drives the card's "finding details…" line. The
+  // reservation ref below is the source of truth for dedup; these state sets
+  // exist only to drive the UI.
+  const [detailsPendingIds, setDetailsPendingIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  // Saved bars between enrichment attempts (a backoff wait or the slow
+  // deferred re-attempt pool) — the card shows a subtle "details will
+  // retry…" status instead of silently looking abandoned.
+  const [detailsDeferredIds, setDetailsDeferredIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [enrichingNames, setEnrichingNames] = useState<Set<string>>(
     () => new Set(),
   );
@@ -601,35 +624,64 @@ export function TourProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bars, connError]);
 
-  // ---- details / vibe-tag enrichment (bounded queue + retry) ----
+  // ---- details / vibe-tag enrichment (bounded queue + recoverable retry) ----
   // Details come from the Gemini route, which persists the result itself
   // inside a Firestore transaction (the client never writes them — the live
   // onSnapshot listener surfaces the server's write). Enrichment used to fire
   // one parallel request per un-enriched bar the moment bars loaded: a burst
-  // of bars could trip the provider's rate limit, and a single failure (429,
-  // 5xx, 10s timeout) permanently marked the bar as failed for the whole
-  // session — details and vibe tags then stayed missing until a page refresh
-  // re-ran the pass with a clean `failedIds`. The queue below caps how many
-  // requests are in flight at once and retries transient failures with
-  // backoff a bounded number of times before a bar is written off for the
-  // session, so temporary provider hiccups no longer leave bars permanently
-  // un-enriched.
-  const DETAIL_FETCH_CONCURRENCY = 2;
-  const MAX_DETAIL_ATTEMPTS = 4;
-  const DETAIL_RETRY_DELAYS = [5000, 15000, 30000];
+  // could trip the provider's rate limit, and a single failure (429, 5xx,
+  // 10s timeout, malformed JSON, or a too-short description) permanently
+  // marked the bar as failed for the whole session — details and vibe tags
+  // then stayed missing until a page refresh re-ran the pass with a clean
+  // `failedIds`. The queue below keeps the bounded concurrency cap, and the
+  // retry schedule (see src/lib/enrichment.ts) NEVER writes a bar off:
+  // standard attempts with 5s/15s/30s/60s backoff, then a simpler fallback
+  // prompt with 2m/5m/10m backoff, then a slow self-pacing deferred pool
+  // (one re-attempt ~every 10 minutes). A bar is only ever "resting" between
+  // attempts, never abandoned.
   const detailsQueueRef = useRef<
-    Array<{ bar: Bar; attempt: number; forceRefresh: boolean }>
+    Array<{
+      bar: Bar;
+      attempt: number;
+      forceRefresh: boolean;
+      usingFallback: boolean;
+    }>
   >([]);
-  const detailsQueuedIdsRef = useRef<Set<string>>(new Set());
+  // Single reservation set: every bar that is queued, waiting on a retry
+  // timer, deferred, or in flight. The auto-fetch pass (which re-runs on
+  // every bars/snapshot change) consults this so a bar can never be
+  // double-enqueued — that's what makes onSnapshot updates harmless.
+  const detailsReservedRef = useRef<Set<string>>(new Set());
   const detailsInFlightRef = useRef(0);
-  const failedIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    failedIdsRef.current = failedIds;
-  }, [failedIds]);
+
+  // Terminal cleanup: forget every trace of a bar's pipeline state — used on
+  // success, when the bar is removed, or when another client enriched it
+  // first. Idempotent.
+  const releaseDetailState = useCallback((id: string) => {
+    detailsReservedRef.current.delete(id);
+    setFetchingIds((s) => {
+      if (!s.has(id)) return s;
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    setDetailsPendingIds((s) => {
+      if (!s.has(id)) return s;
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    setDetailsDeferredIds((s) => {
+      if (!s.has(id)) return s;
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+  }, []);
 
   // Pulls the next bars off the queue while under the concurrency cap. Skips
-  // entries whose bar was removed, already enriched by another client, or
-  // written off since they were queued.
+  // entries whose bar was removed or already enriched by another client since
+  // they were queued (releasing their reservation so nothing lingers).
   const pumpDetailsQueue = useCallback(() => {
     while (
       detailsInFlightRef.current < DETAIL_FETCH_CONCURRENCY &&
@@ -637,99 +689,161 @@ export function TourProvider({ children }: { children: ReactNode }) {
     ) {
       const entry = detailsQueueRef.current.shift();
       if (!entry) break;
-      detailsQueuedIdsRef.current.delete(entry.bar.id);
       const current = barsRef.current?.find((b) => b.id === entry.bar.id);
-      if (
-        !current ||
-        failedIdsRef.current.has(entry.bar.id) ||
-        (!entry.forceRefresh && current.detailsFetched)
-      ) {
+      if (!current || (!entry.forceRefresh && !needsEnrichment(current))) {
+        releaseDetailState(entry.bar.id);
         continue;
       }
       detailsInFlightRef.current += 1;
-      void fetchBarDetails(current, entry.forceRefresh, entry.attempt).finally(
-        () => {
-          detailsInFlightRef.current -= 1;
-          pumpDetailsQueue();
-        },
-      );
+      setDetailsPendingIds((s) => {
+        if (!s.has(entry.bar.id)) return s;
+        const n = new Set(s);
+        n.delete(entry.bar.id);
+        return n;
+      });
+      setFetchingIds((s) => new Set(s).add(entry.bar.id));
+      void fetchBarDetails(
+        current,
+        entry.forceRefresh,
+        entry.attempt,
+        entry.usingFallback,
+      ).finally(() => {
+        detailsInFlightRef.current -= 1;
+        pumpDetailsQueue();
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // One enrichment attempt for a bar. On success the bar's details arrive via
-  // the Firestore snapshot; on failure, retry with backoff (the retry
-  // re-checks the latest bars state, so a bar enriched by another client in
-  // the meantime is skipped) before the bar is written off for the session.
+  // the Firestore snapshot (the route persisted them in a transaction) and
+  // the card's status clears. On failure the bar is never written off for the
+  // session: it schedules a backoff retry, then a simpler fallback prompt
+  // phase, and finally the slow deferred pool — see nextEnrichmentStep. Every
+  // wait re-checks the latest bars state, so a bar enriched by another client
+  // in the meantime is skipped instead of re-called.
   const fetchBarDetails = useCallback(
-    async (bar: Bar, forceRefresh: boolean, attempt: number): Promise<void> => {
-      setFetchingIds((s) => new Set(s).add(bar.id));
-      const prompt = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${bar.address || bar.neighborhood || "New York City"}" has already been verified as a real, currently open business via Google Places.\n\nUsing only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
-      const data = await callGemini(prompt, bar.id, forceRefresh);
+    async (
+      bar: Bar,
+      forceRefresh: boolean,
+      attempt: number,
+      usingFallback: boolean,
+    ): Promise<void> => {
+      const prompt = buildEnrichmentPrompt(bar, usingFallback);
+      // callGemini already returns null on every failure path; the extra
+      // catch guarantees a reservation can never strand even if something
+      // unexpected throws, keeping the pump's finally the only cleanup.
+      const data = await callGemini(prompt, bar.id, forceRefresh).catch(
+        () => null,
+      );
+      if (data) {
+        // Enriched — the route persisted the details; the snapshot will
+        // surface them. Clear every trace of the pipeline for this bar.
+        releaseDetailState(bar.id);
+        return;
+      }
+      // Failed attempt (network error, timeout, rate limit, malformed JSON,
+      // or a description too short for the route's >35-char gate). Plan the
+      // next step — retry, fallback, or deferred — and keep the bar reserved
+      // the whole time so the auto-fetch pass can't restart it at attempt 1.
+      const step = nextEnrichmentStep(attempt);
       setFetchingIds((s) => {
         const n = new Set(s);
         n.delete(bar.id);
         return n;
       });
-      if (data) return;
-      if (attempt >= MAX_DETAIL_ATTEMPTS) {
-        setFailedIds((s) => new Set(s).add(bar.id));
-        return;
-      }
-      const delayMs = DETAIL_RETRY_DELAYS[attempt - 1] ?? 30000;
-      // Reserve the bar while it waits so the auto-fetch pass (which re-runs
-      // on every bars change) can't re-enqueue it as a fresh attempt and
-      // defeat the backoff. The reservation is released when the retry fires.
-      detailsQueuedIdsRef.current.add(bar.id);
+      setDetailsDeferredIds((s) => new Set(s).add(bar.id));
+      const waitMs = step.deferred
+        ? DEFERRED_RETRY_DELAY
+        : step.delayMs ?? DEFERRED_RETRY_DELAY;
       setTimeout(() => {
         const current = barsRef.current?.find((b) => b.id === bar.id);
-        if (!current || failedIdsRef.current.has(bar.id)) return;
-        detailsQueuedIdsRef.current.delete(bar.id);
+        if (!current) {
+          // Removed while we waited — nothing to retry.
+          releaseDetailState(bar.id);
+          return;
+        }
+        if (!forceRefresh && !needsEnrichment(current)) {
+          // Enriched by another client while we waited — done.
+          releaseDetailState(bar.id);
+          return;
+        }
+        setDetailsDeferredIds((s) => {
+          const n = new Set(s);
+          n.delete(bar.id);
+          return n;
+        });
+        setDetailsPendingIds((s) => new Set(s).add(bar.id));
         detailsQueueRef.current.push({
           bar: current,
-          attempt: attempt + 1,
+          attempt: step.attempt,
           forceRefresh,
+          usingFallback: step.usingFallback,
         });
         pumpDetailsQueue();
-      }, delayMs);
+      }, waitMs);
     },
-    [pumpDetailsQueue],
+    [pumpDetailsQueue, releaseDetailState],
   );
 
   // Public entry: queue a bar for enrichment (used by the auto-fetch pass
   // below and by callers that just added a bar — addSuggestionToWishlist /
   // saveVisitedForm). Goes through the same bounded queue so the concurrency
-  // cap and retry logic apply everywhere.
+  // cap and retry logic apply everywhere. A bar already reserved (queued,
+  // waiting, deferred, or in flight) is never re-queued.
   const runDetailsFetch = useCallback(
     (bar: Bar, forceRefresh?: boolean) => {
-      if (
-        failedIdsRef.current.has(bar.id) ||
-        detailsQueuedIdsRef.current.has(bar.id)
-      )
-        return;
-      if (!forceRefresh && bar.detailsFetched) return;
-      detailsQueuedIdsRef.current.add(bar.id);
+      if (detailsReservedRef.current.has(bar.id)) return;
+      if (!forceRefresh && !needsEnrichment(bar)) return;
+      detailsReservedRef.current.add(bar.id);
+      setDetailsPendingIds((s) => new Set(s).add(bar.id));
       detailsQueueRef.current.push({
         bar,
         attempt: 1,
         forceRefresh: !!forceRefresh,
+        usingFallback: false,
       });
       pumpDetailsQueue();
     },
     [pumpDetailsQueue],
   );
 
+  // Page-load repair pass + duplicate guard. Runs on every bars/snapshot
+  // change, but the reservation ref means it can never fire a second Gemini
+  // request for a bar already in the pipeline. The predicate is
+  // needsEnrichment — missing/empty/short/unusable description OR
+  // detailsFetched false — NOT just detailsFetched, so a legacy record that
+  // claims to be fetched but has no usable description re-enters the queue
+  // automatically and gets repaired without being re-added. Also prunes
+  // pipeline UI state for bars that vanished or are now enriched, so a card's
+  // status disappears the moment the snapshot shows a usable description.
   useEffect(() => {
     if (!bars) return;
+    const byId = new Map(bars.map((b) => [b.id, b]));
+    const pruneAndRelease = (prev: Set<string>) => {
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        const bar = byId.get(id);
+        if (bar && needsEnrichment(bar)) next.add(id);
+        else {
+          changed = true;
+          detailsReservedRef.current.delete(id);
+        }
+      });
+      return changed ? next : prev;
+    };
+    setFetchingIds(pruneAndRelease);
+    setDetailsPendingIds(pruneAndRelease);
+    setDetailsDeferredIds(pruneAndRelease);
     bars.forEach((bar) => {
       if (
-        bar.detailsFetched ||
-        failedIds.has(bar.id) ||
-        fetchingIds.has(bar.id) ||
-        detailsQueuedIdsRef.current.has(bar.id)
+        shouldQueueBar(bar, {
+          pending: detailsReservedRef.current,
+          id: bar.id,
+        })
       )
-        return;
-      runDetailsFetch(bar);
+        runDetailsFetch(bar);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bars]);
@@ -784,8 +898,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
         )}`;
       const isEdit = s._wishFormId;
       const id = isEdit ? s._wishFormId : newBarId();
-      const hasDescription =
-        typeof s.description === "string" && s.description.trim().length > 10;
+      // Use the same "usable description" gate as the server (and the
+      // enrichment pipeline) so a fresh wishlist add with a real description
+      // is marked fetched, while a stub or too-short description is queued
+      // for enrichment immediately instead of relying on the repair pass.
+      const hasDescription = isUsefulDescription(s.description);
       const record: Bar = {
         id: id as string,
         name: s.name,
@@ -1476,6 +1593,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
     filteredVisited,
     filteredToTry,
     fetchingIds,
+    detailsPendingIds,
+    detailsDeferredIds,
 
     rankingBattles,
     recordBattle,

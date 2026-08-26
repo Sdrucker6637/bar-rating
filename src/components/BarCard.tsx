@@ -28,6 +28,10 @@ interface BarCardProps {
    *  Battle — shows a small ⚔️ immediately left of the score. */
   battleDecided?: boolean;
   isFetching?: boolean;
+  /** True when the bar is between Gemini detail-enrichment attempts (a
+   *  backoff wait or the slow deferred pool) — shows a subtle "will retry"
+   *  status so the card never looks like enrichment isn't supported. */
+  detailsDeferred?: boolean;
   onNameClick?: () => void;
   onEdit: () => void;
   editLabel?: string;
@@ -50,6 +54,7 @@ export default function BarCard({
   scoreLabel,
   battleDecided,
   isFetching,
+  detailsDeferred,
   onNameClick,
   onEdit,
   editLabel,
@@ -289,6 +294,12 @@ export default function BarCard({
         <div className="mt-2 flex items-center gap-1.5 font-mono text-[0.68rem] text-mute">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-brass" />
           finding details…
+        </div>
+      )}
+
+      {!isFetching && detailsDeferred && (
+        <div className="mt-2 font-mono text-[0.68rem] italic text-mute/70">
+          details will retry…
         </div>
       )}
 

@@ -47,6 +47,8 @@ export default function LeaderboardView() {
     foodMode,
     setFoodMode,
     fetchingIds,
+    detailsPendingIds,
+    detailsDeferredIds,
     startManualAdd,
     editVisited,
     removeBar,
@@ -369,7 +371,10 @@ export default function LeaderboardView() {
                 battleDecided={
                   sortMode === "overall" && battleDecidedIds.has(b.id)
                 }
-                isFetching={fetchingIds.has(b.id)}
+                isFetching={
+                  fetchingIds.has(b.id) || detailsPendingIds.has(b.id)
+                }
+                detailsDeferred={detailsDeferredIds.has(b.id)}
                 onNameClick={() => {
                   if (b.mapsLink) window.open(b.mapsLink, "_blank");
                 }}

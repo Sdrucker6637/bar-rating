@@ -18,6 +18,8 @@ export default function FindView() {
     filteredToTry,
     fitsGroupOnly,
     fetchingIds,
+    detailsPendingIds,
+    detailsDeferredIds,
     startManualAdd,
     addSuggestionToWishlist,
     rankSuggestion,
@@ -91,7 +93,10 @@ export default function FindView() {
           <BarCard
             key={b.id}
             b={b}
-            isFetching={fetchingIds.has(b.id)}
+            isFetching={
+              fetchingIds.has(b.id) || detailsPendingIds.has(b.id)
+            }
+            detailsDeferred={detailsDeferredIds.has(b.id)}
             onNameClick={() => {
               if (b.mapsLink) window.open(b.mapsLink, "_blank");
             }}
