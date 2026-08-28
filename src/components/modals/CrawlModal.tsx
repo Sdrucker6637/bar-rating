@@ -21,6 +21,7 @@ export default function CrawlModal() {
     crawlError,
     replacingIndex,
     crawlEnrichingNames,
+    crawlFailedNames,
     startCrawlPlanning,
     replaceStop,
     removeCrawlStop,
@@ -86,6 +87,7 @@ export default function CrawlModal() {
           {crawlStops.map((s: CrawlStop, i) => {
             const next = crawlStops[i + 1];
             const isEnriching = crawlEnrichingNames.has(s.name);
+            const isFailed = crawlFailedNames.has(s.name);
             const desc = displayDescription(s.description);
             return (
               <div key={s.name}>
@@ -132,6 +134,10 @@ export default function CrawlModal() {
                     ) : isEnriching ? (
                       <div className="mt-2.5 animate-[tda-pulse_1.4s_ease-in-out_infinite] text-[0.82rem] italic text-dim">
                         finding details…
+                      </div>
+                    ) : isFailed ? (
+                      <div className="mt-2.5 font-mono text-[0.68rem] italic text-mute/70">
+                        details unavailable
                       </div>
                     ) : (
                       s.address && (

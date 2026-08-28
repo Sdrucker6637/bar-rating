@@ -338,6 +338,8 @@ interface ShapedPlace {
   placeId: string | null;
   mapsLink: string;
   rating: number | null;
+  types: string[];
+  priceLevel: string;
 }
 
 class PlacesApiError extends Error {
@@ -396,6 +398,8 @@ function filterAndShape(
         ? `https://www.google.com/maps/place/?q=place_id:${p.placeId}`
         : ""),
     rating: typeof p.rating === "number" ? p.rating : null,
+    types: p.types || [],
+    priceLevel: p.priceLevel || "",
   }));
 }
 

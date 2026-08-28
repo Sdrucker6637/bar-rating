@@ -20,6 +20,8 @@ export default function FindView() {
     fetchingIds,
     detailsPendingIds,
     detailsDeferredIds,
+    detailsFailedIds,
+    searchFailedNames,
     startManualAdd,
     addSuggestionToWishlist,
     rankSuggestion,
@@ -57,6 +59,7 @@ export default function FindView() {
               key={s.name}
               s={s}
               isEnriching={enrichingNames.has(s.name)}
+              isFailed={searchFailedNames.has(s.name)}
               onWishlist={() => addSuggestionToWishlist(s)}
               onVisited={() => rankSuggestion(s)}
             />
@@ -97,6 +100,7 @@ export default function FindView() {
               fetchingIds.has(b.id) || detailsPendingIds.has(b.id)
             }
             detailsDeferred={detailsDeferredIds.has(b.id)}
+            detailsFailed={detailsFailedIds.has(b.id)}
             onNameClick={() => {
               if (b.mapsLink) window.open(b.mapsLink, "_blank");
             }}

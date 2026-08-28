@@ -18,6 +18,7 @@ exports.isUsefulDescription = isUsefulDescription;
 exports.needsEnrichment = needsEnrichment;
 exports.isSearchEnrichmentOk = isSearchEnrichmentOk;
 exports.nextEnrichmentStep = nextEnrichmentStep;
+exports.isVenueAppropriateForRating = isVenueAppropriateForRating;
 exports.shouldQueueBar = shouldQueueBar;
 exports.buildEnrichmentPrompt = buildEnrichmentPrompt;
 /** True when a stored description is actually usable — the exact gate the
@@ -102,6 +103,30 @@ function nextEnrichmentStep(attempt) {
         deferred: true,
     };
 }
+/** Venue classification from Google Places types. Used to determine if a
+ *  venue is appropriate for the Bar Rating app before sending to Gemini.
+ *  Matches the Gemini prompt's explicit allowed classification list. */
+const BAR_VENUE_TYPES = new Set([
+    "bar",
+    "night_club",
+    "pub",
+    "wine_bar",
+    "cocktail_bar",
+    "lounge",
+    "restaurant",
+]);
+/** Check if a venue's Google Places types indicate it's a legitimate
+ *  drinking/dining establishment appropriate for the Bar Rating app.
+ *  Returns true if types include any bar/restaurant/nightlife category,
+ *  or if types are empty/missing (legacy records without Places data). */
+function isVenueAppropriateForRating(types) {
+    // If no types provided, allow — legacy records or manual adds may not
+    // have Places classification, and we don't want to block them.
+    if (!types || types.length === 0)
+        return true;
+    // Check if any of the venue's types match our bar/restaurant categories
+    return types.some((t) => BAR_VENUE_TYPES.has(t));
+}
 /** Should a bar be enqueued right now? `pending` is the reservation set —
  *  every bar that is already queued, waiting on a retry timer, deferred, or
  *  in flight. Consulting it here (plus inside runDetailsFetch) is what makes
@@ -115,16 +140,34 @@ function shouldQueueBar(bar, opts) {
 /** Build the Gemini prompt for a saved bar. The standard prompt requests the
  *  full detail set (including capacityHint); the fallback prompt — used after
  *  the standard attempts have failed — requests only the essentials, giving a
- *  stubborn bar a better chance of a shorter, acceptable answer. */
+ *  stubborn bar a better chance of a shorter, acceptable answer.
+ *
+ *  IMPORTANT: The prompt NEVER claims the venue has been "verified as a bar"
+ *  by Google Places or any other source. It asks Gemini to describe the venue
+ *  ONLY from what it actually knows, and to return an empty description if it
+ *  is uncertain. This prevents hallucinated descriptions for venues that may
+ *  not be real bars (e.g. apartments, offices, or misidentified places).
+ *
+ *  The prompt now includes Google Places classification data (types, rating)
+ *  so Gemini can ground its description in actual venue classification rather
+ *  than guessing from the venue name alone. */
 function buildEnrichmentPrompt(bar, usingFallback) {
     const location = bar.address || bar.neighborhood || "New York City";
-    const head = `You are a NYC bar description writer.\n\nThe bar "${bar.name}" located at "${location}" has already been verified as a real, currently open business via Google Places.\n\n`;
+    // Build venue context from Google Places data — this is the primary evidence
+    // Gemini should use, NOT the venue name alone.
+    const venueType = bar.types && bar.types.length > 0
+        ? bar.types.slice(0, 5).join(", ")
+        : "unknown";
+    const ratingStr = bar.rating != null && bar.rating > 0
+        ? `${bar.rating.toFixed(1)} stars`
+        : "no rating";
+    const venueContext = `Venue: "${bar.name}" at "${location}".\nGoogle Places classification: [${venueType}]. Rating: ${ratingStr}.\n\n`;
     if (usingFallback) {
         // The fallback prompt explicitly requires a usable description: the
         // client gates on isUsefulDescription (>35 chars), so an empty/null/short
         // or all-empty response is treated as a failure and retried — the prompt
         // must not hand the model an easy empty-string escape hatch.
-        return `${head}Using only what you know about this specific venue, write a REAL description and return ONLY JSON:\n\n{"description":"a genuine 2-3 sentence write-up (at least 40 characters) of the venue's vibe, drink style, and notable characteristics","tags":["3-5 lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood"}\n\nRules:\n- Do NOT invent or rename the business.\n- The description MUST be a real, informative write-up of 40+ characters — never empty, null, or a one-word stub.\n- If you have little information, keep the description brief but real — describe the venue's style and atmosphere based only on what you actually know, never returning an empty string, null, or a stub.`;
+        return `${venueContext}Using the Google Places classification above as PRIMARY EVIDENCE (not guessing from the name), write a REAL description and return ONLY JSON:\n\n{"description":"a genuine 2-3 sentence write-up (at least 40 characters) of the venue's vibe, drink style, and notable characteristics","tags":["3-5 lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood"}\n\nRules:\n- Use the Google Places classification types above to determine what kind of venue this is.\n- If the types do NOT include bar/night_club/pub/wine_bar/lounge/restaurant/cocktail_bar, this is NOT a bar — set description to an empty string.\n- Describe ONLY if the venue is a legitimate drinking/dining establishment.\n- Do NOT invent or guess based on the venue name alone.\n- Do NOT fabricate vibes, tags, happy hours, or neighborhood data.\n- If you are not confident this is a real bar/cocktail venue, set description to an empty string.\n- The description MUST be a real, informative write-up of 40+ characters — never empty, null, or a one-word stub.\n- If you have little information, keep the description brief but real — describe the venue's style and atmosphere based only on what you actually know, never returning an empty string, null, or a stub.`;
     }
-    return `${head}Using only what you know about this specific venue, return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Do NOT invent or rename the business.\n- If you have no reliable information, set description to an empty string.\n- Do not include a mapsLink field.`;
+    return `${venueContext}Using the Google Places classification above as PRIMARY EVIDENCE (not guessing from the name), return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Use the Google Places classification types above to determine what kind of venue this is.\n- If the types do NOT include bar/night_club/pub/wine_bar/lounge/restaurant/cocktail_bar, this is NOT a bar — set description to an empty string.\n- Describe ONLY if the venue is a legitimate drinking/dining establishment.\n- Do NOT invent or guess based on the venue name alone.\n- Do NOT fabricate vibes, tags, happy hours, neighborhood data, or capacity.\n- If you are not confident this is a real bar/cocktail venue, set description to an empty string.\n- Do not include a mapsLink field.`;
 }

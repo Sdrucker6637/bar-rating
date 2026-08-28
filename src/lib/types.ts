@@ -40,6 +40,8 @@ export interface Bar {
   latitude: number | null;
   longitude: number | null;
   placeId: string | null;
+  /** Google Places types from venue classification. */
+  types?: string[];
   detailsFetched: boolean;
   disqualified: boolean;
   disqualifyReason: string;
@@ -54,6 +56,11 @@ export interface PlaceResult {
   placeId: string | null;
   mapsLink: string;
   rating?: number | null;
+  /** Google Places types (e.g. ["bar", "night_club", "pub", "wine_bar"]).
+   *  Used to ground Gemini descriptions with actual venue classification. */
+  types?: string[];
+  /** Google Places price level (e.g. "PRICE_LEVEL_MODERATE"). */
+  priceLevel?: string;
   neighborhood?: string;
   description?: string;
   tags?: string[];

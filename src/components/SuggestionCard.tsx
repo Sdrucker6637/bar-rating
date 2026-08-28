@@ -14,6 +14,7 @@ import Icon from "./Icon";
 interface SuggestionCardProps {
   s: PlaceResult;
   isEnriching: boolean;
+  isFailed?: boolean;
   onWishlist: () => void;
   onVisited: () => void;
   showCrawlActions?: boolean;
@@ -24,6 +25,7 @@ interface SuggestionCardProps {
 export default function SuggestionCard({
   s,
   isEnriching,
+  isFailed,
   onWishlist,
   onVisited,
   showCrawlActions,
@@ -71,6 +73,10 @@ export default function SuggestionCard({
       ) : isEnriching ? (
         <div className="mt-2 animate-[tda-pulse_1.4s_ease-in-out_infinite] text-[0.82rem] italic text-dim">
           finding details…
+        </div>
+      ) : isFailed ? (
+        <div className="mt-2 font-mono text-[0.68rem] italic text-mute/70">
+          details unavailable
         </div>
       ) : (
         s.address && (

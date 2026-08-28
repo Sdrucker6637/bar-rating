@@ -32,6 +32,9 @@ interface BarCardProps {
    *  backoff wait or the slow deferred pool) — shows a subtle "will retry"
    *  status so the card never looks like enrichment isn't supported. */
   detailsDeferred?: boolean;
+  /** True when the bar's full enrichment budget is exhausted — shows
+   *  "details unavailable" instead of "finding details…". */
+  detailsFailed?: boolean;
   onNameClick?: () => void;
   onEdit: () => void;
   editLabel?: string;
@@ -55,6 +58,7 @@ export default function BarCard({
   battleDecided,
   isFetching,
   detailsDeferred,
+  detailsFailed,
   onNameClick,
   onEdit,
   editLabel,
@@ -260,11 +264,11 @@ export default function BarCard({
             })}
 
             {b.bathroomBonus > 0 && (
-              <div className="flex flex-[1.8] flex-col items-center gap-1.5 px-1 py-2.5 text-center">
+              <div className="flex min-w-0 flex-[1.8] flex-col items-center gap-1.5 overflow-hidden px-1 py-2.5 text-center">
                 <span className="font-serif text-[1.12rem] font-medium leading-none text-cream">
                   {fmt(b.bathroomBonus)}
                 </span>
-                <span className="whitespace-nowrap font-mono text-[0.58rem] uppercase tracking-[0.08em] text-mute">
+                <span className="min-w-0 truncate font-mono text-[0.58rem] uppercase tracking-[0.08em] text-mute">
                   Bathroom bonus
                 </span>
               </div>
@@ -297,9 +301,15 @@ export default function BarCard({
         </div>
       )}
 
-      {!isFetching && detailsDeferred && (
+      {!isFetching && detailsDeferred && !detailsFailed && (
         <div className="mt-2 font-mono text-[0.68rem] italic text-mute/70">
           details will retry…
+        </div>
+      )}
+
+      {!isFetching && detailsFailed && !cleanDesc && (
+        <div className="mt-2 font-mono text-[0.68rem] italic text-mute/70">
+          details unavailable
         </div>
       )}
 

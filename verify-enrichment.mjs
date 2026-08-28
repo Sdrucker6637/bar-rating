@@ -32,6 +32,7 @@ if (tsc.status !== 0) {
 const {
   isUsefulDescription,
   isSearchEnrichmentOk,
+  isVenueAppropriateForRating,
   needsEnrichment,
   nextEnrichmentStep,
   shouldQueueBar,
@@ -114,8 +115,8 @@ check(
   /40|40\+/.test(fallback) && /MUST/.test(fallback),
 );
 check(
-  "fallback prompt no longer offers the empty-string escape hatch",
-  !fallback.includes("set description to an empty string"),
+  "fallback prompt allows empty-string ONLY for unverifiable venues (anti-hallucination)",
+  /not confident/.test(fallback) || !fallback.includes("empty string"),
 );
 check(
   "fallback prompt rejects empty/null stubs explicitly",
@@ -250,6 +251,157 @@ check(
       fb.includes("Whiskey Roxx")
     );
   })(),
+);
+
+// == Issue 1: Anti-hallucination prompt regression ==
+console.log("== Issue 1: Anti-hallucination prompt regression ==");
+check(
+  "standard prompt no longer claims venue is verified as a bar",
+  !standard.includes("verified as a real"),
+);
+check(
+  "fallback prompt no longer claims venue is verified as a bar",
+  !fallback.includes("verified as a real"),
+);
+check(
+  "standard prompt instructs against guessing from name",
+  /not guessing from the name/.test(standard),
+);
+check(
+  "standard prompt instructs against fabricating data",
+  /Do NOT fabricate/.test(standard),
+);
+check(
+  "standard prompt allows empty string for unverifiable venues",
+  /not confident/.test(standard),
+);
+check(
+  "standard prompt still has capacityHint",
+  standard.includes("capacityHint"),
+);
+check(
+  "fallback prompt still has 40+ char requirement",
+  /40/.test(fallback),
+);
+
+// == Issue 2: Bathroom bonus overflow (layout-only, pure-function proxy) ==
+console.log("== Issue 2: Bathroom bonus overflow (layout check) == (checks are visual -- verified via preview_screenshot below)");
+// Issue 2 is a CSS fix; no pure-function regression to test here.
+// Verified visually in the live preview step.
+
+// == Issue 3: Terminal enrichment state (pure-function proxy) ==
+console.log("== Issue 3: Terminal enrichment state regression ==");
+check(
+  "nextEnrichmentStep(8) returns deferred (terminal stop)",
+  nextEnrichmentStep(8).deferred === true,
+);
+check(
+  "nextEnrichmentStep(8) has no delay (terminal)",
+  nextEnrichmentStep(8).delayMs === null,
+);
+check(
+  "nextEnrichmentStep(6) is NOT deferred (still retrying)",
+  nextEnrichmentStep(6).deferred === false,
+);
+check(
+  "full schedule: 7 steps before terminal",
+  (() => {
+    let attempt = 1;
+    let steps = 0;
+    while (!nextEnrichmentStep(attempt).deferred) {
+      if (steps > 20) return false;
+      attempt = nextEnrichmentStep(attempt).attempt;
+      steps++;
+    }
+    return steps === 7;
+  })(),
+);
+
+// == Issue 4: Venue validation using Google Places types ==
+console.log("== Issue 4: Venue validation regression ==");
+check(
+  "isVenueAppropriateForRating: empty types → true (legacy records allowed)",
+  isVenueAppropriateForRating([]) === true,
+);
+check(
+  "isVenueAppropriateForRating: undefined types → true (legacy records allowed)",
+  isVenueAppropriateForRating(undefined) === true,
+);
+check(
+  "isVenueAppropriateForRating: bar type → true",
+  isVenueAppropriateForRating(["bar"]) === true,
+);
+check(
+  "isVenueAppropriateForRating: night_club type → true",
+  isVenueAppropriateForRating(["night_club"]) === true,
+);
+check(
+  "isVenueAppropriateForRating: restaurant type → true",
+  isVenueAppropriateForRating(["restaurant"]) === true,
+);
+check(
+  "isVenueAppropriateForRating: pub type → true",
+  isVenueAppropriateForRating(["pub"]) === true,
+);
+check(
+  "isVenueAppropriateForRating: wine_bar type → true",
+  isVenueAppropriateForRating(["wine_bar"]) === true,
+);
+check(
+  "isVenueAppropriateForRating: lounge type → true",
+  isVenueAppropriateForRating(["lounge"]) === true,
+);
+check(
+  "isVenueAppropriateForRating: cocktail_bar type → true",
+  isVenueAppropriateForRating(["cocktail_bar"]) === true,
+);
+check(
+  "isVenueAppropriateForRating: brewery type → false (not a bar)",
+  isVenueAppropriateForRating(["brewery"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: distillery type → false (not a bar)",
+  isVenueAppropriateForRating(["distillery"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: cafe type → false (not a bar)",
+  isVenueAppropriateForRating(["cafe"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: food_and_drink type → false (not a bar)",
+  isVenueAppropriateForRating(["food_and_drink"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: liquor_store type → false (not a bar)",
+  isVenueAppropriateForRating(["liquor_store"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: residence type → false",
+  isVenueAppropriateForRating(["residence"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: home type → false",
+  isVenueAppropriateForRating(["home"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: lodging type → false",
+  isVenueAppropriateForRating(["lodging"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: real estate type → false",
+  isVenueAppropriateForRating(["real_estate_office"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: hospital type → false",
+  isVenueAppropriateForRating(["hospital"]) === false,
+);
+check(
+  "isVenueAppropriateForRating: bar + non-bar types → true (at least one bar type)",
+  isVenueAppropriateForRating(["bar", "establishment"]) === true,
+);
+check(
+  "isVenueAppropriateForRating: only non-bar types → false",
+  isVenueAppropriateForRating(["point_of_interest", "establishment"]) === false,
 );
 
 console.log("");

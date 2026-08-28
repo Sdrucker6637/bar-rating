@@ -49,6 +49,7 @@ export default function LeaderboardView() {
     fetchingIds,
     detailsPendingIds,
     detailsDeferredIds,
+    detailsFailedIds,
     startManualAdd,
     editVisited,
     removeBar,
@@ -375,6 +376,7 @@ export default function LeaderboardView() {
                   fetchingIds.has(b.id) || detailsPendingIds.has(b.id)
                 }
                 detailsDeferred={detailsDeferredIds.has(b.id)}
+                detailsFailed={detailsFailedIds.has(b.id)}
                 onNameClick={() => {
                   if (b.mapsLink) window.open(b.mapsLink, "_blank");
                 }}

@@ -86,6 +86,14 @@ interface TourContextValue {
   /** Saved bars waiting on a backoff/deferred retry after a failed
    *  enrichment attempt — their cards show a subtle "will retry" status. */
   detailsDeferredIds: Set<string>;
+  /** Saved bars whose enrichment budget is fully exhausted — their cards
+   *  show "details unavailable" instead of "finding details…". On the next
+   *  page load the repair pass re-queues them automatically. */
+  detailsFailedIds: Set<string>;
+  /** Search results whose enrichment budget is fully exhausted. */
+  searchFailedNames: Set<string>;
+  /** Crawl stops whose enrichment budget is fully exhausted. */
+  crawlFailedNames: Set<string>;
 
   // ---- global Bar Battle tiebreaks ----
   rankingBattles: RankingBattle[];
@@ -293,6 +301,20 @@ export function TourProvider({ children }: { children: ReactNode }) {
   // deferred re-attempt pool) — the card shows a subtle "details will
   // retry…" status instead of silently looking abandoned.
   const [detailsDeferredIds, setDetailsDeferredIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  // Saved bars whose full retry budget (standard → fallback → deferred) is
+  // exhausted — the card shows "details unavailable" instead of "finding
+  // details…". The page-load repair pass re-queues them on next visit.
+  const [detailsFailedIds, setDetailsFailedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  // Search results whose enrichment budget is exhausted.
+  const [searchFailedNames, setSearchFailedNames] = useState<Set<string>>(
+    () => new Set(),
+  );
+  // Crawl stops whose enrichment budget is exhausted.
+  const [crawlFailedNames, setCrawlFailedNames] = useState<Set<string>>(
     () => new Set(),
   );
   const [enrichingNames, setEnrichingNames] = useState<Set<string>>(
@@ -678,6 +700,12 @@ export function TourProvider({ children }: { children: ReactNode }) {
       n.delete(id);
       return n;
     });
+    setDetailsFailedIds((s) => {
+      if (!s.has(id)) return s;
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
   }, []);
 
   // Pulls the next bars off the queue while under the concurrency cap. Skips
@@ -745,7 +773,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
       }
       // Failed attempt (network error, timeout, rate limit, malformed JSON,
       // or a description too short for the route's >35-char gate). Plan the
-      // next step — retry, fallback, or deferred — and keep the bar reserved
+      // next step — retry, fallback, or terminal — and keep the bar reserved
       // the whole time so the auto-fetch pass can't restart it at attempt 1.
       const step = nextEnrichmentStep(attempt);
       setFetchingIds((s) => {
@@ -753,10 +781,30 @@ export function TourProvider({ children }: { children: ReactNode }) {
         n.delete(bar.id);
         return n;
       });
+      // After the full bounded retry schedule (standard → fallback), the bar
+      // enters a terminal "failed" state instead of the old infinite deferred
+      // pool. The page-load repair pass re-queues it on next visit.
+      if (step.deferred) {
+        // Terminal: release the bar from the pipeline and mark it failed.
+        // The UI shows "details unavailable" instead of "finding details…".
+        detailsReservedRef.current.delete(bar.id);
+        setDetailsPendingIds((s) => {
+          if (!s.has(bar.id)) return s;
+          const n = new Set(s);
+          n.delete(bar.id);
+          return n;
+        });
+        setDetailsDeferredIds((s) => {
+          if (!s.has(bar.id)) return s;
+          const n = new Set(s);
+          n.delete(bar.id);
+          return n;
+        });
+        setDetailsFailedIds((s) => new Set(s).add(bar.id));
+        return;
+      }
       setDetailsDeferredIds((s) => new Set(s).add(bar.id));
-      const waitMs = step.deferred
-        ? DEFERRED_RETRY_DELAY
-        : step.delayMs ?? DEFERRED_RETRY_DELAY;
+      const waitMs = step.delayMs ?? DEFERRED_RETRY_DELAY;
       setTimeout(() => {
         const current = barsRef.current?.find((b) => b.id === bar.id);
         if (!current) {
@@ -924,6 +972,9 @@ export function TourProvider({ children }: { children: ReactNode }) {
         latitude: s.latitude || null,
         longitude: s.longitude || null,
         placeId: s.placeId || null,
+        // Preserve Google Places types from the search result so Gemini can
+        // ground its description in actual venue classification.
+        types: s.types || [],
         mapsLink,
         detailsFetched: hasDescription,
         disqualified: false,
@@ -978,6 +1029,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
     searchEpochRef.current += 1;
     searchEnrichReservedRef.current.clear();
     setEnrichingNames(new Set());
+    setSearchFailedNames(new Set());
   }, []);
 
   // One enrichment attempt for a search result. On success the description is
@@ -1032,15 +1084,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
       const step = nextEnrichmentStep(attempt);
       if (step.deferred) {
         // Search results are ephemeral: after the full bounded schedule the
-        // result keeps its honest state (address shown, no fake completion)
-        // instead of polling forever for a card the user will likely have
-        // moved past.
+        // result shows "details unavailable" instead of polling forever
+        // for a card the user will likely have moved past.
         searchEnrichReservedRef.current.delete(name);
         setEnrichingNames((s) => {
           const n = new Set(s);
           n.delete(name);
           return n;
         });
+        setSearchFailedNames((s) => new Set(s).add(name));
         return;
       }
       // ±500ms jitter so concurrently-failing results don't retry in lockstep.
@@ -1124,6 +1176,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
     crawlEpochRef.current += 1;
     crawlEnrichReservedRef.current.clear();
     setCrawlEnrichingNames(new Set());
+    setCrawlFailedNames(new Set());
   }, []);
 
   // One enrichment attempt for a crawl stop — mirrors
@@ -1179,15 +1232,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
       const step = nextEnrichmentStep(attempt);
       if (step.deferred) {
         // Crawl stops are ephemeral: after the full bounded schedule the
-        // stop keeps its honest state (address shown, no fake completion)
-        // instead of polling forever for a stop the user will likely have
-        // replaced or closed.
+        // stop shows "details unavailable" instead of polling forever
+        // for a stop the user will likely have replaced or closed.
         crawlEnrichReservedRef.current.delete(name);
         setCrawlEnrichingNames((s) => {
           const n = new Set(s);
           n.delete(name);
           return n;
         });
+        setCrawlFailedNames((s) => new Set(s).add(name));
         return;
       }
       // ±500ms jitter so concurrently-failing stops don't retry in lockstep.
@@ -1871,6 +1924,9 @@ export function TourProvider({ children }: { children: ReactNode }) {
     fetchingIds,
     detailsPendingIds,
     detailsDeferredIds,
+    detailsFailedIds,
+    searchFailedNames,
+    crawlFailedNames,
 
     rankingBattles,
     recordBattle,
