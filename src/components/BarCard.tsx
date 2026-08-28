@@ -50,6 +50,48 @@ const STATS: Array<[keyof Bar, string]> = [
   ["drinks", "Drinks"],
 ];
 
+function ScoreCell({
+  bar,
+  statKey,
+  label,
+  isBonus,
+  mobileSpan,
+}: {
+  bar: Bar;
+  statKey: keyof Bar;
+  label: string;
+  isBonus?: boolean;
+  mobileSpan: number;
+}) {
+  const v = bar[statKey] as unknown as number | null;
+  const strong = v !== null && v >= 8.5;
+  const exceptional = v !== null && v >= 9.5;
+  const spanCls =
+    mobileSpan === 3 ? "col-span-3" : mobileSpan === 2 ? "col-span-2" : "";
+  return (
+    <div
+      className={`flex flex-col items-center gap-1.5 bg-ink px-1 py-2.5 text-center ${spanCls}`}
+    >
+      <span
+        className={`font-serif text-[1.12rem] font-medium leading-none ${
+          isBonus
+            ? "text-gold [text-shadow:0_0_16px_rgba(201,168,118,0.35)]"
+            : exceptional
+              ? "text-gold [text-shadow:0_0_16px_rgba(201,168,118,0.35)]"
+              : strong
+                ? "text-gold"
+                : "text-cream"
+        }`}
+      >
+        {fmt(v)}
+      </span>
+      <span className="font-mono text-[0.58rem] uppercase tracking-[0.08em] text-mute">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export default function BarCard({
   b,
   rank,
@@ -234,44 +276,40 @@ export default function BarCard({
       )}
 
       {b.status === "visited" && (
-        <div className="mt-3.5 rounded-[6px] border border-line2 bg-ink shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
-          <div className="flex divide-x divide-line">
-            {STATS.map(([key, label]) => {
-              const v = b[key] as unknown as number | null;
-              const strong = v !== null && v >= 8.5;
-              const exceptional = v !== null && v >= 9.5;
-              return (
-                <div
-                  key={key}
-                  className="flex flex-1 flex-col items-center gap-1.5 px-1 py-2.5 text-center"
-                >
-                  <span
-                    className={`font-serif text-[1.12rem] font-medium leading-none ${
-                      exceptional
-                        ? "text-gold [text-shadow:0_0_16px_rgba(201,168,118,0.35)]"
-                        : strong
-                          ? "text-gold"
-                          : "text-cream"
-                    }`}
-                  >
-                    {fmt(v)}
-                  </span>
-                  <span className="font-mono text-[0.58rem] uppercase tracking-[0.08em] text-mute">
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
+        <div className="mt-3.5 overflow-hidden rounded-[6px] border border-line2 bg-ink shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
+          {/* Desktop: all 5 scores in one clean row */}
+          <div className="hidden grid-cols-5 gap-px bg-gold/20 sm:grid">
+            {STATS.map(([key, label]) => (
+              <ScoreCell
+                key={key}
+                bar={b}
+                statKey={key}
+                label={label}
+                mobileSpan={2}
+              />
+            ))}
+          </div>
 
+          {/* Mobile: 6-column grid — 5 scores use 2+2+2 / 3+3, 6 scores use all 2-col spans */}
+          <div className="grid grid-cols-6 gap-px bg-gold/20 sm:hidden">
+            {STATS.map(([key, label], i) => (
+              <ScoreCell
+                key={key}
+                bar={b}
+                statKey={key}
+                label={label}
+                mobileSpan={b.bathroomBonus > 0 ? 2 : i < 3 ? 2 : 3}
+              />
+            ))}
             {b.bathroomBonus > 0 && (
-              <div className="flex min-w-0 flex-[1.8] flex-col items-center gap-1.5 overflow-hidden px-1 py-2.5 text-center">
-                <span className="font-serif text-[1.12rem] font-medium leading-none text-cream">
-                  {fmt(b.bathroomBonus)}
-                </span>
-                <span className="min-w-0 truncate font-mono text-[0.58rem] uppercase tracking-[0.08em] text-mute">
-                  Bathroom bonus
-                </span>
-              </div>
+              <ScoreCell
+                key="bathroom"
+                bar={b}
+                statKey="bathroomBonus"
+                label="Bathroom Bonus"
+                isBonus
+                mobileSpan={2}
+              />
             )}
           </div>
         </div>
