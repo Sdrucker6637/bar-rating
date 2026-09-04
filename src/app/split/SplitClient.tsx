@@ -1067,11 +1067,121 @@ export default function SplitClient() {
     };
   }
 
+  // One net amount owed between two people who each paid for a place, so
+  // covering different tabs across the trip never means two separate
+  // payments changing hands between the same two people.
+  interface SettleUpLine {
+    fromId: string;
+    fromName: string;
+    toId: string;
+    toName: string;
+    amount: number;
+    /** Which place(s) the amount comes from, e.g. "(Place A vs Place B)" —
+     *  as few words as it takes, since the real numbers are already shown
+     *  above this in every message that includes it. */
+    note: string;
+  }
+
+  // Nets what any two payers owe each other across the WHOLE trip. Only
+  // payers have a "credit" side (money they fronted) to net against what
+  // they owe elsewhere — everyone else still just owes whichever payer(s)
+  // covered the places they were at, unchanged. A pair that never actually
+  // owed each other anything (no overlap, or their shares happened to
+  // cancel exactly) is left out entirely — nothing to settle, nothing to
+  // explain.
+  function computeSettleUp(): SettleUpLine[] {
+    const payerIds = Array.from(
+      new Set(
+        splitPlaces.map((pl) => pl.paidBy).filter((id): id is string => !!id),
+      ),
+    );
+    const lines: SettleUpLine[] = [];
+    for (let i = 0; i < payerIds.length; i++) {
+      for (let j = i + 1; j < payerIds.length; j++) {
+        const aId = payerIds[i];
+        const bId = payerIds[j];
+        const aName = splitPeople.find((p) => p.id === aId)?.name || "?";
+        const bName = splitPeople.find((p) => p.id === bId)?.name || "?";
+        // What A owes B: A's share of every place B paid that A attended.
+        let aOwesB = 0;
+        const aOwesBPlaces: string[] = [];
+        // What B owes A: B's share of every place A paid that B attended.
+        let bOwesA = 0;
+        const bOwesAPlaces: string[] = [];
+        splitPlaces.forEach((place, idx) => {
+          if (place.paidBy === bId && place.crewIds.includes(aId)) {
+            const amt = placeTotalsList[idx].perPersonTotal[aId] || 0;
+            if (amt > 0) {
+              aOwesB += amt;
+              aOwesBPlaces.push(placeLabel(place, idx));
+            }
+          }
+          if (place.paidBy === aId && place.crewIds.includes(bId)) {
+            const amt = placeTotalsList[idx].perPersonTotal[bId] || 0;
+            if (amt > 0) {
+              bOwesA += amt;
+              bOwesAPlaces.push(placeLabel(place, idx));
+            }
+          }
+        });
+        const net = aOwesB - bOwesA;
+        if (Math.abs(net) < 0.005) continue; // settled — nothing to show
+        // Note reads debtor-first: the place(s) that put them in the hole,
+        // then the place(s) that brought it back down — so "X owes Y $10
+        // (Place 1 vs Place 2)" always means Place 1 is X's larger side.
+        const debtorPlaces = net > 0 ? aOwesBPlaces : bOwesAPlaces;
+        const creditorPlaces = net > 0 ? bOwesAPlaces : aOwesBPlaces;
+        const note =
+          debtorPlaces.length && creditorPlaces.length
+            ? `(${debtorPlaces.join(", ")} vs ${creditorPlaces.join(", ")})`
+            : debtorPlaces.length
+              ? `(${debtorPlaces.join(", ")})`
+              : `(${creditorPlaces.join(", ")})`;
+        lines.push(
+          net > 0
+            ? {
+                fromId: aId,
+                fromName: aName,
+                toId: bId,
+                toName: bName,
+                amount: net,
+                note,
+              }
+            : {
+                fromId: bId,
+                fromName: bName,
+                toId: aId,
+                toName: aName,
+                amount: -net,
+                note,
+              },
+        );
+      }
+    }
+    return lines;
+  }
+
   function buildGrandShareResults(includeBreakdown: boolean): SplitShareResults {
+    const settleUp = computeSettleUp();
+    // Every payer who fronted at least one place — used to suppress the old
+    // per-place "pay X back" note between two payers in THIS summary (the
+    // grand total is the only place that knows about every place at once,
+    // so it's the only place that can net them). Their per-place *amounts*
+    // still show — only the now-superseded payment instruction is dropped.
+    const allPayerIds = new Set(
+      splitPlaces.map((pl) => pl.paidBy).filter((id): id is string => !!id),
+    );
+    const settleUpGroupLines = settleUp.map(
+      (s) => `- ${s.fromName} owes ${s.toName} $${s.amount.toFixed(2)} ${s.note}`,
+    );
+
     const group = [
       splitPlaces
         .map((_, i) => buildPlaceShareResults(i, includeBreakdown).group)
         .join("\n\n"),
+      ...(settleUpGroupLines.length > 0
+        ? ["", "Settle up:", ...settleUpGroupLines]
+        : []),
       "",
       "Grand total:",
       ...splitPeople.map(
@@ -1090,11 +1200,17 @@ export default function SplitClient() {
         const payer = place.paidBy
           ? splitPeople.find((sp) => sp.id === place.paidBy) || null
           : null;
-        const paidByNote = payer
-          ? place.paidBy === p.id
-            ? " — you paid, others owe you"
-            : ` — pay ${payer.name} back`
-          : "";
+        // Between two payers, the per-place "pay X back" is superseded by
+        // the one net Settle Up line below — showing both would mean two
+        // conflicting instructions for the same two people.
+        const bothPayers =
+          !!payer && allPayerIds.has(p.id) && allPayerIds.has(payer.id);
+        const paidByNote =
+          payer && !bothPayers
+            ? place.paidBy === p.id
+              ? " — you paid, others owe you"
+              : ` — pay ${payer.name} back`
+            : "";
         perPlaceLines.push(
           `- ${placeLabel(place, i)} — $${(t.perPersonTotal[p.id] || 0).toFixed(2)}${paidByNote}`,
         );
@@ -1117,6 +1233,13 @@ export default function SplitClient() {
           );
         }
       });
+      const mySettleUp = settleUp
+        .filter((s) => s.fromId === p.id || s.toId === p.id)
+        .map((s) =>
+          s.fromId === p.id
+            ? `You owe ${s.toName} $${s.amount.toFixed(2)} ${s.note}`
+            : `${s.fromName} owes you $${s.amount.toFixed(2)} ${s.note}`,
+        );
       return {
         personId: p.id,
         name: p.name,
@@ -1124,6 +1247,7 @@ export default function SplitClient() {
         message: [
           `Hey ${p.name}! Your total for the night is $${amount.toFixed(2)}.`,
           ...(perPlaceLines.length > 0 ? ["", ...perPlaceLines] : []),
+          ...(mySettleUp.length > 0 ? ["", "Settle up:", ...mySettleUp] : []),
         ].join("\n"),
       };
     });
