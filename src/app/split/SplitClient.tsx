@@ -42,6 +42,7 @@ function emptyPlace(id: string, crewIds: string[]): SplitPlace {
     evenRounds: {},
     evenExcluded: [],
     evenMaxRounds: 1,
+    paidBy: null,
   };
 }
 
@@ -111,6 +112,7 @@ export default function SplitClient() {
           crewIds: place.crewIds.filter((cid) => cid !== id),
           evenExcluded: place.evenExcluded.filter((cid) => cid !== id),
           evenRounds: nextRounds,
+          paidBy: place.paidBy === id ? null : place.paidBy,
           items: place.items.map((it) => {
             if (!(id in it.assignedTo)) return it;
             const nextAssigned = { ...it.assignedTo };
@@ -162,6 +164,18 @@ export default function SplitClient() {
         if (i !== placeIndex) return pl;
         const n = Number(raw);
         return { ...pl, tip: Number.isFinite(n) && n >= 0 ? n : 0 };
+      }),
+    );
+  }
+
+  // Who fronted this place's bill — purely informational (never touches any
+  // totals), but carried into every share message so everyone knows who to
+  // pay back. Clicking the already-selected person clears it.
+  function setPlacePaidBy(placeIndex: number, personId: string | null) {
+    setSplitPlaces((prev) =>
+      prev.map((pl, i) => {
+        if (i !== placeIndex) return pl;
+        return { ...pl, paidBy: pl.paidBy === personId ? null : personId };
       }),
     );
   }
@@ -598,6 +612,7 @@ export default function SplitClient() {
           crewIds: pl.crewIds.filter((id) => id !== personId),
           evenExcluded: pl.evenExcluded.filter((id) => id !== personId),
           evenRounds: nextRounds,
+          paidBy: pl.paidBy === personId ? null : pl.paidBy,
           items: pl.items.map((it) => {
             if (!(personId in it.assignedTo)) return it;
             const nextAssigned = { ...it.assignedTo };
@@ -893,6 +908,18 @@ export default function SplitClient() {
       0,
     );
     const billLines = isEven ? evenBillLines(place) : [];
+    const payer = place.paidBy
+      ? splitPeople.find((p) => p.id === place.paidBy) || null
+      : null;
+    // Who to settle up with — the payer's own message says they're owed
+    // back, everyone else's says who to pay. Purely informational, never
+    // affects any total.
+    const payerNote = (personId: string): string | null => {
+      if (!payer) return null;
+      return personId === payer.id
+        ? `You covered this tab — everyone else will pay you back.`
+        : `Pay ${payer.name} back for this one.`;
+    };
 
     const individuals: SplitShareMessage[] = place.crewIds.map((id) => {
       const person = splitPeople.find((p) => p.id === id);
@@ -909,10 +936,12 @@ export default function SplitClient() {
           };
         }
         const rounds = place.evenRounds[id] ?? maxRounds;
+        const note = payerNote(id);
         const message = [
           `${label} — Bill Split`,
           "",
           `Hey ${name}! Your share is $${amount.toFixed(2)} — accounted for ${rounds}/${maxRounds} rounds.`,
+          ...(note ? [note] : []),
           ...(billLines.length > 0 ? ["", "Bill:", ...billLines] : []),
         ].join("\n");
         return { personId: id, name, excluded: false, message };
@@ -927,10 +956,12 @@ export default function SplitClient() {
       if (extraPerPerson > 0) {
         itemLines.push(`- Tax/tip — $${extraPerPerson.toFixed(2)}`);
       }
+      const note = payerNote(id);
       const message = [
         `${label} — Bill Split`,
         "",
         `Your share: $${amount.toFixed(2)}`,
+        ...(note ? [note] : []),
         ...(itemLines.length > 0 ? ["", "Items:", ...itemLines] : []),
         "",
         `Total: $${amount.toFixed(2)}`,
@@ -960,6 +991,7 @@ export default function SplitClient() {
     return {
       group: [
         `${label} — Bill Split`,
+        ...(payer ? [`Paid by: ${payer.name}`] : []),
         "",
         ...lines,
         ...(breakdownLines.length > 0
@@ -990,8 +1022,16 @@ export default function SplitClient() {
         if (!place.crewIds.includes(p.id)) return;
         const t = placeTotalsList[i];
         const isEven = place.splitMethod === "even";
+        const payer = place.paidBy
+          ? splitPeople.find((sp) => sp.id === place.paidBy) || null
+          : null;
+        const paidByNote = payer
+          ? place.paidBy === p.id
+            ? " — you paid, others owe you"
+            : ` — pay ${payer.name} back`
+          : "";
         perPlaceLines.push(
-          `- ${placeLabel(place, i)} — $${(t.perPersonTotal[p.id] || 0).toFixed(2)}`,
+          `- ${placeLabel(place, i)} — $${(t.perPersonTotal[p.id] || 0).toFixed(2)}${paidByNote}`,
         );
         // Carry the calculation itself along, indented under the place, so
         // the grand-total message isn't just a list of numbers to trust.
@@ -1049,6 +1089,7 @@ export default function SplitClient() {
         onSetPlaceName={setPlaceName}
         onSetPlaceTax={setPlaceTax}
         onSetPlaceTip={setPlaceTip}
+        onSetPlacePaidBy={setPlacePaidBy}
         onAddScreenshots={addScreenshotsToPlace}
         onRemoveScreenshot={removeScreenshotFromPlace}
         onRemovePersonFromPlace={removePersonFromPlace}

@@ -142,6 +142,10 @@ export interface SplitPlace {
   /** The bill's total round count — full participation equals this number.
    *  People are capped at it and new crew members default to it. */
   evenMaxRounds: number;
+  /** Who fronted this place's bill — a `SplitPerson` id, or null if nobody's
+   *  been picked yet. Purely informational (doesn't affect any totals) but
+   *  carried into every share message so everyone knows who to pay back. */
+  paidBy: string | null;
 }
 
 export interface SplitTotals {

@@ -42,6 +42,8 @@ interface SplitBillViewProps {
   /** Manual tax/tip entry (used when a place has no receipt photo to parse). */
   onSetPlaceTax: (placeIndex: number, raw: string) => void;
   onSetPlaceTip: (placeIndex: number, raw: string) => void;
+  /** Sets (or clears, if already selected) who fronted this place's bill. */
+  onSetPlacePaidBy: (placeIndex: number, personId: string | null) => void;
   onAddScreenshots: (placeIndex: number, files: FileList) => void;
   onRemoveScreenshot: (placeIndex: number, shotId: string) => void;
   readingAll: boolean;
@@ -129,6 +131,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
     onSetPlaceName,
     onSetPlaceTax,
     onSetPlaceTip,
+    onSetPlacePaidBy,
     onAddScreenshots,
     onRemoveScreenshot,
     readingAll,
@@ -429,6 +432,14 @@ export default function SplitBillView(props: SplitBillViewProps) {
           className={`rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
         >
           <PanelHeading>{placeLabel(place, activePlaceIndex)}</PanelHeading>
+
+          <PaidBySelector
+            crew={crew}
+            paidBy={place.paidBy}
+            onSelect={(personId) =>
+              onSetPlacePaidBy(activePlaceIndex, personId)
+            }
+          />
 
           <SplitMethodToggle
             method={place.splitMethod}
@@ -1039,6 +1050,51 @@ function AddItemControl({
         </button>
       </div>
     </form>
+  );
+}
+
+// Who fronted this place's bill — purely informational (it never touches any
+// total) but carried into every share message so everyone knows who to pay
+// back. A single-select: clicking the already-selected person clears it.
+function PaidBySelector({
+  crew,
+  paidBy,
+  onSelect,
+}: {
+  crew: SplitPerson[];
+  paidBy: string | null;
+  onSelect: (personId: string | null) => void;
+}) {
+  return (
+    <div className="mb-3.5">
+      <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        Who paid?
+      </div>
+      {crew.length === 0 ? (
+        <div className="font-mono text-[0.72rem] text-mute">
+          Add people below to pick who paid this tab.
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {crew.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={paidBy === p.id}
+              onClick={() => onSelect(p.id === paidBy ? null : p.id)}
+              className={`${chipCls} ${paidBy === p.id ? chipActiveCls : ""}`}
+              title={
+                paidBy === p.id
+                  ? `${p.name} paid — tap to clear`
+                  : `Mark ${p.name} as having paid this tab`
+              }
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
