@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SplitBillView from "@/components/SplitBillView";
 import TabIntro from "@/components/TabIntro";
 import { distributeCents, evenShares } from "@/lib/splitMath";
+import { checkSplitAchievements } from "@/lib/achievements";
+import { useTour } from "@/lib/tour-context";
 import type {
   SplitItem,
   SplitPerson,
@@ -62,6 +64,7 @@ function itemKey(name: string, price: number): string {
 }
 
 export default function SplitClient() {
+  const { unlockAchievements } = useTour();
   const [splitStep, setSplitStep] = useState<SplitStep>("names");
   const [splitPeople, setSplitPeople] = useState<SplitPerson[]>([]);
   const [splitNameInput, setSplitNameInput] = useState("");
@@ -72,6 +75,10 @@ export default function SplitClient() {
   // "+ someone new" are deletable; the original crew isn't.
   const [originalRosterIds, setOriginalRosterIds] = useState<string[]>([]);
   const [readingAll, setReadingAll] = useState(false);
+  // Whether "Split evenly" was used on ANY item this session — Itemized to
+  // Death is specifically about hand-assigning instead of that shortcut, so
+  // an item ending up single-assigned by coincidence doesn't count.
+  const usedSplitEvenlyRef = useRef(false);
 
   function resetSplitBill() {
     setSplitStep("names");
@@ -82,6 +89,7 @@ export default function SplitClient() {
     setActivePlaceIndex(0);
     setOriginalRosterIds([]);
     setReadingAll(false);
+    usedSplitEvenlyRef.current = false;
   }
 
   // ---------------- names step ----------------
@@ -501,6 +509,7 @@ export default function SplitClient() {
     itemId: string,
     personIds: string[],
   ) {
+    usedSplitEvenlyRef.current = true;
     setSplitPlaces((prev) =>
       prev.map((pl, pi) => {
         if (pi !== placeIndex) return pl;
@@ -814,6 +823,33 @@ export default function SplitClient() {
     });
     return { perPersonTotal };
   }, [placeTotalsList, splitPeople]);
+
+  // Split the Bill never touches Firestore (see the README), so this is the
+  // one point where its three achievements get checked — right when the
+  // numbers are final. Only the unlock itself is written; the split data
+  // stays exactly as ephemeral as it always was.
+  useEffect(() => {
+    if (splitStep !== "summary") return;
+    const allItems = splitPlaces.flatMap((pl) => pl.items);
+    const perPersonTotals = Object.values(grandTotals.perPersonTotal);
+    const payerCounts = new Map<string, number>();
+    splitPlaces.forEach((pl) => {
+      if (!pl.paidBy) return;
+      payerCounts.set(pl.paidBy, (payerCounts.get(pl.paidBy) || 0) + 1);
+    });
+    const payerCoverCount =
+      payerCounts.size > 0 ? Math.max(...payerCounts.values()) : 0;
+    const keys = checkSplitAchievements(
+      allItems,
+      usedSplitEvenlyRef.current,
+      perPersonTotals,
+      payerCoverCount,
+    );
+    if (keys.length > 0) {
+      void unlockAchievements(keys.map((key) => ({ key })));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitStep]);
 
   // Two variants of every message — full receipt and totals-only — so the
   // "include breakdown" toggle in ShareResults can switch between them

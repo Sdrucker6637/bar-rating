@@ -10,12 +10,14 @@ import VisitedNamePromptModal from "./modals/VisitedNamePromptModal";
 import WishFormModal from "./modals/WishFormModal";
 import PlacesModal from "./modals/PlacesModal";
 import CrawlModal from "./modals/CrawlModal";
+import AchievementToastStack from "./AchievementToastStack";
 
 const TABS = [
   { route: "/leaderboard", label: "Leaderboard" },
   { route: "/find", label: "Discover" },
   { route: "/map", label: "Tour Map" },
   { route: "/split", label: "Split the Bill" },
+  { route: "/achievements", label: "Achievements" },
 ];
 
 export default function Shell({ children }: { children: React.ReactNode }) {
@@ -105,6 +107,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       <WishFormModal />
       <PlacesModal />
       <CrawlModal />
+      <AchievementToastStack />
     </div>
   );
 }

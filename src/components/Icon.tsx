@@ -193,6 +193,22 @@ const GLYPHS: Record<string, ReactNode> = {
   chevronDown: <polyline points="6 9 12 15 18 9" />,
   // check (selected state)
   check: <polyline points="20 6 9 17 4 12" />,
+  // padlock (locked achievement)
+  lock: (
+    <>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+      <path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5" />
+    </>
+  ),
+  // medal (unlocked achievement)
+  medal: (
+    <>
+      <circle cx="12" cy="14.5" r="6.5" />
+      <path d="M9 8.5 6 2h3l3 5.5" />
+      <path d="M15 8.5 18 2h-3l-3 5.5" />
+      <path d="M10.3 14.5h3.4" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof GLYPHS;

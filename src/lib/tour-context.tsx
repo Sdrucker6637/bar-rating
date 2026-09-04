@@ -14,7 +14,7 @@ import { db } from "./firebase";
 import { base, DOC_PATH, emptyVisitedForm, emptyWishForm } from "./constants";
 import { seedBars } from "./seed";
 import { avgWithFood, avgWithoutFood, haversineMeters } from "./scoring";
-import { rankEntries } from "./ranking";
+import { pendingBattlePairs, rankEntries } from "./ranking";
 import { displayDescription } from "./parse";
 import { callGemini } from "./gemini";
 import {
@@ -29,7 +29,14 @@ import {
 } from "./enrichment";
 import { fetchPlaces, fetchBarSuggestions, fetchRandomBar } from "./places";
 import { SURPRISE_VIBES } from "./constants";
+import {
+  checkCrawlPlanAchievements,
+  checkDerivedAchievements,
+  checkMenaceToSobriety,
+  isOneNightStand,
+} from "./achievements";
 import type {
+  AchievementUnlock,
   Bar,
   PlaceResult,
   RankingBattle,
@@ -103,6 +110,21 @@ interface TourContextValue {
     bar2Id: string,
     winnerId: string,
   ) => Promise<boolean>;
+
+  // ---- achievements ----
+  /** Every permanently-unlocked achievement, from the shared doc. */
+  achievementUnlocks: AchievementUnlock[];
+  /** Unlocks not yet shown as a toast — Shell renders and dismisses these.
+   *  Also the entry point for the Split the Bill flow, which never touches
+   *  Firestore itself but still needs to record a one-time unlock. */
+  pendingAchievementToasts: AchievementUnlock[];
+  dismissAchievementToast: (key: string) => void;
+  /** Records one or more achievements as permanently unlocked (no-ops for
+   *  any key already unlocked). Used directly by SplitClient for the split
+   *  achievements, which this module has no visibility into. */
+  unlockAchievements: (
+    entries: Array<{ key: string; context?: string }>,
+  ) => Promise<void>;
 
   // ---- leaderboard filters ----
   search: string;
@@ -261,6 +283,48 @@ export function TourProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     rankingBattlesRef.current = rankingBattles;
   }, [rankingBattles]);
+
+  // Permanent, one-time achievement unlocks — see src/lib/achievements.ts.
+  // Loaded from the same shared document as bars/rankingBattles.
+  const [achievementUnlocks, setAchievementUnlocks] = useState<
+    AchievementUnlock[]
+  >([]);
+  const achievementUnlocksRef = useRef<AchievementUnlock[]>([]);
+  useEffect(() => {
+    achievementUnlocksRef.current = achievementUnlocks;
+  }, [achievementUnlocks]);
+  const [pendingAchievementToasts, setPendingAchievementToasts] = useState<
+    AchievementUnlock[]
+  >([]);
+  const dismissAchievementToast = useCallback((key: string) => {
+    setPendingAchievementToasts((prev) => prev.filter((u) => u.key !== key));
+  }, []);
+  // Small counter living alongside the shared doc (not inside `bars`, so it
+  // never touches the bars transaction) — how many times the "Fits our
+  // group" filter has been switched on and actually hidden a wishlist bar.
+  const [capacityFilterMisses, setCapacityFilterMisses] = useState(0);
+  const capacityFilterMissesRef = useRef(0);
+  useEffect(() => {
+    capacityFilterMissesRef.current = capacityFilterMisses;
+  }, [capacityFilterMisses]);
+  // Whether the initial achievement backfill has already run this session —
+  // guards against re-scanning (and re-toasting) the same pre-existing state
+  // every time the effect below re-fires for an unrelated bars/battles edit.
+  const achievementBackfillDoneRef = useRef(false);
+  // Names from the most recently PLANNED crawl — kept even after the modal
+  // closes (only replaced by a newer plan) so a bathroom-bonus rating
+  // entered afterward can still be cross-referenced for Menace to Sobriety.
+  const lastCrawlStopNamesRef = useRef<Set<string>>(new Set());
+  // Per-slot replace count for the crawl currently open — reset by every
+  // fresh plan, never by replaceStop itself (Commitment Issues wants
+  // "swapped the SAME slot three-plus times", not "three replaces total").
+  const crawlReplaceCountsRef = useRef<Record<number, number>>({});
+  // Every battled PAIR (unordered bar1|bar2 key) recorded in THIS browser
+  // session — Cherry Picked ("personally settle every vote in a multi-way
+  // tie in one go") has no durable notion of "personally" without accounts,
+  // so it's approximated as a session-local streak instead of derived from
+  // persisted state.
+  const sessionBattlePairKeysRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     barsRef.current = bars;
   }, [bars]);
@@ -349,6 +413,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
           const healed = healMissingMapsLinks((data.bars as Bar[]) || []);
           setBars(healed.bars);
           setRankingBattles((data.rankingBattles as RankingBattle[]) || []);
+          setAchievementUnlocks(
+            (data.achievementUnlocks as AchievementUnlock[]) || [],
+          );
+          setCapacityFilterMisses(Number(data.capacityFilterMisses) || 0);
           // One-time heal: legacy bars load with an empty mapsLink, which hides
           // the card's Map action. Write the backfilled links back so the
           // stored copy is fixed too — idempotent, so the follow-up snapshot
@@ -395,6 +463,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
                 bars: seedBars,
                 groupSize: DEFAULT_GROUP_SIZE,
                 rankingBattles: [],
+                achievementUnlocks: [],
+                capacityFilterMisses: 0,
               });
             }
           }).catch(() => setConnError(true));
@@ -522,7 +592,9 @@ export function TourProvider({ children }: { children: ReactNode }) {
         });
         return next;
       };
-      setRankingBattles(mk(rankingBattlesRef.current));
+      const optimisticBattles = mk(rankingBattlesRef.current);
+      setRankingBattles(optimisticBattles);
+      sessionBattlePairKeysRef.current.add(pairKey(bar1Id, bar2Id));
       try {
         await db.runTransaction(async (tx) => {
           const snap = await tx.get(docRef);
@@ -539,6 +611,35 @@ export function TourProvider({ children }: { children: ReactNode }) {
           tx.update(docRef, { rankingBattles: mk(freshBattles) });
         });
         setSaveError(false);
+        // Cherry Picked (best-effort, session-scoped — see
+        // sessionBattlePairKeysRef): the winner's current tie group has 3+
+        // members, every battle among that group happened in THIS session,
+        // and no tiebreak within the group is still pending.
+        const liveBars = barsRef.current || [];
+        const winnerBar = liveBars.find((b) => b.id === winnerId);
+        const wScore = winnerBar && !winnerBar.disqualified ? avgWithFood(winnerBar) : null;
+        if (winnerBar && wScore !== null) {
+          const key = wScore.toFixed(9);
+          const group = liveBars.filter((b) => {
+            if (b.disqualified) return false;
+            const s = avgWithFood(b);
+            return s !== null && s.toFixed(9) === key;
+          });
+          if (group.length >= 3) {
+            const groupIds = new Set(group.map((b) => b.id));
+            const groupBattles = optimisticBattles.filter(
+              (btl) => groupIds.has(btl.bar1Id) && groupIds.has(btl.bar2Id),
+            );
+            const allThisSession = groupBattles.every((btl) =>
+              sessionBattlePairKeysRef.current.has(pairKey(btl.bar1Id, btl.bar2Id)),
+            );
+            const scoredGroup = group.map((b) => ({ item: b, score: wScore }));
+            const stillPending = pendingBattlePairs(scoredGroup, optimisticBattles);
+            if (allThisSession && groupBattles.length >= 2 && stillPending.length === 0) {
+              void unlockAchievements([{ key: "cherry_picked" }]);
+            }
+          }
+        }
         return true;
       } catch {
         // Revert the optimistic entry so local state stays in sync with the
@@ -550,6 +651,52 @@ export function TourProvider({ children }: { children: ReactNode }) {
         );
         setSaveError(true);
         return false;
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
+
+  // Records one or more achievement unlocks as permanent, one-time facts.
+  // Same shape as recordBattle: field-scoped (only ever writes
+  // `achievementUnlocks`, never `bars`), and re-reads the LATEST document
+  // inside the transaction so two clients unlocking different achievements
+  // at once can't clobber each other. Deduped by key — a key already present
+  // is never appended twice, which is what makes an unlock permanent: once
+  // it's in the array, nothing here ever removes or re-derives it.
+  const unlockAchievements = useCallback(
+    async (entries: Array<{ key: string; context?: string }>) => {
+      if (entries.length === 0) return;
+      // Named `existing` (not `base`) to avoid shadowing the `base` bar
+      // shape imported from ./constants.
+      const mk = (existing: AchievementUnlock[]): AchievementUnlock[] => {
+        const known = new Set(existing.map((u) => u.key));
+        const fresh = entries.filter((e) => !known.has(e.key));
+        if (fresh.length === 0) return existing;
+        const now = Date.now();
+        return [
+          ...existing,
+          ...fresh.map((e) => ({ key: e.key, unlockedAt: now, context: e.context })),
+        ];
+      };
+      const optimistic = mk(achievementUnlocksRef.current);
+      if (optimistic !== achievementUnlocksRef.current) {
+        setAchievementUnlocks(optimistic);
+        const newlyAdded = optimistic.slice(achievementUnlocksRef.current.length);
+        setPendingAchievementToasts((prev) => [...prev, ...newlyAdded]);
+      }
+      try {
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(docRef);
+          if (!snap.exists) return;
+          const fresh =
+            (snap.data()?.achievementUnlocks as AchievementUnlock[]) || [];
+          const next = mk(fresh);
+          if (next !== fresh) tx.update(docRef, { achievementUnlocks: next });
+        });
+      } catch {
+        // Non-critical and self-healing: the next derivation pass will
+        // simply see these keys as still-missing and retry the write.
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
@@ -646,6 +793,35 @@ export function TourProvider({ children }: { children: ReactNode }) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bars, connError]);
+
+  // Achievement backfill + live detection, in one pass. Runs every time
+  // bars/battles/the capacity-filter counter change — including the very
+  // first snapshot after this feature ships, which is what makes it a
+  // backfill: whatever is ALREADY true in the real shared list (a bar
+  // already at #1, a bar already disqualified, 12 bars already visited...)
+  // gets unlocked the moment the updated app loads, dated to that load —
+  // the app has no history of exactly when most of this became true, so
+  // "now" is the only honest timestamp for anything pre-existing. From then
+  // on the same pass just catches whatever newly became true. Diffing
+  // against the ref (not state) means a rapid run of edits can't schedule
+  // duplicate unlock writes for the same key.
+  useEffect(() => {
+    if (!bars) return;
+    const derived = checkDerivedAchievements(
+      bars,
+      rankingBattles,
+      capacityFilterMisses,
+    );
+    if (checkMenaceToSobriety(lastCrawlStopNamesRef.current, bars)) {
+      derived.add("menace_to_sobriety");
+    }
+    const already = new Set(achievementUnlocksRef.current.map((u) => u.key));
+    const fresh = [...derived].filter((k) => !already.has(k));
+    if (fresh.length === 0) return;
+    achievementBackfillDoneRef.current = true;
+    void unlockAchievements(fresh.map((key) => ({ key })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bars, rankingBattles, capacityFilterMisses, unlockAchievements]);
 
   // ---- details / vibe-tag enrichment (bounded queue + recoverable retry) ----
   // Details come from the Gemini route, which persists the result itself
@@ -979,6 +1155,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
         detailsFetched: hasDescription,
         disqualified: false,
         disqualifyReason: "",
+        // Only set on a genuinely NEW bar — an edit (isEdit) spreads `record`
+        // over the existing bar below, and an unconditional value here would
+        // overwrite its real creation time/origin with "now"/undefined.
+        ...(!isEdit ? { createdAt: Date.now(), origin: s._origin } : {}),
       };
       const persistPromise = persist((prev) =>
         isEdit
@@ -1374,21 +1554,29 @@ export function TourProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const replacement =
-        candidates[Math.floor(Math.random() * candidates.length)];
+      const replacement: CrawlStop = {
+        ...candidates[Math.floor(Math.random() * candidates.length)],
+        _origin: "crawl",
+      };
       setCrawlStops((prevStops) =>
         prevStops.map((s, i) => (i === index ? replacement : s)),
       );
       setReplacingIndex(null);
       enrichCrawlStop(replacement);
+      // Commitment Issues: swapped this SAME slot three-plus times this plan.
+      const count = (crawlReplaceCountsRef.current[index] || 0) + 1;
+      crawlReplaceCountsRef.current[index] = count;
+      if (count >= 3) void unlockAchievements([{ key: "commitment_issues" }]);
     },
-    [crawlStops, bars, enrichCrawlStop],
+    [crawlStops, bars, enrichCrawlStop, unlockAchievements],
   );
 
   const runCrawlPlan = useCallback(
     async (startBar: PlaceResult) => {
       const requestedCount = crawlCount;
       setCrawlPlanning(true);
+      // A fresh plan starts a fresh replace-slot count for Commitment Issues.
+      crawlReplaceCountsRef.current = {};
       const normalizedStart: CrawlStop = {
         name: startBar.name,
         address: startBar.address || "",
@@ -1401,6 +1589,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
         tags: startBar.tags || [],
         happyHour: startBar.happyHour || "",
         rating: null,
+        _origin: "crawl",
       };
       if (
         !Number.isFinite(normalizedStart.latitude) ||
@@ -1452,8 +1641,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
           truncated = true;
           break;
         }
-        const next =
-          candidates[Math.floor(Math.random() * candidates.length)];
+        const next: CrawlStop = {
+          ...candidates[Math.floor(Math.random() * candidates.length)],
+          _origin: "crawl",
+        };
         usedNames.add(next.name);
         stops.push(next);
       }
@@ -1475,8 +1666,21 @@ export function TourProvider({ children }: { children: ReactNode }) {
       // enqueue the new ones.
       resetCrawlEnrichment();
       stops.forEach((s) => enrichCrawlStop(s));
+      // Kept even after the crawl modal closes — see lastCrawlStopNamesRef.
+      lastCrawlStopNamesRef.current = new Set(stops.map((s) => s.name));
+      const crawlKeys = checkCrawlPlanAchievements(stops);
+      if (crawlKeys.length > 0) {
+        void unlockAchievements(crawlKeys.map((key) => ({ key })));
+      }
     },
-    [crawlCount, bars, seenNames, enrichCrawlStop, resetCrawlEnrichment],
+    [
+      crawlCount,
+      bars,
+      seenNames,
+      enrichCrawlStop,
+      resetCrawlEnrichment,
+      unlockAchievements,
+    ],
   );
 
   const confirmPlaceSelection = useCallback(
@@ -1569,6 +1773,24 @@ export function TourProvider({ children }: { children: ReactNode }) {
     });
   }, [toTry, fitsGroupOnly, groupSize]);
 
+  // "Fits our group" hides wishlist bars below the group size. Doesn't Fit
+  // Our Group counts how many times switching the filter ON actually hid
+  // something — tracked in a counter alongside the shared doc (not inside
+  // `bars`) rather than per-bar, since it's about the ACTION of filtering,
+  // not any one bar.
+  const prevFitsGroupOnlyRef = useRef(false);
+  useEffect(() => {
+    const turnedOn = fitsGroupOnly && !prevFitsGroupOnlyRef.current;
+    prevFitsGroupOnlyRef.current = fitsGroupOnly;
+    if (!turnedOn) return;
+    if (filteredToTry.length >= toTry.length) return; // nothing was hidden
+    const next = capacityFilterMissesRef.current + 1;
+    capacityFilterMissesRef.current = next;
+    setCapacityFilterMisses(next);
+    docRef.set({ capacityFilterMisses: next }, { merge: true }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitsGroupOnly, filteredToTry.length, toTry.length]);
+
   const startCrawlPlanning = useCallback(async () => {
     setCrawlError(null);
     setCrawlStops([]);
@@ -1598,7 +1820,17 @@ export function TourProvider({ children }: { children: ReactNode }) {
     }
     const start = fresh[Math.floor(Math.random() * fresh.length)];
     await runCrawlPlan(start);
-  }, [crawlStartInput, bars, seenNames, startPlacesLookup, runCrawlPlan]);
+    // No Plan, Just Vibes — this whole branch only runs when no starting
+    // bar was typed in.
+    void unlockAchievements([{ key: "no_plan_just_vibes" }]);
+  }, [
+    crawlStartInput,
+    bars,
+    seenNames,
+    startPlacesLookup,
+    runCrawlPlan,
+    unlockAchievements,
+  ]);
 
   const runSearch = useCallback(async () => {
     resetSearchEnrichment();
@@ -1617,9 +1849,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
     );
     // Google doesn't expose venue capacity, so this only filters bars that already
     // have a capacity set from a prior manual edit; new Places results pass through.
-    const fitFiltered = fitsGroupOnly
-      ? results.filter((r) => !r.capacityHint || r.capacityHint >= groupSize)
-      : results;
+    const fitFiltered = (
+      fitsGroupOnly
+        ? results.filter((r) => !r.capacityHint || r.capacityHint >= groupSize)
+        : results
+    ).map((r) => ({ ...r, _origin: "search" as const }));
     setSearchResults(fitFiltered);
     setSearching(false);
     setSearchDone(true);
@@ -1655,7 +1889,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
       ballerMode,
       exploreMode,
     );
-    setSearchResults(pick ? [pick] : []);
+    const tagged = pick ? { ...pick, _origin: "surprise" as const } : null;
+    setSearchResults(tagged ? [tagged] : []);
     setSearching(false);
     setSearchDone(true);
     if (pick) {
@@ -1699,7 +1934,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
         const fresh = results.filter((r) => !exclude.includes(r.name));
 
-        const pick = fresh[Math.floor(Math.random() * fresh.length)];
+        const picked = fresh[Math.floor(Math.random() * fresh.length)];
+        const pick = picked ? { ...picked, _origin: "nearby" as const } : null;
 
         setSearchResults(pick ? [pick] : []);
         setSearching(false);
@@ -1774,8 +2010,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
                 types: visitedSuggestion.types || [],
                 mapsLink,
                 detailsFetched: false,
+                createdAt: Date.now(),
+                origin: visitedSuggestion._origin,
               }
-            : { ...base, ...patch, id, tags: [] };
+            : { ...base, ...patch, id, tags: [], createdAt: Date.now() };
           // Wishlist consistency, handled in ONE place for every way a bar can
           // reach the leaderboard (manual add, Discover "I visited", crawl "I
           // visited"): if the same venue already sits on the wishlist, this
@@ -1817,6 +2055,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
                     : wishlistMatch.types || [],
                 detailsFetched:
                   baseRecord.detailsFetched || wishlistMatch.detailsFetched,
+                // A historical fact, not a live status — set once here and
+                // never cleared, so Finally/Dream → Reality can check it long
+                // after the bar's wishlist days are over.
+                cameFromWishlist: true,
               }
             : baseRecord;
           record = finalRecord;
@@ -1888,9 +2130,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const removeBar = useCallback(
     (id: string) => {
+      // One-Night Stand only makes sense checked BEFORE deletion — the
+      // record (and its createdAt) won't exist to check afterward.
+      const bar = (barsRef.current || []).find((b) => b.id === id);
+      if (bar && isOneNightStand(bar)) {
+        void unlockAchievements([{ key: "one_night_stand", context: bar.name }]);
+      }
       persist((prev) => prev.filter((b) => b.id !== id));
     },
-    [persist],
+    [persist, unlockAchievements],
   );
 
   const toggleDisqualify = useCallback(
@@ -1900,7 +2148,14 @@ export function TourProvider({ children }: { children: ReactNode }) {
       } else {
         const reason = window.prompt("Why disqualify this one? (optional)", "");
         if (reason === null) return;
-        updateBar(b.id, { disqualified: true, disqualifyReason: reason });
+        // wasDisqualified is a one-way flag — never cleared by the
+        // reinstate branch above — so Redemption Arc stays checkable from
+        // current state alone (disqualified: false, wasDisqualified: true).
+        updateBar(b.id, {
+          disqualified: true,
+          disqualifyReason: reason,
+          wasDisqualified: true,
+        });
       }
     },
     [updateBar],
@@ -1938,6 +2193,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
     rankingBattles,
     recordBattle,
+
+    achievementUnlocks,
+    pendingAchievementToasts,
+    dismissAchievementToast,
+    unlockAchievements,
 
     search,
     setSearch,

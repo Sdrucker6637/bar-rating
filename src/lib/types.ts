@@ -19,6 +19,13 @@ export interface RankingBattle {
   createdAt: number;
 }
 
+/** How a bar record came to exist — drives a few achievement checks (e.g.
+ *  "added via Nearby", "added straight from a crawl stop"). Optional and
+ *  absent on every bar predating this field; a missing origin just never
+ *  matches an origin-specific achievement, which is the correct behavior
+ *  for legacy bars whose real origin was never recorded. */
+export type BarOrigin = "manual" | "surprise" | "nearby" | "search" | "crawl";
+
 export interface Bar {
   id: string;
   name: string;
@@ -45,6 +52,24 @@ export interface Bar {
   detailsFetched: boolean;
   disqualified: boolean;
   disqualifyReason: string;
+  /** Client timestamp (Date.now()) when this record was created. Absent on
+   *  bars that predate this field — achievement checks that need it (e.g.
+   *  "removed within a day of adding") simply never match a legacy bar
+   *  missing it, which is the only honest behavior since the real creation
+   *  time was never recorded. */
+  createdAt?: number;
+  /** How this bar was added — see BarOrigin. */
+  origin?: BarOrigin;
+  /** True once this bar has ever been visited after having sat on the
+   *  wishlist first (set the moment status flips to-try -> visited via a
+   *  wishlist match). Never cleared once set — it's a historical fact about
+   *  the bar, not a live description of its current status. */
+  cameFromWishlist?: boolean;
+  /** True once this bar has ever been disqualified, even if it was later
+   *  reinstated (disqualified: false). Never cleared once set — lets
+   *  "reinstated a bar you'd disqualified" be checked from current state
+   *  alone, without needing a change history. */
+  wasDisqualified?: boolean;
 }
 
 /** A Google Places result, possibly enriched with Gemini flavor text. */
@@ -69,6 +94,27 @@ export interface PlaceResult {
   notes?: string;
   _placeIntent?: "visited" | "wishlist" | "crawlStart";
   _wishFormId?: string;
+  /** Which discovery flow produced this result — carried through into the
+   *  saved Bar's `origin` field when the user adds it. Set by runSearch
+   *  ("search"), runRandomSearch ("surprise"), runNearbySearch ("nearby"),
+   *  and the crawl flow ("crawl"); absent for a manual add. */
+  _origin?: BarOrigin;
+}
+
+/** One permanent, one-time achievement unlock — see src/lib/achievements.ts
+ *  for the full catalog. There are no accounts, so an unlock belongs to the
+ *  shared house, not a person: no name, just what happened and when. Once
+ *  written, an unlock is never removed or re-evaluated, even if the bar or
+ *  battle that earned it later changes — it's a record of a moment, not a
+ *  live description of current state. */
+export interface AchievementUnlock {
+  /** Matches one AchievementDef.key in src/lib/achievements.ts. */
+  key: string;
+  /** Client timestamp (Date.now()) when this was first detected as true. */
+  unlockedAt: number;
+  /** Short free-text context shown on the badge card (e.g. a bar name, or
+   *  a battle's two contenders) — never a person's name. */
+  context?: string;
 }
 
 export interface VisitedForm {
