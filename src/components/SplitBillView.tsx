@@ -581,43 +581,25 @@ export default function SplitBillView(props: SplitBillViewProps) {
                   key={it.id}
                   className="rounded-lg border border-line bg-panel px-5 py-4"
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      gap: "0.6rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div className="font-serif text-[1.1rem] font-medium text-cream">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 truncate font-serif text-[1.1rem] font-medium text-cream">
                       {it.name || "(unnamed item)"}
                     </div>
-                    <div
-                      style={{
-                        marginLeft: "auto",
-                        display: "flex",
-                        flexWrap: "wrap",
-                        alignItems: "center",
-                        justifyContent: "flex-end",
-                        gap: "0.6rem",
-                      }}
+                    <button
+                      className="flex-shrink-0 cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist hover:border-redDeep hover:text-red"
+                      onClick={() => onRemoveItem(activePlaceIndex, it.id)}
                     >
-                      <div className="flex items-center gap-1.5 font-mono text-[0.8rem] text-mist">
-                        <span>${it.price.toFixed(2)}</span>
-                        {q > 1 && <span>· Qty {q}</span>}
-                        {includedIds.length > 1 && (
-                          <span className="rounded-full border border-goldDeep bg-[rgba(138,109,47,0.15)] px-2 py-0.5 font-mono text-[0.66rem] text-gold">
-                            ÷ {includedIds.length} ways
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        className="cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist hover:border-redDeep hover:text-red"
-                        onClick={() => onRemoveItem(activePlaceIndex, it.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
+                      Remove
+                    </button>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[0.8rem] text-mist">
+                    <span>${it.price.toFixed(2)}</span>
+                    {q > 1 && <span>· Qty {q}</span>}
+                    {includedIds.length > 1 && (
+                      <span className="rounded-full border border-goldDeep bg-[rgba(138,109,47,0.15)] px-2 py-0.5 font-mono text-[0.66rem] text-gold">
+                        ÷ {includedIds.length} ways
+                      </span>
+                    )}
                   </div>
                   {q > 1 && wholeUnitShares && (
                     <div className="mt-0.5 font-mono text-[0.68rem] text-mute">
