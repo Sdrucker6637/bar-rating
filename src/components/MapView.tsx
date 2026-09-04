@@ -156,10 +156,12 @@ export default function MapView({ bars }: MapViewProps) {
       };
 
       L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
         {
-          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+          attribution:
+            "&copy; OpenStreetMap contributors &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
           maxZoom: 19,
+          maxNativeZoom: 16,
         },
       ).addTo(map);
 

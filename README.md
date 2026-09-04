@@ -63,7 +63,7 @@ A shared, collaborative drinking journal for a friend group: rank every bar you'
 | UI | **React 18.3** | Client Components; no server components except thin page shells |
 | Styling | **Tailwind CSS 3.4** + custom CSS | Dark "walnut & brass" theme (see `tailwind.config.ts`); fonts: Fraunces (serif), Inter (sans), IBM Plex Mono (mono) via Google Fonts |
 | Database | **Firebase Firestore** | Only Firebase service used; client web SDK (`firebase/compat`) + `firebase-admin` in one API route |
-| Map | **Leaflet 1.9** + **leaflet.heat** 0.2 | CARTO dark tiles; heat plugin loaded from unpkg at runtime |
+| Map | **Leaflet 1.9** + **leaflet.heat** 0.2 | Esri dark tiles; heat plugin loaded from unpkg at runtime |
 | Search/geo | **Google Places API (New)** — `places:searchText` | Server-side, verified lookups + discovery |
 | AI | **Google Gemini API** (`generativelanguage.googleapis.com`) | Text generation + vision (receipts); default model `gemini-3.5-flash-lite` |
 | Geocoding fallback | **OpenStreetMap Nominatim** | Client-side fallback for coordinate backfill |
@@ -111,7 +111,7 @@ Not present (do not assume): Firebase Auth, Firebase Storage, Firebase Hosting, 
   - `/api/places` — Google Places Text Search, caching, exact-match ranking, discovery filtering.
   - `/api/gemini` — Gemini text generation for bar descriptions; persists results to Firestore in a transaction when given a `barId`.
   - `/api/split-receipt` — Gemini vision parse of receipt images (stateless; no Firestore).
-- **External services:** Google Places (verification/discovery), Google Gemini (flavor text + receipt parsing), Nominatim (coordinate fallback), CARTO tiles (map basemap), Google Fonts, unpkg (heat plugin).
+- **External services:** Google Places (verification/discovery), Google Gemini (flavor text + receipt parsing), Nominatim (coordinate fallback), Esri tiles (map basemap), Google Fonts, unpkg (heat plugin).
 - **Firebase:** the app's source of truth — one shared document per the whole app plus a search cache collection.
 
 ---
@@ -222,7 +222,7 @@ Not present (do not assume): Firebase Auth, Firebase Storage, Firebase Hosting, 
 
 ### 7. Tour Map
 
-1. Leaflet map centered on NYC; CARTO dark tiles.
+1. Leaflet map centered on NYC; Esri dark tiles.
 2. Visited mode: heat layer + circle markers; each marker's color is interpolated along the visited gradient by the bar's score normalized to the currently displayed range.
 3. Wishlist mode: single mint color, cluster density.
 4. Bars without coordinates are skipped (they're healed automatically on load — see Business Logic).
@@ -383,10 +383,10 @@ Document: placesSearchCache/<fnv1a-hash-key>
 - **Error handling:** failures silently leave the bar without coordinates (retried next full page load).
 - **Caching:** none.
 
-### CARTO basemap tiles
+### Esri basemap tiles
 
 - **Purpose:** Leaflet dark map tiles.
-- **Endpoint:** `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png` (attribution required — provided).
+- **Endpoint:** `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}` (attribution required — provided; no API key). Switched from CARTO's `basemaps.cartocdn.com` after it began requiring an API key for anonymous requests.
 - **Client-side**, free tier with attribution.
 
 ### leaflet.heat (unpkg CDN)
@@ -486,7 +486,7 @@ The app requests full fields (names, addresses, status, price level, types, rati
 
 Reality check: this app caches aggressively (24 h shared Firestore cache + 10 min client cache; crawl/nearby use `noCache` but are rare), so monthly billable requests will be far below page-view counts. For the current small user base, Places cost is **$0/month**.
 
-### Nominatim / CARTO / Fonts / unpkg
+### Nominatim / Esri / Fonts / unpkg
 
 All free (attribution-only) at this scale. Nominatim's 1 req/s policy is already paced in code.
 
@@ -502,7 +502,7 @@ Assumptions: "users" = monthly active visitors; per-visitor monthly activity ≈
 | **Places Text Search Pro** (~300 / 3,000 / 30,000 req) | $0 (free cap) | $0 (free cap) | $800 − $200 credit = **~$600** |
 | **Firestore** (1 shared doc + cache docs) | $0 (Spark) | $0 (Spark) | ~$5–25 (Blaze; cache doc churn grows with searches) |
 | **Vercel** | $0 (Hobby) | $0 (Hobby) | $20 (Pro) or Hobby + overages |
-| **Other** (Nominatim/CARTO/fonts) | $0 | $0 | $0 |
+| **Other** (Nominatim/Esri/fonts) | $0 | $0 | $0 |
 | **Total (est.)** | **~$0–1/mo** | **~$2–5/mo** | **~$640–700/mo** |
 
 **Known fixed costs:** $0 (Vercel Hobby, free tiers). Everything else is **estimated**. The Large scenario is dominated by Places Text Search Pro; moving to the Places "Enterprise" subscription or tightening the cache TTL would change that curve. Gemini's free tier covers the small/moderate rows.
@@ -810,7 +810,7 @@ Propagation: Firestore write → `onSnapshot` on every connected client → `set
 
 **Main technologies:** Next.js 14 (App Router) · React 18 · TypeScript 5.5 · Tailwind 3.4 · Firebase Firestore (web + admin SDKs + REST) · Leaflet + leaflet.heat · Vercel.
 
-**Main external APIs:** Google Places API (New) Text Search (`places:searchText`) · Google Gemini API (`:generateContent`) · OpenStreetMap Nominatim (fallback geocode) · CARTO basemap tiles · Google Fonts · unpkg CDN.
+**Main external APIs:** Google Places API (New) Text Search (`places:searchText`) · Google Gemini API (`:generateContent`) · OpenStreetMap Nominatim (fallback geocode) · Esri basemap tiles · Google Fonts · unpkg CDN.
 
 **AI models:** `gemini-3.5-flash-lite` (default; override `GEMINI_MODEL`) — bar descriptions, search enrichment, receipt parsing.
 
