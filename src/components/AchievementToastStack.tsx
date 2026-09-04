@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useTour } from "@/lib/tour-context";
 import { ACHIEVEMENTS_BY_KEY } from "@/lib/achievements";
 import type { AchievementUnlock } from "@/lib/types";
-import Icon from "./Icon";
 
 const VISIBLE_MS = 4200;
 
@@ -46,8 +45,8 @@ function Toast({
           : "translate-y-3 opacity-0"
       }`}
     >
-      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-brass/40 bg-[radial-gradient(circle_at_35%_30%,#E5B93F,#8A6D2F_75%)] text-deep shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.25)]">
-        <Icon name="medal" size={17} />
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-brass/40 bg-[radial-gradient(circle_at_35%_30%,#E5B93F,#8A6D2F_75%)] text-[1.05rem] leading-none shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.25)]">
+        {def.icon}
       </div>
       <div className="min-w-0">
         <div className="font-mono text-[0.58rem] uppercase tracking-[0.13em] text-gold">

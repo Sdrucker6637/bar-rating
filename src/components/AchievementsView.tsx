@@ -126,8 +126,8 @@ export default function AchievementsView() {
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_120%_at_15%_-10%,rgba(184,150,95,0.1),transparent_60%)]"
           />
           <div className="relative flex items-center gap-4 px-5 py-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-brass/40 bg-[radial-gradient(circle_at_35%_30%,#E5B93F,#8A6D2F_75%)] text-deep shadow-lift">
-              <Icon name="medal" size={18} />
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-brass/40 bg-[radial-gradient(circle_at_35%_30%,#E5B93F,#8A6D2F_75%)] text-[1.2rem] leading-none shadow-lift">
+              {mostRecentDef.icon}
             </div>
             <div className="min-w-0">
               <div className="font-mono text-[0.6rem] uppercase tracking-[0.13em] text-gold">
@@ -230,7 +230,7 @@ export default function AchievementsView() {
                       className={`flex items-start gap-3 ${locked ? "opacity-45" : ""}`}
                     >
                       <div
-                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-cream/10"
+                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-cream/10 text-[1.05rem] leading-none"
                         style={{
                           background: locked
                             ? "#221C17"
@@ -238,11 +238,7 @@ export default function AchievementsView() {
                           filter: locked ? "grayscale(1) brightness(0.75)" : undefined,
                         }}
                       >
-                        <Icon
-                          name={locked ? "lock" : "medal"}
-                          size={15}
-                          className={locked ? "text-mute" : "text-deep"}
-                        />
+                        {def.icon}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div

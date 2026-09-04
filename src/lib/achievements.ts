@@ -33,74 +33,80 @@ export interface AchievementDef {
   name: string;
   desc: string;
   category: AchievementCategory;
+  /** One emoji shown in the badge's medallion — the one deliberate spot in
+   *  the app that uses emoji: achievements are the house's fun/silly/naughty
+   *  corner, distinct in tone from the monochrome line-icon language
+   *  everywhere else (see Icon.tsx), and each badge needs to read apart
+   *  from its neighbors at a glance, not just by name. */
+  icon: string;
 }
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   // ---- Exploration ----
-  { key: "bar_hopper", name: "Bar Hopper", desc: "Visit 10 bars.", category: "exploration" },
-  { key: "bar_slut", name: "Bar Slut", desc: "Visit 25 bars.", category: "exploration" },
-  { key: "local_legend", name: "Local Legend", desc: "Visit 5 bars in the same neighborhood.", category: "exploration" },
-  { key: "touch_grass", name: "Touch Grass", desc: "Visit bars in 10 different neighborhoods.", category: "exploration" },
-  { key: "gps_gremlin", name: "GPS Gremlin", desc: "Add or visit a bar found through Nearby.", category: "exploration" },
-  { key: "fuck_around_find_out", name: "Fuck Around & Find Out", desc: "Use Surprise Us and actually go rate the bar it gave you.", category: "exploration" },
-  { key: "one_for_the_road", name: "One for the Road", desc: "Add a bar straight from a crawl stop.", category: "exploration" },
-  { key: "absolutely_no_reason", name: "Absolutely No Reason", desc: "Add a bar with no notes, tags, or description at all.", category: "exploration" },
+  { key: "bar_hopper", name: "Bar Hopper", desc: "Visit 10 bars.", category: "exploration" , icon: "👟" },
+  { key: "bar_slut", name: "Bar Slut", desc: "Visit 25 bars.", category: "exploration" , icon: "🥾" },
+  { key: "local_legend", name: "Local Legend", desc: "Visit 5 bars in the same neighborhood.", category: "exploration" , icon: "📍" },
+  { key: "touch_grass", name: "Touch Grass", desc: "Visit bars in 10 different neighborhoods.", category: "exploration" , icon: "🌿" },
+  { key: "gps_gremlin", name: "GPS Gremlin", desc: "Add or visit a bar found through Nearby.", category: "exploration" , icon: "📡" },
+  { key: "fuck_around_find_out", name: "Fuck Around & Find Out", desc: "Use Surprise Us and actually go rate the bar it gave you.", category: "exploration" , icon: "🎲" },
+  { key: "one_for_the_road", name: "One for the Road", desc: "Add a bar straight from a crawl stop.", category: "exploration" , icon: "🚪" },
+  { key: "absolutely_no_reason", name: "Absolutely No Reason", desc: "Add a bar with no notes, tags, or description at all.", category: "exploration" , icon: "❓" },
 
   // ---- Rating ----
-  { key: "whore_for_the_score", name: "Whore for the Score", desc: "Fully rate 10 bars.", category: "rating" },
-  { key: "professional_bar_enjoyer", name: "Professional Bar Enjoyer", desc: "Fully rate 25 bars.", category: "rating" },
-  { key: "golden_throne", name: "Golden Throne", desc: "Award a bar bonus points just for its bathroom.", category: "rating" },
-  { key: "the_connoisseur", name: "The Connoisseur", desc: "Give a bar the exact same score in every category.", category: "rating" },
-  { key: "harsh_critic", name: "Harsh Critic", desc: "Every category ≤4.", category: "rating" },
-  { key: "generous_soul", name: "Generous Soul", desc: "Every category ≥9.", category: "rating" },
-  { key: "red_flag", name: "Red Flag", desc: "One category ≤3, another ≥9, same bar.", category: "rating" },
-  { key: "money_talks", name: "Money Talks", desc: "Value is a bar's highest-rated category.", category: "rating" },
-  { key: "food_critic", name: "Food Critic", desc: "Food ≥9 and Drinks ≤6.", category: "rating" },
-  { key: "fuck_thats_good", name: "Fuck, That's Good", desc: "Overall score 9+.", category: "rating" },
-  { key: "fuck_thats_bad", name: "Fuck, That's Bad", desc: "Overall score ≤4.", category: "rating" },
-  { key: "good_head", name: "Good Head", desc: "Vibe score of 9+.", category: "rating" },
-  { key: "we_need_to_talk", name: "We Need to Talk", desc: "Service score of 3 or below.", category: "rating" },
-  { key: "go_big_or_go_home", name: "Go Big or Go Home", desc: "Visit a bar with 20+ capacity.", category: "rating" },
-  { key: "tight_squeeze", name: "Tight Squeeze", desc: "Visit a bar with 5 or less capacity.", category: "rating" },
-  { key: "i_can_fix_her", name: "I Can Fix Her", desc: "A bar scores ≤5 overall but has one category at 8+.", category: "rating" },
+  { key: "whore_for_the_score", name: "Whore for the Score", desc: "Fully rate 10 bars.", category: "rating" , icon: "💯" },
+  { key: "professional_bar_enjoyer", name: "Professional Bar Enjoyer", desc: "Fully rate 25 bars.", category: "rating" , icon: "🎓" },
+  { key: "golden_throne", name: "Golden Throne", desc: "Award a bar bonus points just for its bathroom.", category: "rating" , icon: "🚽" },
+  { key: "the_connoisseur", name: "The Connoisseur", desc: "Give a bar the exact same score in every category.", category: "rating" , icon: "🧐" },
+  { key: "harsh_critic", name: "Harsh Critic", desc: "Every category ≤4.", category: "rating" , icon: "😤" },
+  { key: "generous_soul", name: "Generous Soul", desc: "Every category ≥9.", category: "rating" , icon: "😇" },
+  { key: "red_flag", name: "Red Flag", desc: "One category ≤3, another ≥9, same bar.", category: "rating" , icon: "🚩" },
+  { key: "money_talks", name: "Money Talks", desc: "Value is a bar's highest-rated category.", category: "rating" , icon: "💰" },
+  { key: "food_critic", name: "Food Critic", desc: "Food ≥9 and Drinks ≤6.", category: "rating" , icon: "🍽️" },
+  { key: "fuck_thats_good", name: "Fuck, That's Good", desc: "Overall score 9+.", category: "rating" , icon: "👍" },
+  { key: "fuck_thats_bad", name: "Fuck, That's Bad", desc: "Overall score ≤4.", category: "rating" , icon: "👎" },
+  { key: "good_head", name: "Good Head", desc: "Vibe score of 9+.", category: "rating" , icon: "🗣️" },
+  { key: "we_need_to_talk", name: "We Need to Talk", desc: "Service score of 3 or below.", category: "rating" , icon: "💬" },
+  { key: "go_big_or_go_home", name: "Go Big or Go Home", desc: "Visit a bar with 20+ capacity.", category: "rating" , icon: "🏟️" },
+  { key: "tight_squeeze", name: "Tight Squeeze", desc: "Visit a bar with 5 or less capacity.", category: "rating" , icon: "🤏" },
+  { key: "i_can_fix_her", name: "I Can Fix Her", desc: "A bar scores ≤5 overall but has one category at 8+.", category: "rating" , icon: "🔧" },
 
   // ---- Leaderboard & Bar Battle ----
-  { key: "house_record", name: "The House Record", desc: "The first bar to ever reach #1.", category: "battle" },
-  { key: "top_shelf", name: "Top Shelf", desc: "Have at least 10 ranked bars on the board.", category: "battle" },
-  { key: "peoples_champion", name: "The People's Champion", desc: "Win a Bar Battle that flips who's #1.", category: "battle" },
-  { key: "cockfight", name: "Cockfight", desc: "Take part in your first Bar Battle.", category: "battle" },
-  { key: "sword_fight", name: "Sword Fight", desc: "Take part in 5 Bar Battles total.", category: "battle" },
-  { key: "bottoms_up", name: "Bottoms Up", desc: "Pick the lower-ranked bar in a battle.", category: "battle" },
-  { key: "split_decision", name: "Split Decision", desc: "Win any tiebreaker vote.", category: "battle" },
-  { key: "time_loop", name: "Time Loop", desc: "Cause a three-way tie where nobody actually wins.", category: "battle" },
-  { key: "cherry_picked", name: "Cherry Picked", desc: "Personally settle every vote in a multi-way tie in one go.", category: "battle" },
-  { key: "its_not_you_its_me", name: "It's Not You, It's Me", desc: "Disqualify a bar from the running.", category: "battle" },
-  { key: "redemption_arc", name: "Redemption Arc", desc: "Reinstate a bar you'd disqualified.", category: "battle" },
+  { key: "house_record", name: "The House Record", desc: "The first bar to ever reach #1.", category: "battle" , icon: "🏆" },
+  { key: "top_shelf", name: "Top Shelf", desc: "Have at least 10 ranked bars on the board.", category: "battle" , icon: "🥂" },
+  { key: "peoples_champion", name: "The People's Champion", desc: "Win a Bar Battle that flips who's #1.", category: "battle" , icon: "🎖️" },
+  { key: "cockfight", name: "Cockfight", desc: "Take part in your first Bar Battle.", category: "battle" , icon: "⚔️" },
+  { key: "sword_fight", name: "Sword Fight", desc: "Take part in 5 Bar Battles total.", category: "battle" , icon: "🤺" },
+  { key: "bottoms_up", name: "Bottoms Up", desc: "Pick the lower-ranked bar in a battle.", category: "battle" , icon: "🔻" },
+  { key: "split_decision", name: "Split Decision", desc: "Win any tiebreaker vote.", category: "battle" , icon: "⚖️" },
+  { key: "time_loop", name: "Time Loop", desc: "Cause a three-way tie where nobody actually wins.", category: "battle" , icon: "🌀" },
+  { key: "cherry_picked", name: "Cherry Picked", desc: "Personally settle every vote in a multi-way tie in one go.", category: "battle" , icon: "🍒" },
+  { key: "its_not_you_its_me", name: "It's Not You, It's Me", desc: "Disqualify a bar from the running.", category: "battle" , icon: "🚫" },
+  { key: "redemption_arc", name: "Redemption Arc", desc: "Reinstate a bar you'd disqualified.", category: "battle" , icon: "🔄" },
 
   // ---- Wishlist ----
-  { key: "window_shopper", name: "Window Shopper", desc: "Add your first wishlist bar.", category: "wishlist" },
-  { key: "i_have_a_type", name: "I Have a Type", desc: "Wishlist 5 bars in the same neighborhood.", category: "wishlist" },
-  { key: "someday", name: "Someday", desc: "10+ bars sitting on the wishlist.", category: "wishlist" },
-  { key: "wishlist_hoarder", name: "Wishlist Hoarder", desc: "20+ bars sitting on the wishlist.", category: "wishlist" },
-  { key: "finally", name: "Finally", desc: "Visit your first wishlisted bar.", category: "wishlist" },
-  { key: "dream_to_reality", name: "Dream → Reality", desc: "Visit 5 wishlisted bars.", category: "wishlist" },
-  { key: "one_night_stand", name: "One-Night Stand", desc: "Wishlist a bar, then pull it the same night.", category: "wishlist" },
-  { key: "doesnt_fit_our_group", name: "Doesn't Fit Our Group", desc: "Get bounced by the capacity filter three times.", category: "wishlist" },
+  { key: "window_shopper", name: "Window Shopper", desc: "Add your first wishlist bar.", category: "wishlist" , icon: "👀" },
+  { key: "i_have_a_type", name: "I Have a Type", desc: "Wishlist 5 bars in the same neighborhood.", category: "wishlist" , icon: "🏷️" },
+  { key: "someday", name: "Someday", desc: "10+ bars sitting on the wishlist.", category: "wishlist" , icon: "📅" },
+  { key: "wishlist_hoarder", name: "Wishlist Hoarder", desc: "20+ bars sitting on the wishlist.", category: "wishlist" , icon: "📦" },
+  { key: "finally", name: "Finally", desc: "Visit your first wishlisted bar.", category: "wishlist" , icon: "✅" },
+  { key: "dream_to_reality", name: "Dream → Reality", desc: "Visit 5 wishlisted bars.", category: "wishlist" , icon: "⭐" },
+  { key: "one_night_stand", name: "One-Night Stand", desc: "Wishlist a bar, then pull it the same night.", category: "wishlist" , icon: "💔" },
+  { key: "doesnt_fit_our_group", name: "Doesn't Fit Our Group", desc: "Get bounced by the capacity filter three times.", category: "wishlist" , icon: "🚷" },
 
   // ---- Crawl Planning ----
-  { key: "third_base", name: "Third Base", desc: "Plan a 3-stop crawl.", category: "crawl" },
-  { key: "no_survivors", name: "No Survivors", desc: "Plan the full 8-stop crawl.", category: "crawl" },
-  { key: "no_plan_just_vibes", name: "No Plan, Just Vibes", desc: "Start a crawl with no starting bar picked.", category: "crawl" },
-  { key: "sole_survivor", name: "Sole Survivor", desc: "A whole crawl where every walk stays short.", category: "crawl" },
-  { key: "quickie", name: "Quickie", desc: "Two crawl stops just a couple minutes apart.", category: "crawl" },
-  { key: "menace_to_sobriety", name: "Menace to Sobriety", desc: "Bathroom bonuses at 3 different bars in one crawl.", category: "crawl" },
-  { key: "walk_of_shame", name: "Walk of Shame", desc: "The last leg of a crawl turns into a real hike.", category: "crawl" },
-  { key: "commitment_issues", name: "Commitment Issues", desc: "Swap the same crawl stop three-plus times.", category: "crawl" },
+  { key: "third_base", name: "Third Base", desc: "Plan a 3-stop crawl.", category: "crawl" , icon: "3️⃣" },
+  { key: "no_survivors", name: "No Survivors", desc: "Plan the full 8-stop crawl.", category: "crawl" , icon: "💀" },
+  { key: "no_plan_just_vibes", name: "No Plan, Just Vibes", desc: "Start a crawl with no starting bar picked.", category: "crawl" , icon: "🧭" },
+  { key: "sole_survivor", name: "Sole Survivor", desc: "A whole crawl where every walk stays short.", category: "crawl" , icon: "🚶" },
+  { key: "quickie", name: "Quickie", desc: "Two crawl stops just a couple minutes apart.", category: "crawl" , icon: "⚡" },
+  { key: "menace_to_sobriety", name: "Menace to Sobriety", desc: "Bathroom bonuses at 3 different bars in one crawl.", category: "crawl" , icon: "🐐" },
+  { key: "walk_of_shame", name: "Walk of Shame", desc: "The last leg of a crawl turns into a real hike.", category: "crawl" , icon: "🔥" },
+  { key: "commitment_issues", name: "Commitment Issues", desc: "Swap the same crawl stop three-plus times.", category: "crawl" , icon: "🔁" },
 
   // ---- Split the Bill ----
-  { key: "itemized_to_death", name: "Itemized to Death", desc: "Hand-assign every item instead of splitting evenly.", category: "split" },
-  { key: "exact_change", name: "Exact Change", desc: "Someone's share lands on a round dollar amount.", category: "split" },
-  { key: "sugar_daddy_sugar_mama", name: "Sugar Daddy / Sugar Mama", desc: "Cover the whole group's bill at 2+ places in one night.", category: "split" },
+  { key: "itemized_to_death", name: "Itemized to Death", desc: "Hand-assign every item instead of splitting evenly.", category: "split" , icon: "🧾" },
+  { key: "exact_change", name: "Exact Change", desc: "Someone's share lands on a round dollar amount.", category: "split" , icon: "🎯" },
+  { key: "sugar_daddy_sugar_mama", name: "Sugar Daddy / Sugar Mama", desc: "Cover the whole group's bill at 2+ places in one night.", category: "split" , icon: "💸" },
 ];
 
 export const ACHIEVEMENTS_BY_KEY: Map<string, AchievementDef> = new Map(
