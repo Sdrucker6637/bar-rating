@@ -22,6 +22,24 @@ export function distributeWholeUnits(total: number, n: number): number[] {
   return Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0));
 }
 
+/**
+ * Splits a multi-quantity item's `quantity` evenly across `n` people. Uses
+ * whole units (distributeWholeUnits) when there are enough units to go
+ * around (n <= quantity) so the +/- steppers stay in physical whole numbers.
+ * When there are MORE people than units — e.g. 2 orders of nuggets split
+ * across 7 people — a whole unit can't reach everyone, so instead every
+ * person gets an equal fractional share (quantity / n). distributeCents only
+ * cares about each person's weight relative to the others, so this still
+ * divides the item's cost exactly evenly; it just can't be expressed as
+ * whole-unit ownership. Used by both "Split evenly" and toggling someone
+ * on/off an item so neither path silently caps out at `quantity` people.
+ */
+export function evenShares(quantity: number, n: number): number[] {
+  if (n <= 0) return [];
+  if (n > quantity) return Array.from({ length: n }, () => quantity / n);
+  return distributeWholeUnits(quantity, n);
+}
+
 export function distributeCents(
   totalCents: number,
   entries: Array<{ id: string; weight: number }>,

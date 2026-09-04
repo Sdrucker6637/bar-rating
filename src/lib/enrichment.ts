@@ -195,19 +195,30 @@ export function buildEnrichmentPrompt(
   const location = bar.address || bar.neighborhood || "New York City";
   // Build venue context from Google Places data — this is the primary evidence
   // Gemini should use, NOT the venue name alone.
-  const venueType = bar.types && bar.types.length > 0
-    ? bar.types.slice(0, 5).join(", ")
-    : "unknown";
+  const hasTypes = !!(bar.types && bar.types.length > 0);
+  const venueType = hasTypes ? bar.types!.slice(0, 5).join(", ") : "unknown";
   const ratingStr = bar.rating != null && bar.rating > 0
     ? `${bar.rating.toFixed(1)} stars`
     : "no rating";
   const venueContext = `Venue: "${bar.name}" at "${location}".\nGoogle Places classification: [${venueType}]. Rating: ${ratingStr}.\n\n`;
+  // Only saved bars added via a Places search carry classification types —
+  // manually-added bars and legacy records legitimately have none. Gating
+  // "is this a bar" on the classification list is only safe when we actually
+  // HAVE a classification: with venueType "unknown" that rule would reject
+  // every untyped venue outright (an empty description that then fails the
+  // route's usable-description gate and burns the bar's whole retry budget
+  // for no reason), which is what left so many otherwise-real bars stuck on
+  // "details unavailable". When there's no classification data, fall back to
+  // judging the venue the old way — from what Gemini actually knows about it.
+  const classificationRule = hasTypes
+    ? "- Use the Google Places classification types above to determine what kind of venue this is.\n- If the types do NOT include bar/night_club/pub/wine_bar/lounge/restaurant/cocktail_bar, this is NOT a bar — set description to an empty string.\n"
+    : "- No Google Places classification is available for this venue — judge from what you actually know about it whether it's a legitimate bar/restaurant/nightlife venue.\n";
   if (usingFallback) {
     // The fallback prompt explicitly requires a usable description: the
     // client gates on isUsefulDescription (>35 chars), so an empty/null/short
     // or all-empty response is treated as a failure and retried — the prompt
     // must not hand the model an easy empty-string escape hatch.
-    return `${venueContext}Using the Google Places classification above as PRIMARY EVIDENCE (not guessing from the name), write a REAL description and return ONLY JSON:\n\n{"description":"a genuine 2-3 sentence write-up (at least 40 characters) of the venue's vibe, drink style, and notable characteristics","tags":["3-5 lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood"}\n\nRules:\n- Use the Google Places classification types above to determine what kind of venue this is.\n- If the types do NOT include bar/night_club/pub/wine_bar/lounge/restaurant/cocktail_bar, this is NOT a bar — set description to an empty string.\n- Describe ONLY if the venue is a legitimate drinking/dining establishment.\n- Do NOT invent or guess based on the venue name alone.\n- Do NOT fabricate vibes, tags, happy hours, or neighborhood data.\n- If you are not confident this is a real bar/cocktail venue, set description to an empty string.\n- The description MUST be a real, informative write-up of 40+ characters — never empty, null, or a one-word stub.\n- If you have little information, keep the description brief but real — describe the venue's style and atmosphere based only on what you actually know, never returning an empty string, null, or a stub.`;
+    return `${venueContext}Using the Google Places classification above as PRIMARY EVIDENCE (not guessing from the name), write a REAL description and return ONLY JSON:\n\n{"description":"a genuine 2-3 sentence write-up (at least 40 characters) of the venue's vibe, drink style, and notable characteristics","tags":["3-5 lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood"}\n\nRules:\n${classificationRule}- Describe ONLY if the venue is a legitimate drinking/dining establishment.\n- Do NOT invent or guess based on the venue name alone.\n- Do NOT fabricate vibes, tags, happy hours, or neighborhood data.\n- If you are not confident this is a real bar/cocktail venue, set description to an empty string.\n- The description MUST be a real, informative write-up of 40+ characters — never empty, null, or a one-word stub.\n- If you have little information, keep the description brief but real — describe the venue's style and atmosphere based only on what you actually know, never returning an empty string, null, or a stub.`;
   }
-  return `${venueContext}Using the Google Places classification above as PRIMARY EVIDENCE (not guessing from the name), return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n- Use the Google Places classification types above to determine what kind of venue this is.\n- If the types do NOT include bar/night_club/pub/wine_bar/lounge/restaurant/cocktail_bar, this is NOT a bar — set description to an empty string.\n- Describe ONLY if the venue is a legitimate drinking/dining establishment.\n- Do NOT invent or guess based on the venue name alone.\n- Do NOT fabricate vibes, tags, happy hours, neighborhood data, or capacity.\n- If you are not confident this is a real bar/cocktail venue, set description to an empty string.\n- Do not include a mapsLink field.`;
+  return `${venueContext}Using the Google Places classification above as PRIMARY EVIDENCE (not guessing from the name), return ONLY JSON:\n\n{"description":"two to three sentences covering vibe, drink style, and notable characteristics","tags":["3 to 5 short lowercase vibe words"],"happyHour":"short string or null","neighborhood":"short neighborhood name","capacityHint":0}\n\nRules:\n${classificationRule}- Describe ONLY if the venue is a legitimate drinking/dining establishment.\n- Do NOT invent or guess based on the venue name alone.\n- Do NOT fabricate vibes, tags, happy hours, neighborhood data, or capacity.\n- If you are not confident this is a real bar/cocktail venue, set description to an empty string.\n- Do not include a mapsLink field.`;
 }

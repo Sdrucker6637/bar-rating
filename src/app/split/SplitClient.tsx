@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import SplitBillView from "@/components/SplitBillView";
 import TabIntro from "@/components/TabIntro";
-import { distributeCents, distributeWholeUnits } from "@/lib/splitMath";
+import { distributeCents, evenShares } from "@/lib/splitMath";
 import type {
   SplitItem,
   SplitPerson,
@@ -497,22 +497,15 @@ export default function SplitClient() {
             if (personIds.length === 0) return { ...it, assignedTo: {} };
             const q = it.quantity || 1;
             const nextAssigned: Record<string, number> = {};
-            if (q === 1) {
-              // Single unit — split its cost evenly across everyone (each
-              // person takes a fractional share of the one unit).
-              const share = 1 / personIds.length;
-              personIds.forEach((pid) => {
-                nextAssigned[pid] = share;
-              });
-            } else {
-              // Multiple units — hand out WHOLE units as evenly as possible
-              // (2,1,1,1 for 5 drinks / 4 people) so unit counts and the +/−
-              // steppers stay in whole numbers that sum to the quantity.
-              const shares = distributeWholeUnits(q, personIds.length);
-              personIds.forEach((pid, i) => {
-                nextAssigned[pid] = shares[i];
-              });
-            }
+            // Whole units when there are enough to go around (so the +/−
+            // steppers stay in whole numbers), otherwise an equal fractional
+            // share per person — e.g. 2 orders of nuggets split 7 ways can't
+            // give everyone a whole order, but distributeCents only cares
+            // about relative weight, so the COST still splits exactly evenly.
+            const shares = evenShares(q, personIds.length);
+            personIds.forEach((pid, i) => {
+              nextAssigned[pid] = shares[i];
+            });
             return { ...it, assignedTo: nextAssigned };
           }),
         };
@@ -547,19 +540,13 @@ export default function SplitClient() {
             if (nextIncluded.length === 0) return { ...it, assignedTo: {} };
             const q = it.quantity || 1;
             const nextAssigned: Record<string, number> = {};
-            if (q === 1) {
-              const share = 1 / nextIncluded.length;
-              nextIncluded.forEach((pid) => {
-                nextAssigned[pid] = share;
-              });
-            } else {
-              // Same whole-unit rule as "Split evenly": redistribute the
-              // quantity in whole units among whoever is currently included.
-              const shares = distributeWholeUnits(q, nextIncluded.length);
-              nextIncluded.forEach((pid, i) => {
-                nextAssigned[pid] = shares[i];
-              });
-            }
+            // Same rule as "Split evenly": redistribute the quantity among
+            // whoever is currently included, in whole units when there are
+            // enough to go around, otherwise an equal fractional share.
+            const shares = evenShares(q, nextIncluded.length);
+            nextIncluded.forEach((pid, i) => {
+              nextAssigned[pid] = shares[i];
+            });
             return { ...it, assignedTo: nextAssigned };
           }),
         };
@@ -781,7 +768,12 @@ export default function SplitClient() {
         (a, c) => a + c,
         0,
       );
-      return sum + Math.max(0, q - assignedSum);
+      // Equal fractional shares (more people than units — see evenShares)
+      // sum back to q only up to floating-point precision, so round the
+      // leftover before summing to avoid a near-zero value like 4e-16
+      // showing up as "units not assigned".
+      const leftover = Math.round((q - assignedSum) * 1e6) / 1e6;
+      return sum + Math.max(0, leftover);
     }, 0);
 
     return {
@@ -822,10 +814,74 @@ export default function SplitClient() {
     return place.name.trim() || `Place ${index + 1}`;
   }
 
+  // This person's assigned items at `place` and what each cost them — the
+  // exact same cents-accurate split used for the real totals. Shared by the
+  // per-place individual message and the grand-total individual message so
+  // "how the split was calculated" always matches, everywhere it's shown.
+  function personItemLines(place: SplitPlace, personId: string): string[] {
+    const lines: string[] = [];
+    place.items.forEach((it) => {
+      const units = it.assignedTo[personId] || 0;
+      if (units <= 0) return;
+      const centsByPerson = distributeCents(
+        Math.round((it.price || 0) * 100),
+        Object.entries(it.assignedTo)
+          .filter(([, u]) => (u || 0) > 0)
+          .map(([pid, u]) => ({ id: pid, weight: u })),
+      );
+      const cost = (centsByPerson[personId] || 0) / 100;
+      lines.push(`- ${it.name || "(unnamed item)"} — $${cost.toFixed(2)}`);
+    });
+    return lines;
+  }
+
+  // Line-by-line record of what each item cost and how it was split, so
+  // anyone reading the GROUP message can check the math themselves instead
+  // of just trusting the final per-person numbers.
+  function itemSplitBreakdownLines(place: SplitPlace): string[] {
+    return place.items.map((it) => {
+      const entries = Object.entries(it.assignedTo).filter(
+        ([, u]) => (u || 0) > 0,
+      );
+      if (entries.length === 0) {
+        return `- ${it.name || "(unnamed item)"} — $${(it.price || 0).toFixed(2)} (unassigned)`;
+      }
+      const centsByPerson = distributeCents(
+        Math.round((it.price || 0) * 100),
+        entries.map(([pid, u]) => ({ id: pid, weight: u })),
+      );
+      const parts = entries.map(([pid]) => {
+        const person = splitPeople.find((p) => p.id === pid);
+        const cost = (centsByPerson[pid] || 0) / 100;
+        return `${person ? person.name : "?"} $${cost.toFixed(2)}`;
+      });
+      return `- ${it.name || "(unnamed item)"} ($${(it.price || 0).toFixed(2)}) → ${parts.join(", ")}`;
+    });
+  }
+
+  // Bill contents for an Even Split place — items plus tax/tip — so the
+  // rounds-based per-person shares can be checked against the actual bill.
+  function evenBillLines(place: SplitPlace): string[] {
+    const lines = place.items.map(
+      (it) =>
+        `- ${it.name || "(unnamed item)"} — $${(it.price || 0).toFixed(2)}${
+          it.quantity > 1 ? ` (x${it.quantity})` : ""
+        }`,
+    );
+    const tax = Number(place.tax || 0);
+    const tip = Number(place.tip || 0);
+    if (tax > 0) lines.push(`- Tax — $${tax.toFixed(2)}`);
+    if (tip > 0) lines.push(`- Tip — $${tip.toFixed(2)}`);
+    return lines;
+  }
+
   // One shared messaging system for BOTH split methods. The split method only
   // decides what goes INTO each message — Even Split adds round accounting,
   // Item by Item adds that person's assigned items. Whether the user sends
-  // individually or to the group is a separate choice layered on top.
+  // individually or to the group is a separate choice layered on top. Every
+  // message — individual or group — includes how the split was actually
+  // calculated (items and shares, or bill + rounds), not just the final
+  // dollar amount, so whoever reads it can check the math themselves.
   function buildPlaceShareResults(placeIndex: number): SplitShareResults {
     const place = splitPlaces[placeIndex];
     const totals = placeTotalsList[placeIndex];
@@ -836,6 +892,7 @@ export default function SplitClient() {
       (s, id) => s + (totals.perPersonTotal[id] || 0),
       0,
     );
+    const billLines = isEven ? evenBillLines(place) : [];
 
     const individuals: SplitShareMessage[] = place.crewIds.map((id) => {
       const person = splitPeople.find((p) => p.id === id);
@@ -852,27 +909,16 @@ export default function SplitClient() {
           };
         }
         const rounds = place.evenRounds[id] ?? maxRounds;
-        return {
-          personId: id,
-          name,
-          excluded: false,
-          message: `Hey ${name}! Your share at ${label} is $${amount.toFixed(2)} — accounted for ${rounds}/${maxRounds} rounds.`,
-        };
+        const message = [
+          `${label} — Bill Split`,
+          "",
+          `Hey ${name}! Your share is $${amount.toFixed(2)} — accounted for ${rounds}/${maxRounds} rounds.`,
+          ...(billLines.length > 0 ? ["", "Bill:", ...billLines] : []),
+        ].join("\n");
+        return { personId: id, name, excluded: false, message };
       }
       // Item by item — this person's assigned items and their cost.
-      const itemLines: string[] = [];
-      place.items.forEach((it) => {
-        const units = it.assignedTo[id] || 0;
-        if (units <= 0) return;
-        const centsByPerson = distributeCents(
-          Math.round((it.price || 0) * 100),
-          Object.entries(it.assignedTo)
-            .filter(([, u]) => (u || 0) > 0)
-            .map(([pid, u]) => ({ id: pid, weight: u })),
-        );
-        const cost = (centsByPerson[id] || 0) / 100;
-        itemLines.push(`- ${it.name || "(unnamed item)"} — $${cost.toFixed(2)}`);
-      });
+      const itemLines = personItemLines(place, id);
       const extraPerPerson =
         place.crewIds.length > 0
           ? (Number(place.tax || 0) + Number(place.tip || 0)) /
@@ -905,11 +951,20 @@ export default function SplitClient() {
       return `${name} — $${amount.toFixed(2)}`;
     });
 
+    // "How it was split" — the calculation itself, not just the totals, so
+    // the group message doubles as a receipt anyone can check.
+    const breakdownLines = isEven
+      ? billLines
+      : itemSplitBreakdownLines(place);
+
     return {
       group: [
         `${label} — Bill Split`,
         "",
         ...lines,
+        ...(breakdownLines.length > 0
+          ? ["", isEven ? "Bill:" : "How it was split:", ...breakdownLines]
+          : []),
         "",
         `Total: $${groupTotal.toFixed(2)}`,
       ].join("\n"),
@@ -934,9 +989,26 @@ export default function SplitClient() {
       splitPlaces.forEach((place, i) => {
         if (!place.crewIds.includes(p.id)) return;
         const t = placeTotalsList[i];
+        const isEven = place.splitMethod === "even";
         perPlaceLines.push(
           `- ${placeLabel(place, i)} — $${(t.perPersonTotal[p.id] || 0).toFixed(2)}`,
         );
+        // Carry the calculation itself along, indented under the place, so
+        // the grand-total message isn't just a list of numbers to trust.
+        const detailLines = isEven
+          ? []
+          : personItemLines(place, p.id).map((l) => `  ${l}`);
+        if (isEven) {
+          const excluded = place.evenExcluded.includes(p.id);
+          const rounds = place.evenRounds[p.id] ?? (place.evenMaxRounds || 1);
+          perPlaceLines.push(
+            excluded
+              ? "  (excluded from this tab)"
+              : `  (${rounds}/${place.evenMaxRounds || 1} rounds)`,
+          );
+        } else {
+          perPlaceLines.push(...detailLines);
+        }
       });
       return {
         personId: p.id,

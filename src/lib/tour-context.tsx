@@ -1768,6 +1768,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
                 latitude: visitedSuggestion.latitude || null,
                 longitude: visitedSuggestion.longitude || null,
                 placeId: visitedSuggestion.placeId || null,
+                // Carry Google Places classification through so enrichment
+                // can ground its description in it instead of falling back
+                // to "unknown" for every bar added via "I visited".
+                types: visitedSuggestion.types || [],
                 mapsLink,
                 detailsFetched: false,
               }
@@ -1807,6 +1811,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
                   baseRecord.longitude ?? wishlistMatch.longitude ?? null,
                 placeId: baseRecord.placeId || wishlistMatch.placeId || null,
                 mapsLink: baseRecord.mapsLink || wishlistMatch.mapsLink || "",
+                types:
+                  baseRecord.types && baseRecord.types.length
+                    ? baseRecord.types
+                    : wishlistMatch.types || [],
                 detailsFetched:
                   baseRecord.detailsFetched || wishlistMatch.detailsFetched,
               }

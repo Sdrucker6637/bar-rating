@@ -526,6 +526,15 @@ export default function SplitBillView(props: SplitBillViewProps) {
               );
               const remaining = q - assignedSum;
               const assignedShares = Object.values(it.assignedTo);
+              // Whole-unit steppers (and the "N of Q unassigned" line) only
+              // make sense when every assigned share is a whole number —
+              // once there are more included people than units (e.g. 2
+              // orders of nuggets split 7 ways), shares are equal fractions
+              // of a unit instead, so those controls give way to a plain
+              // "shared evenly" note.
+              const wholeUnitShares = assignedShares.every((s) =>
+                Number.isInteger(s),
+              );
               // Active only when the item is currently split evenly across
               // EVERY member of the crew — derived from the live assignment
               // state, so unchecking even one person deactivates it and there
@@ -592,10 +601,16 @@ export default function SplitBillView(props: SplitBillViewProps) {
                       </button>
                     </div>
                   </div>
-                  {q > 1 && (
+                  {q > 1 && wholeUnitShares && (
                     <div className="mt-0.5 font-mono text-[0.68rem] text-mute">
                       ${(it.price / q).toFixed(2)} each · {remaining} of {q}{" "}
                       unassigned
+                    </div>
+                  )}
+                  {q > 1 && !wholeUnitShares && (
+                    <div className="mt-0.5 font-mono text-[0.68rem] text-mute">
+                      Shared evenly across {includedIds.length} people (more
+                      people than the {q} orders)
                     </div>
                   )}
                   <div className="mt-2.5 flex flex-wrap gap-1">
@@ -667,7 +682,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                               >
                                 {p.name}
                               </span>
-                              {q > 1 ? (
+                              {q > 1 && wholeUnitShares ? (
                                 <div
                                   style={{
                                     display: "flex",
