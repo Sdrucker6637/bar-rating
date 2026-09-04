@@ -676,7 +676,16 @@ export function TourProvider({ children }: { children: ReactNode }) {
         const now = Date.now();
         return [
           ...existing,
-          ...fresh.map((e) => ({ key: e.key, unlockedAt: now, context: e.context })),
+          // Firestore rejects `undefined` field values outright (the write
+          // throws) — every achievement without a context (the vast
+          // majority) was hitting exactly that, silently, because the catch
+          // block below swallowed it. Only include `context` when it's a
+          // real string, never as an explicit `undefined`.
+          ...fresh.map((e) =>
+            e.context !== undefined
+              ? { key: e.key, unlockedAt: now, context: e.context }
+              : { key: e.key, unlockedAt: now },
+          ),
         ];
       };
       const optimistic = mk(achievementUnlocksRef.current);
@@ -694,9 +703,13 @@ export function TourProvider({ children }: { children: ReactNode }) {
           const next = mk(fresh);
           if (next !== fresh) tx.update(docRef, { achievementUnlocks: next });
         });
-      } catch {
-        // Non-critical and self-healing: the next derivation pass will
-        // simply see these keys as still-missing and retry the write.
+      } catch (err) {
+        // Logged (not swallowed): a transient network error here really is
+        // self-healing — the next derivation pass retries it — but a
+        // persistent failure (bad data shape, permissions) would otherwise
+        // retry forever with no visible trace, which is exactly how the
+        // undefined-context bug above went unnoticed.
+        console.error("Failed to persist achievement unlock:", err);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
@@ -1158,7 +1171,13 @@ export function TourProvider({ children }: { children: ReactNode }) {
         // Only set on a genuinely NEW bar — an edit (isEdit) spreads `record`
         // over the existing bar below, and an unconditional value here would
         // overwrite its real creation time/origin with "now"/undefined.
-        ...(!isEdit ? { createdAt: Date.now(), origin: s._origin } : {}),
+        // `origin` is omitted entirely (not set to `undefined`) when there
+        // is none — Firestore rejects an explicit `undefined` field on the
+        // WHOLE bars-array write, not just this one bar, so a plain manual
+        // wishlist add (no _origin at all) would otherwise fail to save.
+        ...(!isEdit
+          ? { createdAt: Date.now(), ...(s._origin ? { origin: s._origin } : {}) }
+          : {}),
       };
       const persistPromise = persist((prev) =>
         isEdit
@@ -2011,7 +2030,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
                 mapsLink,
                 detailsFetched: false,
                 createdAt: Date.now(),
-                origin: visitedSuggestion._origin,
+                // Omitted (not set to `undefined`) when there is none — see
+                // the matching note in addSuggestionToWishlist.
+                ...(visitedSuggestion._origin
+                  ? { origin: visitedSuggestion._origin }
+                  : {}),
               }
             : { ...base, ...patch, id, tags: [], createdAt: Date.now() };
           // Wishlist consistency, handled in ONE place for every way a bar can
