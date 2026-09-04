@@ -825,9 +825,9 @@ export default function SplitClient() {
   }, [placeTotalsList, splitPeople]);
 
   // Split the Bill never touches Firestore (see the README), so this is the
-  // one point where its three achievements get checked — right when the
-  // numbers are final. Only the unlock itself is written; the split data
-  // stays exactly as ephemeral as it always was.
+  // one point where its achievements get checked — right when the numbers
+  // are final. Only the unlock itself is written; the split data stays
+  // exactly as ephemeral as it always was.
   useEffect(() => {
     if (splitStep !== "summary") return;
     const allItems = splitPlaces.flatMap((pl) => pl.items);
@@ -839,11 +839,20 @@ export default function SplitClient() {
     });
     const payerCoverCount =
       payerCounts.size > 0 ? Math.max(...payerCounts.values()) : 0;
+    const placeCrewSizes = splitPlaces.map((pl) => pl.crewIds.length);
+    // Every place has a payer set, and it's the same person throughout.
+    const allPlacesSamePayer =
+      splitPlaces.length > 0 &&
+      splitPlaces.every(
+        (pl) => pl.paidBy !== null && pl.paidBy === splitPlaces[0].paidBy,
+      );
     const keys = checkSplitAchievements(
       allItems,
       usedSplitEvenlyRef.current,
       perPersonTotals,
       payerCoverCount,
+      placeCrewSizes,
+      allPlacesSamePayer,
     );
     if (keys.length > 0) {
       void unlockAchievements(keys.map((key) => ({ key })));

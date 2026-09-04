@@ -32,8 +32,10 @@ import { SURPRISE_VIBES } from "./constants";
 import {
   checkCrawlPlanAchievements,
   checkDerivedAchievements,
+  checkDominoEffect,
+  checkFullSend,
   checkMenaceToSobriety,
-  isOneNightStand,
+  isSpeedDating,
 } from "./achievements";
 import type {
   AchievementUnlock,
@@ -1586,6 +1588,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
       const count = (crawlReplaceCountsRef.current[index] || 0) + 1;
       crawlReplaceCountsRef.current[index] = count;
       if (count >= 3) void unlockAchievements([{ key: "commitment_issues" }]);
+      // Domino Effect: 3+ replaces total, any slots — distinct from
+      // Commitment Issues' same-slot rule above.
+      const totalReplaces = Object.values(crawlReplaceCountsRef.current).reduce(
+        (a, c) => a + c,
+        0,
+      );
+      if (checkDominoEffect(totalReplaces)) {
+        void unlockAchievements([{ key: "domino_effect" }]);
+      }
     },
     [crawlStops, bars, enrichCrawlStop, unlockAchievements],
   );
@@ -1997,6 +2008,12 @@ export function TourProvider({ children }: { children: ReactNode }) {
         notes: visitedForm.notes.trim(),
       };
       let record: Bar | undefined;
+      // Speed Dating ("wishlist a bar and visit it within 24 hours") is
+      // checked against the PRE-transition record — whichever wishlist bar
+      // this save is turning into a visited one — captured here (same
+      // pattern as `record` below) so it can fire once, after persist
+      // succeeds, without re-deriving it from steady state later.
+      let speedDatingBarName: string | null = null;
       await persist((prev) => {
         let next: Bar[];
         if (isNew) {
@@ -2085,21 +2102,45 @@ export function TourProvider({ children }: { children: ReactNode }) {
               }
             : baseRecord;
           record = finalRecord;
+          // The old wishlist record (with the ORIGINAL wishlist-add
+          // timestamp) is about to be discarded below in favor of this new
+          // one — check Speed Dating against it now, before it's gone.
+          if (wishlistMatch && isSpeedDating(wishlistMatch)) {
+            speedDatingBarName = finalRecord.name;
+          }
           next = [...prev, finalRecord].filter(
             (b) => !(b.status === "to-try" && sameVenue(b, finalRecord)),
           );
         } else {
-          next = prev.map((b) => (b.id === id ? { ...b, ...patch } : b));
+          const preVisitBar = prev.find((b) => b.id === id);
+          // Fixes a pre-existing gap: this is the primary "I visited" path
+          // (the wishlist card's own button, via markVisited) — it edits the
+          // SAME bar id in place, so cameFromWishlist was never being set
+          // here at all, only on the OTHER path above. Finally/Dream →
+          // Reality need it set on whichever path actually transitions a
+          // bar from wishlist to visited.
+          const wasWishlisted = preVisitBar?.status === "to-try";
+          if (preVisitBar && isSpeedDating(preVisitBar)) {
+            speedDatingBarName = preVisitBar.name;
+          }
+          next = prev.map((b) =>
+            b.id === id
+              ? { ...b, ...patch, ...(wasWishlisted ? { cameFromWishlist: true } : {}) }
+              : b,
+          );
           record = next.find((b) => b.id === id);
         }
         return next;
       });
+      if (speedDatingBarName) {
+        void unlockAchievements([{ key: "speed_dating", context: speedDatingBarName }]);
+      }
       setShowVisitedForm(false);
       setVisitedForm(emptyVisitedForm);
       setVisitedSuggestion(null);
       if (record && !record.detailsFetched) runDetailsFetch(record);
     },
-    [visitedForm, visitedSuggestion, persist, runDetailsFetch],
+    [visitedForm, visitedSuggestion, persist, runDetailsFetch, unlockAchievements],
   );
 
   const saveWishForm = useCallback(
@@ -2153,15 +2194,9 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const removeBar = useCallback(
     (id: string) => {
-      // One-Night Stand only makes sense checked BEFORE deletion — the
-      // record (and its createdAt) won't exist to check afterward.
-      const bar = (barsRef.current || []).find((b) => b.id === id);
-      if (bar && isOneNightStand(bar)) {
-        void unlockAchievements([{ key: "one_night_stand", context: bar.name }]);
-      }
       persist((prev) => prev.filter((b) => b.id !== id));
     },
-    [persist, unlockAchievements],
+    [persist],
   );
 
   const toggleDisqualify = useCallback(
@@ -2189,12 +2224,22 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const closeCrawlModal = useCallback(() => {
+    // Full Send: closing the modal on a full, never-replaced 8-stop plan is
+    // the closest the app gets to a "crawl completed" signal (there's no
+    // explicit completion event — see checkFullSend's doc comment).
+    const totalReplaces = Object.values(crawlReplaceCountsRef.current).reduce(
+      (a, c) => a + c,
+      0,
+    );
+    if (checkFullSend(crawlStopsRef.current.length, totalReplaces)) {
+      void unlockAchievements([{ key: "full_send" }]);
+    }
     setShowCrawlModal(false);
     setCrawlStops([]);
     setCrawlError(null);
     setCrawlStartInput("");
     setCrawlEnrichingNames(new Set());
-  }, []);
+  }, [unlockAchievements]);
 
   const value: TourContextValue = {
     bars,
