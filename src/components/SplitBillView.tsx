@@ -87,10 +87,15 @@ interface SplitBillViewProps {
 
   placeTotalsList: SplitTotals[];
   grandTotals: { perPersonTotal: Record<string, number> };
-  /** Precomputed share messages (group + individual) for every place. */
+  /** Precomputed share messages (group + individual) for every place, full
+   *  receipt (splits + items) included. */
   placeShareList: SplitShareResults[];
-  /** Precomputed share messages for the whole trip. */
+  /** Same as `placeShareList` but totals-only — no split/item breakdown. */
+  placeShareListNoBreakdown: SplitShareResults[];
+  /** Precomputed share messages for the whole trip, full receipt included. */
   grandShare: SplitShareResults;
+  /** Same as `grandShare` but totals-only — no split/item breakdown. */
+  grandShareNoBreakdown: SplitShareResults;
   onSendSms: (message: string) => void;
   onReset: () => void;
 }
@@ -152,7 +157,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
     placeTotalsList,
     grandTotals,
     placeShareList,
+    placeShareListNoBreakdown,
     grandShare,
+    grandShareNoBreakdown,
     onSendSms,
     onReset,
   } = props;
@@ -839,6 +846,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
           <div className="mt-5 border-t border-line pt-4">
             <ShareResults
               results={placeShareList[activePlaceIndex]}
+              resultsNoBreakdown={placeShareListNoBreakdown[activePlaceIndex]}
               onSendSms={onSendSms}
             />
             <div className="mt-3 flex flex-wrap gap-2.5">
@@ -913,7 +921,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
       </div>
 
       <div className="flex flex-col gap-2.5">
-        <ShareResults results={grandShare} onSendSms={onSendSms} />
+        <ShareResults
+          results={grandShare}
+          resultsNoBreakdown={grandShareNoBreakdown}
+          onSendSms={onSendSms}
+        />
         <div className="flex flex-wrap gap-2.5">
           <button
             className={`${btnSecondaryCls} flex-1`}
@@ -1415,9 +1427,11 @@ function EvenSplitSection({
 // explicit individual-vs-group choice and hands the chosen message to sms.
 function ShareResults({
   results,
+  resultsNoBreakdown,
   onSendSms,
 }: {
   results: SplitShareResults;
+  resultsNoBreakdown: SplitShareResults;
   onSendSms: (message: string) => void;
 }) {
   // One mode selector, not two buttons: the gold fill tracks which share
@@ -1425,7 +1439,12 @@ function ShareResults({
   // only picks the mode; the actual send happens on the per-message Send
   // buttons below — one "Send" for the group message, one per person.
   const [mode, setMode] = useState<"individual" | "group">("group");
-  const hasPeople = results.individuals.length > 0;
+  // Whether to include the full split/item breakdown or just the bottom-line
+  // numbers — on by default (that's what people usually want to check), but
+  // easy to turn off for a shorter message.
+  const [includeBreakdown, setIncludeBreakdown] = useState(true);
+  const active = includeBreakdown ? results : resultsNoBreakdown;
+  const hasPeople = active.individuals.length > 0;
   const segBase =
     "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 font-mono text-[0.7rem] font-semibold uppercase tracking-[0.04em] transition-colors disabled:cursor-default disabled:opacity-40";
 
@@ -1434,6 +1453,15 @@ function ShareResults({
       <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
         Share results
       </div>
+      <label className="mb-2.5 flex cursor-pointer items-center gap-2 font-mono text-[0.72rem] text-mist">
+        <input
+          type="checkbox"
+          checked={includeBreakdown}
+          onChange={(e) => setIncludeBreakdown(e.target.checked)}
+          className="h-3.5 w-3.5 cursor-pointer accent-brass"
+        />
+        Include the full breakdown (splits &amp; items)
+      </label>
       <div
         role="group"
         aria-label="Share results"
@@ -1481,13 +1509,13 @@ function ShareResults({
               <button
                 type="button"
                 className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream"
-                onClick={() => onSendSms(results.group)}
+                onClick={() => onSendSms(active.group)}
               >
                 <Icon name="message" size={11} /> Send
               </button>
             </div>
           ) : (
-            results.individuals.map((m) => (
+            active.individuals.map((m) => (
               <div
                 key={m.personId}
                 className="flex items-center justify-between gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-3 py-2"

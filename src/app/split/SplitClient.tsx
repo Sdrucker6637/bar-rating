@@ -815,13 +815,24 @@ export default function SplitClient() {
     return { perPersonTotal };
   }, [placeTotalsList, splitPeople]);
 
+  // Two variants of every message — full receipt and totals-only — so the
+  // "include breakdown" toggle in ShareResults can switch between them
+  // without rebuilding strings on every keystroke/toggle.
   const placeShareList = useMemo(
-    () => splitPlaces.map((_, i) => buildPlaceShareResults(i)),
+    () => splitPlaces.map((_, i) => buildPlaceShareResults(i, true)),
+    [splitPlaces, placeTotalsList, splitPeople],
+  );
+  const placeShareListNoBreakdown = useMemo(
+    () => splitPlaces.map((_, i) => buildPlaceShareResults(i, false)),
     [splitPlaces, placeTotalsList, splitPeople],
   );
 
   const grandShare = useMemo(
-    () => buildGrandShareResults(),
+    () => buildGrandShareResults(true),
+    [splitPlaces, placeTotalsList, splitPeople, grandTotals],
+  );
+  const grandShareNoBreakdown = useMemo(
+    () => buildGrandShareResults(false),
     [splitPlaces, placeTotalsList, splitPeople, grandTotals],
   );
 
@@ -829,49 +840,70 @@ export default function SplitClient() {
     return place.name.trim() || `Place ${index + 1}`;
   }
 
-  // This person's assigned items at `place` and what each cost them — the
-  // exact same cents-accurate split used for the real totals. Shared by the
-  // per-place individual message and the grand-total individual message so
-  // "how the split was calculated" always matches, everywhere it's shown.
-  function personItemLines(place: SplitPlace, personId: string): string[] {
-    const lines: string[] = [];
-    place.items.forEach((it) => {
-      const units = it.assignedTo[personId] || 0;
-      if (units <= 0) return;
-      const centsByPerson = distributeCents(
-        Math.round((it.price || 0) * 100),
-        Object.entries(it.assignedTo)
-          .filter(([, u]) => (u || 0) > 0)
-          .map(([pid, u]) => ({ id: pid, weight: u })),
-      );
-      const cost = (centsByPerson[personId] || 0) / 100;
-      lines.push(`- ${it.name || "(unnamed item)"} — $${cost.toFixed(2)}`);
-    });
-    return lines;
+  // Everyone with a positive share of an item — the one thing that decides
+  // whether an item counts as "split" (>1 person) or "solo" (exactly 1).
+  function itemEntries(it: SplitItem): Array<[string, number]> {
+    return Object.entries(it.assignedTo).filter(([, u]) => (u || 0) > 0);
   }
 
-  // Line-by-line record of what each item cost and how it was split, so
-  // anyone reading the GROUP message can check the math themselves instead
-  // of just trusting the final per-person numbers.
-  function itemSplitBreakdownLines(place: SplitPlace): string[] {
-    return place.items.map((it) => {
-      const entries = Object.entries(it.assignedTo).filter(
-        ([, u]) => (u || 0) > 0,
-      );
-      if (entries.length === 0) {
-        return `- ${it.name || "(unnamed item)"} — $${(it.price || 0).toFixed(2)} (unassigned)`;
-      }
-      const centsByPerson = distributeCents(
-        Math.round((it.price || 0) * 100),
-        entries.map(([pid, u]) => ({ id: pid, weight: u })),
-      );
-      const parts = entries.map(([pid]) => {
-        const person = splitPeople.find((p) => p.id === pid);
-        const cost = (centsByPerson[pid] || 0) / 100;
-        return `${person ? person.name : "?"} $${cost.toFixed(2)}`;
+  // Items shared by MORE than one person — the price still matters here
+  // (that's the whole point of a split), so this keeps the cents-accurate
+  // per-person cost and names everyone in on it. Pass `onlyPersonId` to get
+  // only the splits a given person is part of (used in personal messages);
+  // omit it for the full list (used in the group message).
+  function sharedItemLines(place: SplitPlace, onlyPersonId?: string): string[] {
+    return place.items
+      .map((it) => ({ it, entries: itemEntries(it) }))
+      .filter(
+        ({ entries }) =>
+          entries.length > 1 &&
+          (!onlyPersonId || entries.some(([pid]) => pid === onlyPersonId)),
+      )
+      .map(({ it, entries }) => {
+        const centsByPerson = distributeCents(
+          Math.round((it.price || 0) * 100),
+          entries.map(([pid, u]) => ({ id: pid, weight: u })),
+        );
+        const parts = entries.map(([pid]) => {
+          const person = splitPeople.find((p) => p.id === pid);
+          const cost = (centsByPerson[pid] || 0) / 100;
+          return `${person ? person.name : "?"} $${cost.toFixed(2)}`;
+        });
+        return `- ${it.name || "(unnamed item)"} ($${(it.price || 0).toFixed(2)}) → ${parts.join(", ")}`;
       });
-      return `- ${it.name || "(unnamed item)"} ($${(it.price || 0).toFixed(2)}) → ${parts.join(", ")}`;
+  }
+
+  // An item assigned to exactly one person is entirely theirs — no per-item
+  // price to show (it's already folded into their total), just what it was
+  // and how many they had.
+  function soloItemLabel(it: SplitItem, units: number): string {
+    const name = it.name || "(unnamed item)";
+    return units > 1 ? `${name} x${units}` : name;
+  }
+
+  // This person's solo (not-split) items at `place`.
+  function personSoloItemLines(place: SplitPlace, personId: string): string[] {
+    return place.items
+      .map((it) => ({ it, entries: itemEntries(it) }))
+      .filter(({ entries }) => entries.length === 1 && entries[0][0] === personId)
+      .map(({ it, entries }) => `- ${soloItemLabel(it, entries[0][1])}`);
+  }
+
+  // Every solo item at `place`, across the whole crew — for the group
+  // message, where a solo item needs to say WHOSE it is.
+  function groupSoloItemLines(place: SplitPlace): string[] {
+    const lines: string[] = [];
+    place.crewIds.forEach((pid) => {
+      const person = splitPeople.find((p) => p.id === pid);
+      const name = person ? person.name : "?";
+      place.items.forEach((it) => {
+        const entries = itemEntries(it);
+        if (entries.length === 1 && entries[0][0] === pid) {
+          lines.push(`- ${name}: ${soloItemLabel(it, entries[0][1])}`);
+        }
+      });
     });
+    return lines;
   }
 
   // Bill contents for an Even Split place — items plus tax/tip — so the
@@ -897,7 +929,13 @@ export default function SplitClient() {
   // message — individual or group — includes how the split was actually
   // calculated (items and shares, or bill + rounds), not just the final
   // dollar amount, so whoever reads it can check the math themselves.
-  function buildPlaceShareResults(placeIndex: number): SplitShareResults {
+  // `includeBreakdown` toggles everything below the bottom-line numbers —
+  // splits, solo items, the even-split bill — so a message can be sent as
+  // just the final amounts when the full receipt isn't wanted.
+  function buildPlaceShareResults(
+    placeIndex: number,
+    includeBreakdown: boolean,
+  ): SplitShareResults {
     const place = splitPlaces[placeIndex];
     const totals = placeTotalsList[placeIndex];
     const label = placeLabel(place, placeIndex);
@@ -942,27 +980,40 @@ export default function SplitClient() {
           "",
           `Hey ${name}! Your share is $${amount.toFixed(2)} — accounted for ${rounds}/${maxRounds} rounds.`,
           ...(note ? [note] : []),
-          ...(billLines.length > 0 ? ["", "Bill:", ...billLines] : []),
+          ...(includeBreakdown && billLines.length > 0
+            ? ["", "Bill:", ...billLines]
+            : []),
         ].join("\n");
         return { personId: id, name, excluded: false, message };
       }
-      // Item by item — this person's assigned items and their cost.
-      const itemLines = personItemLines(place, id);
+      // Item by item. Splits (items shared with others) come first — they're
+      // the ones worth checking — then this person's own solo items, listed
+      // by name/quantity only since their cost is already in the total.
+      const mySplits = sharedItemLines(place, id);
+      const mySolo = personSoloItemLines(place, id);
       const extraPerPerson =
         place.crewIds.length > 0
           ? (Number(place.tax || 0) + Number(place.tip || 0)) /
             place.crewIds.length
           : 0;
-      if (extraPerPerson > 0) {
-        itemLines.push(`- Tax/tip — $${extraPerPerson.toFixed(2)}`);
-      }
+      const soloAndExtra = [
+        ...mySolo,
+        ...(extraPerPerson > 0
+          ? [`- Tax/tip — $${extraPerPerson.toFixed(2)}`]
+          : []),
+      ];
       const note = payerNote(id);
       const message = [
         `${label} — Bill Split`,
         "",
         `Your share: $${amount.toFixed(2)}`,
         ...(note ? [note] : []),
-        ...(itemLines.length > 0 ? ["", "Items:", ...itemLines] : []),
+        ...(includeBreakdown && mySplits.length > 0
+          ? ["", "Splits:", ...mySplits]
+          : []),
+        ...(includeBreakdown && soloAndExtra.length > 0
+          ? ["", "Your items:", ...soloAndExtra]
+          : []),
         "",
         `Total: $${amount.toFixed(2)}`,
       ].join("\n");
@@ -983,10 +1034,22 @@ export default function SplitClient() {
     });
 
     // "How it was split" — the calculation itself, not just the totals, so
-    // the group message doubles as a receipt anyone can check.
-    const breakdownLines = isEven
-      ? billLines
-      : itemSplitBreakdownLines(place);
+    // the group message doubles as a receipt anyone can check. Splits (who
+    // shared what, and for how much) lead; solo items follow.
+    const breakdownSections = isEven
+      ? billLines.length > 0
+        ? ["Bill:", ...billLines]
+        : []
+      : (() => {
+          const shared = sharedItemLines(place);
+          const solo = groupSoloItemLines(place);
+          return [
+            ...(shared.length > 0 ? ["Splits:", ...shared] : []),
+            ...(solo.length > 0
+              ? [...(shared.length > 0 ? [""] : []), "Solo items:", ...solo]
+              : []),
+          ];
+        })();
 
     return {
       group: [
@@ -994,8 +1057,8 @@ export default function SplitClient() {
         ...(payer ? [`Paid by: ${payer.name}`] : []),
         "",
         ...lines,
-        ...(breakdownLines.length > 0
-          ? ["", isEven ? "Bill:" : "How it was split:", ...breakdownLines]
+        ...(includeBreakdown && breakdownSections.length > 0
+          ? ["", ...breakdownSections]
           : []),
         "",
         `Total: $${groupTotal.toFixed(2)}`,
@@ -1004,9 +1067,11 @@ export default function SplitClient() {
     };
   }
 
-  function buildGrandShareResults(): SplitShareResults {
+  function buildGrandShareResults(includeBreakdown: boolean): SplitShareResults {
     const group = [
-      splitPlaces.map((_, i) => buildPlaceShareResults(i).group).join("\n\n"),
+      splitPlaces
+        .map((_, i) => buildPlaceShareResults(i, includeBreakdown).group)
+        .join("\n\n"),
       "",
       "Grand total:",
       ...splitPeople.map(
@@ -1033,11 +1098,10 @@ export default function SplitClient() {
         perPlaceLines.push(
           `- ${placeLabel(place, i)} — $${(t.perPersonTotal[p.id] || 0).toFixed(2)}${paidByNote}`,
         );
+        if (!includeBreakdown) return;
         // Carry the calculation itself along, indented under the place, so
         // the grand-total message isn't just a list of numbers to trust.
-        const detailLines = isEven
-          ? []
-          : personItemLines(place, p.id).map((l) => `  ${l}`);
+        // Splits (shared with others) lead, this person's solo items follow.
         if (isEven) {
           const excluded = place.evenExcluded.includes(p.id);
           const rounds = place.evenRounds[p.id] ?? (place.evenMaxRounds || 1);
@@ -1047,7 +1111,10 @@ export default function SplitClient() {
               : `  (${rounds}/${place.evenMaxRounds || 1} rounds)`,
           );
         } else {
-          perPlaceLines.push(...detailLines);
+          perPlaceLines.push(
+            ...sharedItemLines(place, p.id).map((l) => `  ${l}`),
+            ...personSoloItemLines(place, p.id).map((l) => `  ${l}`),
+          );
         }
       });
       return {
@@ -1110,7 +1177,9 @@ export default function SplitClient() {
         placeTotalsList={placeTotalsList}
         grandTotals={grandTotals}
         placeShareList={placeShareList}
+        placeShareListNoBreakdown={placeShareListNoBreakdown}
         grandShare={grandShare}
+        grandShareNoBreakdown={grandShareNoBreakdown}
         onSendSms={sendSms}
         onReset={resetSplitBill}
       />
