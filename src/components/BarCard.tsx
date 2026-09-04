@@ -277,17 +277,36 @@ export default function BarCard({
 
       {b.status === "visited" && (
         <div className="mt-3.5 overflow-hidden rounded-[6px] border border-line2 bg-ink shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
-          {/* Desktop: all 5 scores in one clean row */}
-          <div className="hidden grid-cols-5 gap-px bg-gold/20 sm:grid">
+          {/* Desktop: all scores in one clean row — 5 columns normally, 6
+              when a bathroom bonus adds a cell. mobileSpan={0} deliberately:
+              that prop's col-span-2/3 classes apply unconditionally (not
+              breakpoint-scoped), so passing a real span here — as this used
+              to — broke the "one row" layout into a lopsided 2-per-row wrap
+              once 5 items no longer divided evenly into 5 columns. */}
+          <div
+            className={`hidden gap-px bg-gold/20 sm:grid ${
+              b.bathroomBonus > 0 ? "sm:grid-cols-6" : "sm:grid-cols-5"
+            }`}
+          >
             {STATS.map(([key, label]) => (
               <ScoreCell
                 key={key}
                 bar={b}
                 statKey={key}
                 label={label}
-                mobileSpan={2}
+                mobileSpan={0}
               />
             ))}
+            {b.bathroomBonus > 0 && (
+              <ScoreCell
+                key="bathroom"
+                bar={b}
+                statKey="bathroomBonus"
+                label="Bathroom Bonus"
+                isBonus
+                mobileSpan={0}
+              />
+            )}
           </div>
 
           {/* Mobile: 6-column grid — 5 scores use 2+2+2 / 3+3, 6 scores use all 2-col spans */}
