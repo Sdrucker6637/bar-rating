@@ -71,6 +71,30 @@ type LNamespace = {
   };
 };
 
+// leaflet.heat is a UMD plugin that attaches itself to a global `L` (it does
+// not play well with bundlers), so it's loaded as a classic <script> after
+// Leaflet itself is imported — exactly how the original app loaded it from a
+// CDN. Genuinely module-scoped (not inside the component, which re-runs this
+// whole function body on every render): a mode toggle re-renders MapView, and
+// a `let` reset on each render meant every single toggle re-appended a fresh
+// <script> tag and re-fetched/re-executed the plugin, which is what made
+// switching modes feel sluggish on mobile. One promise, cached for the life
+// of the page, is reused by every mount and every mode toggle.
+let heatPluginPromise: Promise<void> | null = null;
+function loadHeatPlugin(): Promise<void> {
+  if (!heatPluginPromise) {
+    heatPluginPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js";
+      s.dataset.leafletHeat = "true";
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("Failed to load leaflet.heat"));
+      document.head.appendChild(s);
+    });
+  }
+  return heatPluginPromise;
+}
+
 export default function MapView({ bars }: MapViewProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const [mode, setMode] = useState<"visited" | "wishlist">("visited");
@@ -97,26 +121,6 @@ export default function MapView({ bars }: MapViewProps) {
     [bars],
   );
   const geoBars = mode === "visited" ? visitedGeo : wishlistGeo;
-
-  // leaflet.heat is a UMD plugin that attaches itself to a global `L` (it does
-  // not play well with bundlers), so it's loaded as a classic <script> after
-  // Leaflet itself is imported — exactly how the original app loaded it from a
-  // CDN. The load promise is cached at module level so rapid mode toggles
-  // reuse the in-flight (or settled) load instead of racing a fresh script tag.
-  let heatPluginPromise: Promise<void> | null = null;
-  function loadHeatPlugin(): Promise<void> {
-    if (!heatPluginPromise) {
-      heatPluginPromise = new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = "https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js";
-        s.dataset.leafletHeat = "true";
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error("Failed to load leaflet.heat"));
-        document.head.appendChild(s);
-      });
-    }
-    return heatPluginPromise;
-  }
 
   useEffect(() => {
     const node = mapNodeRef.current;

@@ -12,6 +12,11 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Required for env(safe-area-inset-*) to resolve to anything but 0 — Shell's
+  // fixed mobile nav already reads safe-area-inset-bottom for the home
+  // indicator, but that value is a no-op without viewport-fit: "cover"
+  // telling Safari the page draws under the safe areas in the first place.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

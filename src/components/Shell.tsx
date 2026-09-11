@@ -37,11 +37,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="tda-root tda-atmosphere pb-28 sm:pb-16"
+      className="tda-root tda-atmosphere pb-32 sm:pb-16"
       style={{
         minHeight: "100vh",
         color: "#EDE6D9",
         fontFamily: "'Inter', sans-serif",
+        // viewport-fit: cover (see layout.tsx) draws the page under the
+        // notch/Dynamic Island too, not just the home indicator — pad the
+        // top back out so the header never sits under it. A no-op on
+        // devices/browsers without a top inset.
+        paddingTop: "env(safe-area-inset-top)",
       }}
     >
       <div className="mx-auto max-w-[980px] px-5 sm:border-x sm:border-[rgba(184,150,95,0.055)]">
@@ -118,10 +123,21 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Mobile bottom tab bar — thumb-reachable, safe-area aware */}
+      {/* Mobile bottom tab bar — thumb-reachable, safe-area aware.
+          translateZ(0) forces its own compositing layer: iOS Safari has a
+          long-standing bug where a `fixed` element on a tall page can render
+          a frame late (or get momentarily covered by Safari's own bottom
+          toolbar) until the next scroll/repaint — a dedicated layer avoids
+          that. The extra +6px on top of the safe-area inset is a real gap
+          above the home indicator (and Safari's own chrome) rather than
+          sitting flush against it; safe-area-inset-bottom alone is 0 on
+          anything that isn't actually notched. */}
       <nav
         className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-[#12100F]/95 backdrop-blur-sm sm:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 6px)",
+          transform: "translateZ(0)",
+        }}
         aria-label="Sections"
       >
         <div className="flex items-stretch justify-around">
@@ -134,7 +150,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 key={t.route}
                 href={t.route}
                 aria-current={active ? "page" : undefined}
-                className="flex flex-1 flex-col items-center gap-1 py-2.5"
+                className="flex flex-1 flex-col items-center gap-1 py-3"
               >
                 <span
                   className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
