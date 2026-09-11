@@ -14,11 +14,11 @@ import PlacesModal from "./modals/PlacesModal";
 import CrawlModal from "./modals/CrawlModal";
 import AchievementToastStack from "./AchievementToastStack";
 
-const TABS: { route: string; label: string; icon: IconName }[] = [
+const TABS: { route: string; label: string; shortLabel?: string; icon: IconName }[] = [
   { route: "/leaderboard", label: "Leaderboard", icon: "trophy" },
   { route: "/find", label: "Discover", icon: "compass" },
-  { route: "/map", label: "Tour Map", icon: "pin" },
-  { route: "/split", label: "Split the Bill", icon: "receipt" },
+  { route: "/map", label: "Tour Map", shortLabel: "Map", icon: "pin" },
+  { route: "/split", label: "Split the Bill", shortLabel: "Split", icon: "receipt" },
   { route: "/achievements", label: "Achievements", icon: "medal" },
 ];
 
@@ -131,11 +131,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   <Icon name={t.icon} size={16} />
                 </span>
                 <span
-                  className={`font-mono text-[0.58rem] uppercase tracking-[0.1em] ${
+                  className={`whitespace-nowrap font-mono text-[0.58rem] uppercase tracking-[0.1em] ${
                     active ? "text-cream" : "text-mute"
                   }`}
                 >
-                  {t.label}
+                  {t.shortLabel ?? t.label}
                 </span>
               </Link>
             );
