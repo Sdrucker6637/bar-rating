@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTour } from "@/lib/tour-context";
+import { useToolbarOffset } from "@/lib/useToolbarOffset";
 import Icon from "./Icon";
 import type { IconName } from "./Icon";
 import BrandMark from "./BrandMark";
@@ -32,6 +33,9 @@ const TABS: { route: string; label: string; shortLabel?: string; icon: IconName 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const { saveError, setShowInfo, loading } = useTour();
   const pathname = usePathname();
+  // Called unconditionally, ahead of the loading early-return below, so the
+  // hook order never changes between renders.
+  const toolbarOffset = useToolbarOffset();
 
   if (loading) return <LoadingScreen />;
 
@@ -124,19 +128,25 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Mobile bottom tab bar — thumb-reachable, safe-area aware.
-          translateZ(0) forces its own compositing layer: iOS Safari has a
-          long-standing bug where a `fixed` element on a tall page can render
-          a frame late (or get momentarily covered by Safari's own bottom
-          toolbar) until the next scroll/repaint — a dedicated layer avoids
-          that. The extra +6px on top of the safe-area inset is a real gap
-          above the home indicator (and Safari's own chrome) rather than
-          sitting flush against it; safe-area-inset-bottom alone is 0 on
-          anything that isn't actually notched. */}
+          `bottom` tracks useToolbarOffset() rather than sitting at a flat 0:
+          on a fresh load or navigation, mobile Safari's own address bar/
+          toolbar can be expanded, covering the strip of page a plain
+          `bottom: 0` would render into — that's what "the tabs aren't there
+          until I scroll" actually is (scrolling is what collapses Safari's
+          chrome). Riding the live gap between the layout and visual
+          viewport keeps the nav above the browser's own UI immediately,
+          with no scroll needed. translateZ(0) forces its own compositing
+          layer, since a `fixed` element on a tall page can otherwise render
+          a frame late on iOS. The extra +6px on top of the safe-area inset
+          is a real gap above the home indicator rather than sitting flush
+          against it; the inset alone is 0 on anything that isn't notched. */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-[#12100F]/95 backdrop-blur-sm sm:hidden"
+        className="fixed inset-x-0 z-30 border-t border-line bg-[#12100F]/95 backdrop-blur-sm sm:hidden"
         style={{
+          bottom: toolbarOffset,
           paddingBottom: "calc(env(safe-area-inset-bottom) + 6px)",
           transform: "translateZ(0)",
+          transition: "bottom 0.15s ease-out",
         }}
         aria-label="Sections"
       >
