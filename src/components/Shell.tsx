@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTour } from "@/lib/tour-context";
+import Icon from "./Icon";
+import type { IconName } from "./Icon";
 import LoadingScreen from "./LoadingScreen";
 import InfoModal from "./modals/InfoModal";
 import VisitedFormModal from "./modals/VisitedFormModal";
@@ -12,12 +14,12 @@ import PlacesModal from "./modals/PlacesModal";
 import CrawlModal from "./modals/CrawlModal";
 import AchievementToastStack from "./AchievementToastStack";
 
-const TABS = [
-  { route: "/leaderboard", label: "Leaderboard" },
-  { route: "/find", label: "Discover" },
-  { route: "/map", label: "Tour Map" },
-  { route: "/split", label: "Split the Bill" },
-  { route: "/achievements", label: "Achievements" },
+const TABS: { route: string; label: string; icon: IconName }[] = [
+  { route: "/leaderboard", label: "Leaderboard", icon: "trophy" },
+  { route: "/find", label: "Discover", icon: "compass" },
+  { route: "/map", label: "Tour Map", icon: "pin" },
+  { route: "/split", label: "Split the Bill", icon: "receipt" },
+  { route: "/achievements", label: "Achievements", icon: "medal" },
 ];
 
 export default function Shell({ children }: { children: React.ReactNode }) {
@@ -28,12 +30,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="tda-root tda-atmosphere"
+      className="tda-root tda-atmosphere pb-28 sm:pb-16"
       style={{
         minHeight: "100vh",
         color: "#EDE6D9",
         fontFamily: "'Inter', sans-serif",
-        paddingBottom: "4rem",
       }}
     >
       <div className="mx-auto max-w-[980px] px-5 sm:border-x sm:border-[rgba(184,150,95,0.055)]">
@@ -55,8 +56,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
+        {/* Desktop / tablet nav — segmented tabs */}
         <nav
-          className="tda-scroll-x sticky top-0 z-20 -mx-5 mb-8 border-b border-line bg-[#12100F]/95 px-5 backdrop-blur-sm sm:static sm:mx-0 sm:mb-8 sm:border-b sm:border-line sm:bg-transparent sm:px-0 sm:backdrop-blur-none"
+          className="mb-8 hidden border-b border-line sm:block"
           aria-label="Sections"
         >
           <div className="flex items-stretch">
@@ -69,10 +71,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   key={t.route}
                   href={t.route}
                   aria-current={active ? "page" : undefined}
-                  className={`relative flex flex-shrink-0 items-center whitespace-nowrap px-4 py-3 font-mono text-[0.72rem] uppercase tracking-[0.16em] transition-colors duration-150 sm:flex-1 sm:justify-center sm:border-r sm:border-line sm:px-2 sm:first:border-l ${
+                  className={`relative flex flex-1 items-center justify-center gap-2 whitespace-nowrap border-r border-line px-2 py-3 font-mono text-[0.72rem] uppercase tracking-[0.16em] transition-colors duration-150 first:border-l ${
                     active ? "text-cream" : "text-mute hover:text-mist"
                   }`}
                 >
+                  <Icon name={t.icon} size={14} />
                   {t.label}
                   <span
                     aria-hidden="true"
@@ -85,6 +88,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </nav>
+        <div className="h-6 sm:hidden" />
 
         {children}
 
@@ -100,6 +104,44 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           edit entries.
         </div>
       </div>
+
+      {/* Mobile bottom tab bar — thumb-reachable, safe-area aware */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-[#12100F]/95 backdrop-blur-sm sm:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        aria-label="Sections"
+      >
+        <div className="flex items-stretch justify-around">
+          {TABS.map((t) => {
+            const active =
+              pathname === t.route ||
+              (t.route === "/leaderboard" && pathname === "/");
+            return (
+              <Link
+                key={t.route}
+                href={t.route}
+                aria-current={active ? "page" : undefined}
+                className="flex flex-1 flex-col items-center gap-1 py-2.5"
+              >
+                <span
+                  className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                    active ? "border-brass bg-[rgba(201,168,118,0.14)] text-gold" : "border-transparent text-mute"
+                  }`}
+                >
+                  <Icon name={t.icon} size={16} />
+                </span>
+                <span
+                  className={`font-mono text-[0.58rem] uppercase tracking-[0.1em] ${
+                    active ? "text-cream" : "text-mute"
+                  }`}
+                >
+                  {t.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
       <InfoModal />
       <VisitedFormModal />
