@@ -1,10 +1,13 @@
 "use client";
 
 import type { PlaceResult } from "@/lib/types";
-import { displayDescription } from "@/lib/parse";
+import { displayDescription, priceLevelSymbol } from "@/lib/parse";
 import {
   linkBtnCls,
   tagCls,
+  wishlistBtnCls,
+  visitedBtnCls,
+  replaceBtnCls,
   cardHoverCls,
   cardBaseShadowCls,
   cardWarmSurfaceCls,
@@ -33,15 +36,33 @@ export default function SuggestionCard({
   replacing,
 }: SuggestionCardProps) {
   const desc = displayDescription(s.description);
+  const price = priceLevelSymbol(s.priceLevel);
+  const rating = typeof s.rating === "number" && s.rating > 0 ? s.rating : null;
 
   return (
     <div className={`rounded-lg border border-line bg-panel p-3.5 ${cardBaseShadowCls} ${cardWarmSurfaceCls} ${cardHoverCls}`}>
       <div className="font-serif text-[1.05rem] font-medium text-cream">
         {s.name}
       </div>
-      {s.neighborhood && (
-        <div className="mt-0.5 font-mono text-[0.68rem] text-mute">
-          {s.neighborhood}
+      {(s.neighborhood || price || rating) && (
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[0.68rem] text-mute">
+          {s.neighborhood && <span>{s.neighborhood}</span>}
+          {price && (
+            <span className="text-gold" title="Google Places price level">
+              {price}
+            </span>
+          )}
+          {rating && (
+            <span
+              className="inline-flex items-center gap-1"
+              title="Google Places rating"
+            >
+              <span aria-hidden="true" className="text-gold/80">
+                ★
+              </span>
+              {rating.toFixed(1)}
+            </span>
+          )}
         </div>
       )}
       {s.tags && s.tags.length > 0 ? (
@@ -102,21 +123,15 @@ export default function SuggestionCard({
             <Icon name="external" size={12} /> Map
           </a>
         )}
-        <button
-          className="flex-1 cursor-pointer rounded-[5px] border border-green bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-greenLight hover:bg-green hover:text-cream"
-          onClick={onWishlist}
-        >
+        <button className={wishlistBtnCls} onClick={onWishlist}>
           + Wishlist
         </button>
-        <button
-          className="cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream"
-          onClick={onVisited}
-        >
+        <button className={visitedBtnCls} onClick={onVisited}>
           I visited
         </button>
         {showCrawlActions && onReplace && (
           <button
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-50"
+            className={replaceBtnCls}
             disabled={replacing}
             onClick={onReplace}
           >

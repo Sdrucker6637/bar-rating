@@ -18,10 +18,15 @@ import {
   btnSecondaryCls,
   chipCls,
   chipActiveCls,
+  segmentWrapCls,
+  segmentBtnCls,
+  segmentBtnActiveCls,
+  miniRemoveBtnCls,
   cardBaseShadowCls,
   cardWarmSurfaceCls,
 } from "@/lib/ui";
 import Icon from "./Icon";
+import SplitStepper from "./SplitStepper";
 
 interface SplitBillViewProps {
   step: SplitStep;
@@ -107,10 +112,7 @@ const taxTipInputCls =
 
 function PanelHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2
-      style={{ marginTop: 0, fontFamily: "'Fraunces', serif", fontWeight: 500 }}
-      className="text-[1.35rem] text-cream"
-    >
+    <h2 className="m-0 font-serif text-[1.35rem] font-medium text-cream">
       {children}
     </h2>
   );
@@ -170,9 +172,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
   // ---------------- names ----------------
   if (step === "names") {
     return (
-      <div
-        className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
-      >
+      <>
+        <SplitStepper step={step} />
+        <div
+          className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+        >
         <PanelHeading>Who&apos;s splitting the bill?</PanelHeading>
         {people.length > 0 && (
           <div className="mb-3.5">
@@ -191,7 +195,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                   <button
                     onClick={() => onRemovePerson(p.id)}
                     title={`Remove ${p.name}`}
-                    className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/75 transition-colors hover:border-red/40 hover:bg-[rgba(199,118,118,0.12)] hover:text-red"
+                    className={`h-4 w-4 ${miniRemoveBtnCls}`}
                   >
                     <Icon name="x" size={9} />
                   </button>
@@ -247,16 +251,19 @@ export default function SplitBillView(props: SplitBillViewProps) {
             Add at least one more person to split with.
           </div>
         )}
-      </div>
+        </div>
+      </>
     );
   }
 
   // ---------------- places count ----------------
   if (step === "placesCount") {
     return (
-      <div
-        className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
-      >
+      <>
+        <SplitStepper step={step} />
+        <div
+          className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+        >
         <PanelHeading>How many places did you go?</PanelHeading>
         <div className="mb-4 font-mono text-[0.68rem] text-mute">
           One tab will be created per place, so each receipt gets its own crew
@@ -286,14 +293,17 @@ export default function SplitBillView(props: SplitBillViewProps) {
             <Icon name="arrowRight" size={13} />
           </button>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
   // ---------------- receipts ----------------
   if (step === "receipts") {
     return (
-      <div className="my-4 flex flex-col gap-3">
+      <>
+        <SplitStepper step={step} />
+        <div className="my-4 flex flex-col gap-3">
         {places.map((place, i) => (
           <div
             key={place.id}
@@ -335,7 +345,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                 }
                 e.target.value = "";
               }}
-              style={{ display: "none" }}
+              className="hidden"
             />
 
             {place.screenshots.length === 0 && (
@@ -406,7 +416,8 @@ export default function SplitBillView(props: SplitBillViewProps) {
           Every receipt is read automatically when you continue — you can also
           skip a place and add its items by hand on the next step.
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -420,7 +431,9 @@ export default function SplitBillView(props: SplitBillViewProps) {
     const isEven = place.splitMethod === "even";
 
     return (
-      <div className="my-4">
+      <>
+        <SplitStepper step={step} />
+        <div className="my-4">
         <div className="mb-3 flex flex-wrap gap-1.5 overflow-x-auto">
           {places.map((pl, i) => (
             <button
@@ -486,7 +499,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                     onClick={() =>
                       onRemovePersonFromPlace(activePlaceIndex, p.id)
                     }
-                    className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/75 transition-colors hover:border-red/40 hover:bg-[rgba(199,118,118,0.12)] hover:text-red"
+                    className={`h-4 w-4 ${miniRemoveBtnCls}`}
                     title="Remove from this place"
                   >
                     <Icon name="x" size={9} />
@@ -647,16 +660,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                     </button>
                   </div>
                   {includedIds.length > 0 && (
-                    <div
-                      style={{
-                        marginTop: "0.65rem",
-                        paddingTop: "0.6rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.4rem",
-                      }}
-                      className="border-t border-dashed border-[rgba(184,150,95,0.22)]"
-                    >
+                    <div className="mt-[0.65rem] flex flex-col gap-[0.4rem] border-t border-dashed border-[rgba(184,150,95,0.22)] pt-[0.6rem]">
                       {crew
                         .filter((p) => includedIds.includes(p.id))
                         .map((p) => {
@@ -665,31 +669,13 @@ export default function SplitBillView(props: SplitBillViewProps) {
                           return (
                             <div
                               key={p.id}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: "0.6rem",
-                              }}
+                              className="flex items-center justify-between gap-[0.6rem]"
                             >
-                              <span
-                                style={{
-                                  minWidth: "90px",
-                                  fontFamily: "'IBM Plex Mono', monospace",
-                                  fontSize: "0.78rem",
-                                  color: "#BDB3A4",
-                                }}
-                              >
+                              <span className="min-w-[90px] font-mono text-[0.78rem] text-mist">
                                 {p.name}
                               </span>
                               {q > 1 && wholeUnitShares ? (
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem",
-                                  }}
-                                >
+                                <div className="flex items-center gap-2">
                                   <button
                                     className={groupBtnCls}
                                     onClick={() =>
@@ -703,18 +689,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                                   >
                                     −
                                   </button>
-                                  <b
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      minWidth: "1.75rem",
-                                      height: "1.75rem",
-                                      fontFamily: "'IBM Plex Mono', monospace",
-                                      fontSize: "0.8rem",
-                                      color: "#EDE6D9",
-                                    }}
-                                  >
+                                  <b className="flex h-7 min-w-[1.75rem] items-center justify-center font-mono text-[0.8rem] text-cream">
                                     {units}
                                   </b>
                                   <button
@@ -735,13 +710,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                               ) : (
                                 <span />
                               )}
-                              <span
-                                style={{
-                                  fontFamily: "'IBM Plex Mono', monospace",
-                                  fontSize: "0.8rem",
-                                  color: "#C9A876",
-                                }}
-                              >
+                              <span className="font-mono text-[0.8rem] text-gold">
                                 ${cost.toFixed(2)}
                               </span>
                             </div>
@@ -756,18 +725,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
 
           <AddItemControl placeIndex={activePlaceIndex} onAdd={onAddItem} />
 
-          <div
-            style={{
-              marginTop: "1rem",
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: "0.85rem",
-              color: "#BDB3A4",
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "1.5rem",
-            }}
-          >
+          <div className="mt-4 flex flex-wrap items-center gap-6 font-mono text-[0.85rem] text-mist">
             <label className="flex items-center gap-1.5">
               <span>Tax:</span>
               <input
@@ -848,13 +806,16 @@ export default function SplitBillView(props: SplitBillViewProps) {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
   // ---------------- summary ----------------
   return (
-    <div className="my-4 flex flex-col gap-3">
+    <>
+      <SplitStepper step={step} />
+      <div className="my-4 flex flex-col gap-3">
       {places.map((place, i) => {
         const totals = placeTotalsList[i];
         const crew = people.filter((p) => place.crewIds.includes(p.id));
@@ -924,6 +885,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -1099,8 +1061,6 @@ function SplitMethodToggle({
   method: "item" | "even";
   onChange: (m: "item" | "even") => void;
 }) {
-  const segBase =
-    "inline-flex flex-1 cursor-pointer items-center justify-center rounded-[5px] px-3 py-1.5 font-mono text-[0.7rem] font-semibold uppercase tracking-[0.04em] transition-colors";
   return (
     <div className="mb-3.5">
       <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
@@ -1109,14 +1069,14 @@ function SplitMethodToggle({
       <div
         role="group"
         aria-label="Split method"
-        className="inline-flex w-full rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-[#141110] p-0.5 sm:w-auto"
+        className={`w-full sm:w-auto ${segmentWrapCls}`}
       >
         <button
           type="button"
           aria-pressed={method === "item"}
           onClick={() => onChange("item")}
-          className={`${segBase} ${
-            method === "item" ? "bg-brass text-deep" : "text-mist hover:text-cream"
+          className={`${segmentBtnCls} ${
+            method === "item" ? segmentBtnActiveCls : ""
           }`}
         >
           Item by item
@@ -1125,8 +1085,8 @@ function SplitMethodToggle({
           type="button"
           aria-pressed={method === "even"}
           onClick={() => onChange("even")}
-          className={`${segBase} ${
-            method === "even" ? "bg-brass text-deep" : "text-mist hover:text-cream"
+          className={`${segmentBtnCls} ${
+            method === "even" ? segmentBtnActiveCls : ""
           }`}
         >
           Even split
@@ -1214,7 +1174,7 @@ function EvenSplitSection({
                   <span className="text-cream">${(it.price || 0).toFixed(2)}</span>
                   <button
                     onClick={() => onRemoveItem(activePlaceIndex, it.id)}
-                    className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/70 transition-colors hover:border-red/40 hover:text-red"
+                    className={`h-5 w-5 ${miniRemoveBtnCls}`}
                     title="Remove item"
                   >
                     <Icon name="x" size={10} />
@@ -1227,18 +1187,7 @@ function EvenSplitSection({
         <AddItemControl placeIndex={activePlaceIndex} onAdd={onAddItem} />
       </div>
 
-      <div
-        style={{
-          marginBottom: "1rem",
-          fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: "0.85rem",
-          color: "#BDB3A4",
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: "1.5rem",
-        }}
-      >
+      <div className="mb-4 flex flex-wrap items-center gap-6 font-mono text-[0.85rem] text-mist">
         <label className="flex items-center gap-1.5">
           <span>Tax:</span>
           <input
@@ -1427,8 +1376,6 @@ function ShareResults({
   const [includeBreakdown, setIncludeBreakdown] = useState(true);
   const active = includeBreakdown ? results : resultsNoBreakdown;
   const hasPeople = active.individuals.length > 0;
-  const segBase =
-    "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 font-mono text-[0.7rem] font-semibold uppercase tracking-[0.04em] transition-colors disabled:cursor-default disabled:opacity-40";
 
   return (
     <div>
@@ -1447,17 +1394,15 @@ function ShareResults({
       <div
         role="group"
         aria-label="Share results"
-        className="inline-flex w-full rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-[#141110] p-0.5"
+        className={`w-full ${segmentWrapCls}`}
       >
         <button
           type="button"
           aria-pressed={mode === "individual"}
           disabled={!hasPeople}
           onClick={() => setMode("individual")}
-          className={`${segBase} ${
-            mode === "individual"
-              ? "bg-brass text-deep"
-              : "text-mist hover:text-cream"
+          className={`${segmentBtnCls} ${
+            mode === "individual" ? segmentBtnActiveCls : ""
           }`}
         >
           <Icon name="users" size={13} /> Send individually
@@ -1467,10 +1412,8 @@ function ShareResults({
           aria-pressed={mode === "group"}
           disabled={!hasPeople}
           onClick={() => setMode("group")}
-          className={`${segBase} ${
-            mode === "group"
-              ? "bg-brass text-deep"
-              : "text-mist hover:text-cream"
+          className={`${segmentBtnCls} ${
+            mode === "group" ? segmentBtnActiveCls : ""
           }`}
         >
           <Icon name="message" size={13} /> Send to group

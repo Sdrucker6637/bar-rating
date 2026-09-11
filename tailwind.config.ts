@@ -14,7 +14,10 @@ const config: Config = {
         goldBright: "#E5B93F",
         mute: "#93887A",
         mist: "#BDB3A4",
-        dim: "#6E6457",
+        // Lightened from #6E6457 — the darker value read at ~3.3:1 against
+        // panel/ink, below WCAG AA for the small mono print it's used for.
+        // #8A7F6F clears 4.5:1 while staying the quietest tier below `mute`.
+        dim: "#8A7F6F",
         line: "#262029",
         line2: "#302938",
         panel: "#1A1714",

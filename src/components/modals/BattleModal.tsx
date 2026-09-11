@@ -5,6 +5,7 @@ import Modal from "./Modal";
 import Icon from "../Icon";
 import { fmt } from "@/lib/scoring";
 import type { BattlePair } from "@/lib/ranking";
+import { btnPrimaryCls } from "@/lib/ui";
 
 interface BattleModalProps {
   /** Live list of pairs still needing a tiebreak. The parent recomputes this
@@ -42,10 +43,7 @@ export default function BattleModal({
           order is decided.
         </p>
         <div className="mt-5 flex justify-end">
-          <button
-            onClick={onClose}
-            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full bg-brass px-5 py-2.5 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.04em] text-deep shadow-lift transition-all duration-150 hover:bg-gold active:scale-[0.98]"
-          >
+          <button onClick={onClose} className={btnPrimaryCls}>
             Done
           </button>
         </div>

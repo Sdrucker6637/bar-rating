@@ -18,6 +18,7 @@ import {
 } from "@/lib/ui";
 import Modal from "./modals/Modal";
 import Icon from "./Icon";
+import ScoreSeal from "./ScoreSeal";
 
 interface BarCardProps {
   b: Bar;
@@ -215,31 +216,49 @@ export default function BarCard({
           </div>
         </div>
 
-        {score !== undefined && score !== null && (
-          <div className="flex-shrink-0 rounded-[6px] border border-line2 bg-ink px-3.5 py-2 text-right shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
-            <div className="flex items-center justify-end gap-1.5">
-              {battleDecided && !b.disqualified && (
+        {score !== undefined &&
+          score !== null &&
+          (rank === 1 && !b.disqualified ? (
+            // The board's #1 gets the house's signature mark instead of the
+            // plain number box every other row uses — one earned distinction,
+            // not a repeated widget.
+            <div className="relative flex-shrink-0">
+              {battleDecided && (
                 <span
                   title="Position determined by Bar Battle"
                   aria-label="Position determined by Bar Battle"
-                  className="inline-flex"
+                  className="absolute -left-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-line2 bg-ink"
                 >
-                  <Icon name="swords" size={12} className="text-gold/70" />
+                  <Icon name="swords" size={10} className="text-gold/80" />
                 </span>
               )}
-              <span className="font-serif text-[1.3rem] font-medium leading-none text-gold">
-                {b.disqualified ? "N/A" : fmt(score)}
-              </span>
+              <ScoreSeal score={score} label={scoreLabel} size={76} />
             </div>
-            <div
-              className="ml-auto mt-1.5 h-px w-6 bg-brass/30"
-              aria-hidden="true"
-            />
-            <div className="mt-1 text-[0.56rem] uppercase tracking-[0.08em] text-mute">
-              {b.disqualified ? "disqualified" : scoreLabel}
+          ) : (
+            <div className="flex-shrink-0 rounded-[6px] border border-line2 bg-ink px-3.5 py-2 text-right shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
+              <div className="flex items-center justify-end gap-1.5">
+                {battleDecided && !b.disqualified && (
+                  <span
+                    title="Position determined by Bar Battle"
+                    aria-label="Position determined by Bar Battle"
+                    className="inline-flex"
+                  >
+                    <Icon name="swords" size={12} className="text-gold/70" />
+                  </span>
+                )}
+                <span className="font-serif text-[1.3rem] font-medium leading-none text-gold">
+                  {b.disqualified ? "N/A" : fmt(score)}
+                </span>
+              </div>
+              <div
+                className="ml-auto mt-1.5 h-px w-6 bg-brass/30"
+                aria-hidden="true"
+              />
+              <div className="mt-1 text-[0.56rem] uppercase tracking-[0.08em] text-mute">
+                {b.disqualified ? "disqualified" : scoreLabel}
+              </div>
             </div>
-          </div>
-        )}
+          ))}
       </div>
 
       {b.disqualified && b.disqualifyReason && (

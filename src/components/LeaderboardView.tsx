@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTour } from "@/lib/tour-context";
-import { avgWithFood, avgWithoutFood, fmt } from "@/lib/scoring";
+import { avgWithFood, avgWithoutFood } from "@/lib/scoring";
 import { battleDecidedBarIds, pendingBattlePairs } from "@/lib/ranking";
 import type { Bar } from "@/lib/types";
 import BarCard from "./BarCard";
+import ScoreSeal from "./ScoreSeal";
 import TabIntro from "./TabIntro";
 import EmptyState from "./EmptyState";
 import BattleModal from "./modals/BattleModal";
@@ -14,6 +15,9 @@ import {
   inputCls,
   kickerCls,
   chipCls,
+  segmentWrapCls,
+  segmentBtnCls,
+  segmentBtnActiveCls,
   cardBaseShadowCls,
   cardWarmSurfaceCls,
 } from "@/lib/ui";
@@ -203,22 +207,15 @@ export default function LeaderboardView() {
                 </div>
               )}
             </div>
-            <div className="flex-shrink-0 sm:self-center">
-              <div className="min-w-[136px] rounded-[6px] border border-brass/30 bg-ink/70 px-5 py-4 text-center shadow-[inset_0_1px_0_rgba(237,230,217,0.04)]">
-                <div className="font-mono text-[0.6rem] uppercase tracking-[0.16em] text-mute">
-                  House average
-                </div>
-                <div className="mt-1.5 font-mono text-display leading-none text-gold">
-                  {fmt(champScore)}
-                </div>
-                <div
-                  className="mx-auto mt-2.5 h-px w-8 bg-brass/50"
-                  aria-hidden="true"
-                />
-                <div className="mt-2 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-mute">
-                  {foodMode === "with" ? "with food" : "no food"}
-                </div>
+            <div className="flex flex-shrink-0 flex-col items-center gap-1.5 sm:self-center">
+              <div className="font-mono text-[0.58rem] uppercase tracking-[0.16em] text-mute">
+                House average
               </div>
+              <ScoreSeal
+                score={champScore}
+                label={foodMode === "with" ? "with food" : "no food"}
+                size={104}
+              />
             </div>
           </div>
         </div>
@@ -243,19 +240,13 @@ export default function LeaderboardView() {
             the "Sort by" word hides and the trigger shows just the current
             sort so the two still fit side by side. */}
         <div className="flex items-center justify-between gap-2">
-          <div
-            role="group"
-            aria-label="Food filter"
-            className="inline-flex rounded-full border border-[rgba(184,150,95,0.28)] bg-ink p-0.5"
-          >
+          <div role="group" aria-label="Food filter" className={segmentWrapCls}>
             <button
               type="button"
               aria-pressed={foodMode === "with"}
               onClick={() => setFoodMode("with")}
-              className={`rounded-full px-2 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.03em] transition-colors duration-150 ${
-                foodMode === "with"
-                  ? "bg-brass text-deep"
-                  : "text-mist hover:text-cream"
+              className={`${segmentBtnCls} ${
+                foodMode === "with" ? segmentBtnActiveCls : ""
               }`}
             >
               With food
@@ -264,10 +255,8 @@ export default function LeaderboardView() {
               type="button"
               aria-pressed={foodMode === "without"}
               onClick={() => setFoodMode("without")}
-              className={`rounded-full px-2 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.03em] transition-colors duration-150 ${
-                foodMode === "without"
-                  ? "bg-brass text-deep"
-                  : "text-mist hover:text-cream"
+              className={`${segmentBtnCls} ${
+                foodMode === "without" ? segmentBtnActiveCls : ""
               }`}
             >
               Without food

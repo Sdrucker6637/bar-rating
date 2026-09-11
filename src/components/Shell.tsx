@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTour } from "@/lib/tour-context";
 import Icon from "./Icon";
 import type { IconName } from "./Icon";
+import BrandMark from "./BrandMark";
 import LoadingScreen from "./LoadingScreen";
 import InfoModal from "./modals/InfoModal";
 import VisitedFormModal from "./modals/VisitedFormModal";
@@ -39,18 +40,24 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     >
       <div className="mx-auto max-w-[980px] px-5 sm:border-x sm:border-[rgba(184,150,95,0.055)]">
         <header className="border-b border-[rgba(184,150,95,0.16)] pb-7 pt-12 text-center">
-          <h1 className="m-0 font-serif text-display font-medium text-cream">
-            Tour de <span className="italic text-gold">Alcoholism</span>
-            <button
-              type="button"
-              title="How Tour de Alcoholism works"
-              aria-label="How Tour de Alcoholism works"
-              onClick={() => setShowInfo(true)}
-              className="ml-2 inline-flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-full border border-mute bg-transparent align-middle font-mono text-[0.72rem] font-semibold text-gold transition-colors hover:border-gold hover:bg-[rgba(201,168,118,0.1)]"
-            >
-              i
-            </button>
-          </h1>
+          <div className="flex items-center justify-center gap-2.5">
+            <BrandMark
+              size={34}
+              className="hidden flex-shrink-0 opacity-90 drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)] sm:block"
+            />
+            <h1 className="m-0 font-serif text-display font-medium text-cream">
+              Tour de <span className="italic text-gold">Alcoholism</span>
+              <button
+                type="button"
+                title="How Tour de Alcoholism works"
+                aria-label="How Tour de Alcoholism works"
+                onClick={() => setShowInfo(true)}
+                className="ml-2 inline-flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-full border border-mute bg-transparent align-middle font-mono text-[0.72rem] font-semibold text-gold transition-colors hover:border-gold hover:bg-[rgba(201,168,118,0.1)]"
+              >
+                i
+              </button>
+            </h1>
+          </div>
           <div className="mt-3 font-mono text-kicker uppercase text-mute">
             a running record of the bars we&apos;ve survived
           </div>

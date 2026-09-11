@@ -16,10 +16,7 @@ export default function PlacesModal() {
       <h3 className="mt-0 font-serif font-medium text-cream">
         Confirm the location
       </h3>
-      <p
-        className="mb-0.5 font-mono text-[0.8rem]"
-        style={{ color: "#C9A876" }}
-      >
+      <p className="mb-0.5 font-mono text-[0.8rem] text-gold">
         &ldquo;{suggestion.name}&rdquo;
       </p>
       {suggestion.address && (

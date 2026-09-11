@@ -115,8 +115,11 @@ export const cardWarmSurfaceCls =
 export const cardHoverCls =
   "transition-all duration-200 hover:border-line2 hover:shadow-[inset_0_1px_0_rgba(237,230,217,0.05),0_12px_28px_rgba(0,0,0,0.4)]";
 
+// h-9/w-9 (36px) rather than the old h-7/w-7 (28px) — this is the app's one
+// stepper control (group size, crawl stops, split rounds/units/places) and
+// 28px reads fine but is genuinely fiddly to tap one-handed on a phone.
 export const groupBtnCls =
-  "flex h-7 w-7 flex-shrink-0 cursor-pointer items-center justify-center rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-ink text-base leading-none text-brass transition-colors hover:border-brass disabled:cursor-default disabled:opacity-30";
+  "flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-ink text-base leading-none text-brass transition-colors hover:border-brass active:scale-[0.94] disabled:cursor-default disabled:opacity-30";
 
 /** Vibe tag on bar cards — a small menu label, not a UI badge: warm-black
  *  surface, faint brass hairline, muted cream italic serif. Compact and
@@ -126,3 +129,38 @@ export const tagCls =
 
 /** Small uppercase mono label used above section/panel titles for editorial hierarchy. */
 export const kickerCls = "font-mono text-kicker uppercase text-gold";
+
+/** "+ Wishlist" in-card action — one green accent shared by every surface
+ *  that offers it (search results, crawl stops), so the same action always
+ *  looks like the same action. */
+export const wishlistBtnCls =
+  "flex-1 cursor-pointer rounded-[5px] border border-green bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-greenLight transition-colors hover:bg-green hover:text-cream";
+
+/** "I visited" — wishlistBtnCls's neutral companion, same warm brass-tinted
+ *  border language as the rest of the app's quiet actions. */
+export const visitedBtnCls =
+  "cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream";
+
+/** "Replace" — swap this suggestion/stop for a fresh one. Shown wherever a
+ *  single result can be re-rolled without restarting the whole search. */
+export const replaceBtnCls =
+  "inline-flex cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-50";
+
+/** Tiny circular "x" used to pull one entry out of a chip/pill (a roster
+ *  name, a crew member, a screenshot) — quiet until hovered, then a soft red
+ *  wash makes the destructive intent legible. Callers add the size (h-4 w-4
+ *  for a text chip, h-5 w-5 over an image). */
+export const miniRemoveBtnCls =
+  "flex flex-shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/75 transition-colors hover:border-red/40 hover:bg-[rgba(199,118,118,0.12)] hover:text-red";
+
+/** Segmented two/three-way toggle (food filter, split method, share mode) —
+ *  one squared control language everywhere a screen offers a small closed
+ *  set of mutually exclusive modes, rather than each screen inventing its
+ *  own pill/box/shape. Pair segmentBtnCls with segmentBtnActiveCls exactly
+ *  like chipCls/chipActiveCls — the `!` is load-bearing for the same reason
+ *  documented on chipActiveCls above. */
+export const segmentWrapCls =
+  "inline-flex rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-[#141110] p-0.5";
+export const segmentBtnCls =
+  "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 font-mono text-[0.7rem] font-semibold uppercase tracking-[0.04em] text-mist transition-colors hover:text-cream disabled:cursor-default disabled:opacity-40";
+export const segmentBtnActiveCls = "!bg-brass !text-deep hover:!text-deep";

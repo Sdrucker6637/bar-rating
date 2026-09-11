@@ -3,9 +3,19 @@
 import { useTour } from "@/lib/tour-context";
 import type { CrawlStop } from "@/lib/tour-context";
 import Modal from "./Modal";
-import { displayDescription } from "@/lib/parse";
+import { displayDescription, priceLevelSymbol } from "@/lib/parse";
 import { estimateWalkMinutes, haversineMeters } from "@/lib/scoring";
-import { findBtnCls, inputCls, secondaryBtnCls } from "@/lib/ui";
+import {
+  findBtnCls,
+  inputCls,
+  secondaryBtnCls,
+  groupBtnCls,
+  ghostBtnCls,
+  wishlistBtnCls,
+  visitedBtnCls,
+  replaceBtnCls,
+  tagCls,
+} from "@/lib/ui";
 import Icon from "../Icon";
 
 export default function CrawlModal() {
@@ -46,16 +56,16 @@ export default function CrawlModal() {
           onChange={(e) => setCrawlStartInput(e.target.value)}
         />
         <div className="flex items-center gap-1.5 font-mono text-[0.85rem]">
-          <span style={{ color: "#857C8E" }}>Bars</span>
+          <span className="text-mist">Bars</span>
           <button
-            className="h-[26px] w-[26px] cursor-pointer rounded-[5px] border border-line2 bg-ink text-base leading-none text-brass"
+            className={groupBtnCls}
             onClick={() => setCrawlCount(Math.max(2, crawlCount - 1))}
           >
             −
           </button>
           <b className="text-cream">{crawlCount}</b>
           <button
-            className="h-[26px] w-[26px] cursor-pointer rounded-[5px] border border-line2 bg-ink text-base leading-none text-brass"
+            className={groupBtnCls}
             onClick={() => setCrawlCount(Math.min(8, crawlCount + 1))}
           >
             +
@@ -89,6 +99,9 @@ export default function CrawlModal() {
             const isEnriching = crawlEnrichingNames.has(s.name);
             const isFailed = crawlFailedNames.has(s.name);
             const desc = displayDescription(s.description);
+            const price = priceLevelSymbol(s.priceLevel);
+            const rating =
+              typeof s.rating === "number" && s.rating > 0 ? s.rating : null;
             return (
               <div key={s.name}>
                 <div className="flex items-start gap-4 rounded-lg border border-line2 border-l-[3px] border-l-brass bg-ink px-5 py-4">
@@ -99,18 +112,24 @@ export default function CrawlModal() {
                     <div className="font-serif text-[1.08rem] font-medium text-cream">
                       {s.name}
                     </div>
-                    {s.neighborhood && (
-                      <div className="mt-1 font-mono text-[0.68rem] text-mute">
-                        {s.neighborhood}
+                    {(s.neighborhood || price || rating) && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[0.68rem] text-mute">
+                        {s.neighborhood && <span>{s.neighborhood}</span>}
+                        {price && <span className="text-gold">{price}</span>}
+                        {rating && (
+                          <span className="inline-flex items-center gap-1">
+                            <span aria-hidden="true" className="text-gold/80">
+                              ★
+                            </span>
+                            {rating.toFixed(1)}
+                          </span>
+                        )}
                       </div>
                     )}
                     {s.tags && s.tags.length > 0 ? (
-                      <div className="mt-2.5 flex flex-wrap gap-1">
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
                         {s.tags.map((t) => (
-                          <span
-                            key={t}
-                            className="rounded-full bg-line px-2 py-0.5 font-mono text-[0.66rem] text-mist"
-                          >
+                          <span key={t} className={tagCls}>
                             {t}
                           </span>
                         ))}
@@ -149,16 +168,16 @@ export default function CrawlModal() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       {s.mapsLink && (
                         <a
-                          className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist no-underline hover:border-brass hover:text-cream"
+                          className={ghostBtnCls}
                           href={s.mapsLink}
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Map ↗
+                          <Icon name="external" size={12} /> Map
                         </a>
                       )}
                       <button
-                        className="flex-1 cursor-pointer rounded-[5px] border border-green bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-greenLight hover:bg-green hover:text-cream"
+                        className={wishlistBtnCls}
                         onClick={() => {
                           addSuggestionToWishlist(s);
                           removeCrawlStop(s.name);
@@ -167,13 +186,13 @@ export default function CrawlModal() {
                         + Wishlist
                       </button>
                       <button
-                        className="cursor-pointer rounded-[5px] border border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream"
+                        className={visitedBtnCls}
                         onClick={() => rankSuggestion(s)}
                       >
                         I visited
                       </button>
                       <button
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-[5px] border border-line2 bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-50"
+                        className={replaceBtnCls}
                         disabled={replacingIndex !== null}
                         onClick={() => replaceStop(i)}
                       >
