@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTour } from "@/lib/tour-context";
-import { useToolbarOffset } from "@/lib/useToolbarOffset";
 import Icon from "./Icon";
 import type { IconName } from "./Icon";
 import BrandMark from "./BrandMark";
@@ -33,27 +32,44 @@ const TABS: { route: string; label: string; shortLabel?: string; icon: IconName 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const { saveError, setShowInfo, loading } = useTour();
   const pathname = usePathname();
-  // Called unconditionally, ahead of the loading early-return below, so the
-  // hook order never changes between renders.
-  const toolbarOffset = useToolbarOffset();
 
   if (loading) return <LoadingScreen />;
 
   return (
+    // Fixed-height (100dvh) flex shell instead of a body-scrolls,
+    // position:fixed-nav page. `fixed` bottom-anchored elements are computed
+    // against mobile Safari's viewport in a way that can lag its own
+    // collapsible toolbar — a `fixed; bottom: 0` (or a JS-computed offset
+    // chasing window.visualViewport, tried first) can still render behind
+    // the toolbar on a fresh load until a scroll/repaint catches it up,
+    // which is exactly "the tabs aren't there until I scroll". Making the
+    // nav a normal, non-fixed flex item sidesteps that class of bug
+    // entirely: its position is ordinary box layout, not viewport tracking.
+    // 100dvh (not 100vh) is what makes that safe — it already resolves to
+    // the CURRENT visible height, toolbar included, so the shell is never
+    // taller than what's actually on screen.
     <div
-      className="tda-root tda-atmosphere pb-32 sm:pb-16"
+      className="tda-root tda-atmosphere flex flex-col overflow-hidden"
       style={{
-        minHeight: "100vh",
+        height: "100dvh",
         color: "#EDE6D9",
         fontFamily: "'Inter', sans-serif",
-        // viewport-fit: cover (see layout.tsx) draws the page under the
-        // notch/Dynamic Island too, not just the home indicator — pad the
-        // top back out so the header never sits under it. A no-op on
-        // devices/browsers without a top inset.
-        paddingTop: "env(safe-area-inset-top)",
       }}
     >
-      <div className="mx-auto max-w-[980px] px-5 sm:border-x sm:border-[rgba(184,150,95,0.055)]">
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        <div
+          className="mx-auto max-w-[980px] px-5 pb-8 sm:border-x sm:border-[rgba(184,150,95,0.055)] sm:pb-12"
+          style={{
+            // viewport-fit: cover (see layout.tsx) draws the page under the
+            // notch/Dynamic Island too, not just the home indicator — pad
+            // the top back out so the header never sits under it. A no-op
+            // on devices/browsers without a top inset.
+            paddingTop: "env(safe-area-inset-top)",
+          }}
+        >
         <header className="border-b border-[rgba(184,150,95,0.16)] pb-7 pt-12 text-center">
           <div className="flex items-center justify-center gap-2.5">
             <BrandMark
@@ -125,28 +141,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           Shared list — anyone with this page can add stages, rank bars, and
           edit entries.
         </div>
+        </div>
       </div>
 
-      {/* Mobile bottom tab bar — thumb-reachable, safe-area aware.
-          `bottom` tracks useToolbarOffset() rather than sitting at a flat 0:
-          on a fresh load or navigation, mobile Safari's own address bar/
-          toolbar can be expanded, covering the strip of page a plain
-          `bottom: 0` would render into — that's what "the tabs aren't there
-          until I scroll" actually is (scrolling is what collapses Safari's
-          chrome). Riding the live gap between the layout and visual
-          viewport keeps the nav above the browser's own UI immediately,
-          with no scroll needed. translateZ(0) forces its own compositing
-          layer, since a `fixed` element on a tall page can otherwise render
-          a frame late on iOS. The extra +6px on top of the safe-area inset
-          is a real gap above the home indicator rather than sitting flush
-          against it; the inset alone is 0 on anything that isn't notched. */}
+      {/* Mobile bottom tab bar — thumb-reachable, safe-area aware. A normal
+          flex item (not `position: fixed`), always at the bottom of the
+          100dvh shell above — see the note on the shell's root div. */}
       <nav
-        className="fixed inset-x-0 z-30 border-t border-line bg-[#12100F]/95 backdrop-blur-sm sm:hidden"
+        className="z-30 flex-shrink-0 border-t border-line bg-[#12100F]/95 backdrop-blur-sm sm:hidden"
         style={{
-          bottom: toolbarOffset,
           paddingBottom: "calc(env(safe-area-inset-bottom) + 6px)",
-          transform: "translateZ(0)",
-          transition: "bottom 0.15s ease-out",
         }}
         aria-label="Sections"
       >

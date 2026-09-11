@@ -110,9 +110,13 @@ interface SplitBillViewProps {
 const taxTipInputCls =
   "w-20 rounded-[5px] border border-[rgba(184,150,95,0.25)] bg-[#141110] px-2 py-1 font-mono text-[0.85rem] text-cream shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass/20";
 
+// mb-3 rather than m-0: every call site follows this straight with a field,
+// a description line, or a chip row that itself carries no top margin, so
+// the title sat flush against whatever came next (e.g. "Who's splitting the
+// bill?" directly above the name input) everywhere this component is used.
 function PanelHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="m-0 font-serif text-[1.35rem] font-medium text-cream">
+    <h2 className="mb-3 mt-0 font-serif text-[1.35rem] font-medium text-cream">
       {children}
     </h2>
   );
