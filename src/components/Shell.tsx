@@ -16,11 +16,17 @@ import CrawlModal from "./modals/CrawlModal";
 import AchievementToastStack from "./AchievementToastStack";
 
 const TABS: { route: string; label: string; shortLabel?: string; icon: IconName }[] = [
-  { route: "/leaderboard", label: "Leaderboard", icon: "trophy" },
+  // shortLabel is the bottom mobile bar only — the desktop segmented nav
+  // always uses the full label. Every tab gets one now: leaving only the two
+  // longest words shortened made "Map"/"Split" float in extra space while
+  // "Leaderboard"/"Achievements" crowded their neighbors, an uneven rhythm
+  // across 5 equal-width columns. "Badges" reuses the term the Achievements
+  // page itself already uses throughout, rather than inventing a new one.
+  { route: "/leaderboard", label: "Leaderboard", shortLabel: "Ranks", icon: "trophy" },
   { route: "/find", label: "Discover", icon: "compass" },
   { route: "/map", label: "Tour Map", shortLabel: "Map", icon: "pin" },
   { route: "/split", label: "Split the Bill", shortLabel: "Split", icon: "receipt" },
-  { route: "/achievements", label: "Achievements", icon: "medal" },
+  { route: "/achievements", label: "Achievements", shortLabel: "Badges", icon: "medal" },
 ];
 
 export default function Shell({ children }: { children: React.ReactNode }) {

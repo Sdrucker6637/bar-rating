@@ -29,7 +29,13 @@ export default function ScoreSeal({
 }: ScoreSealProps) {
   const r = size / 2;
   const starRadius = r - size * 0.09;
-  const starScale = (size / 96) * 0.62;
+  // Floored rather than purely proportional — below the 96px baseline, a
+  // linear scale shrinks the five-pointed star past where it reads as a
+  // star at all (~5px at 76px) and the ring turns into a smear of gold
+  // flecks. Holding the star at its 96px size below that point keeps every
+  // seal legible; there's still room on the ring even at the smallest size
+  // in use (76px) without stars touching.
+  const starScale = Math.max(0.62, (size / 96) * 0.62);
 
   return (
     <div
@@ -53,14 +59,6 @@ export default function ScoreSeal({
           r={r - 1}
           fill="none"
           stroke="rgba(184,150,95,0.24)"
-          strokeWidth={1}
-        />
-        <circle
-          cx={r}
-          cy={r}
-          r={r - size * 0.065}
-          fill="none"
-          stroke="rgba(184,150,95,0.15)"
           strokeWidth={1}
         />
         {Array.from({ length: STAR_COUNT }).map((_, i) => {

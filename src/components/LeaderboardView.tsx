@@ -235,11 +235,14 @@ export default function LeaderboardView() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {/* Controls never wrap: the food toggle and sort control always share
-            one row, with the sort filling the right side. On narrow screens
-            the "Sort by" word hides and the trigger shows just the current
-            sort so the two still fit side by side. */}
-        <div className="flex items-center justify-between gap-2">
+        {/* The food toggle and sort control share one row, with the sort
+            filling the right side; on narrow screens the "Sort by" word
+            hides so the trigger shows just the current sort. That alone
+            still isn't enough room on a real phone once the "Settle N
+            ties" chip appears too (only shown while a tie is pending), so
+            flex-wrap is the safety net — the right-hand group (ties chip +
+            sort) drops to its own line instead of clipping off-screen. */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div role="group" aria-label="Food filter" className={segmentWrapCls}>
             <button
               type="button"
@@ -262,7 +265,7 @@ export default function LeaderboardView() {
               Without food
             </button>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center justify-end gap-2.5">
             {pendingPairs.length > 0 && (
               <button
                 className={`${chipCls} !border-goldDeep/60 !text-gold hover:!border-gold`}

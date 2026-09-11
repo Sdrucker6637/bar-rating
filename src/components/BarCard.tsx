@@ -232,7 +232,7 @@ export default function BarCard({
                   <Icon name="swords" size={10} className="text-gold/80" />
                 </span>
               )}
-              <ScoreSeal score={score} label={scoreLabel} size={76} />
+              <ScoreSeal score={score} label={scoreLabel} size={92} />
             </div>
           ) : (
             <div className="flex-shrink-0 rounded-[6px] border border-line2 bg-ink px-3.5 py-2 text-right shadow-[inset_0_1px_0_rgba(237,230,217,0.025)]">
