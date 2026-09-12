@@ -69,6 +69,10 @@ function nameSimilarity(a: string, b: string): number {
   if (!na || !nb) return 0;
   if (na === nb) return 1;
   if (na.includes(nb) || nb.includes(na)) return 0.85;
+  // Whitespace-insensitive: the same business is sometimes styled with
+  // different word-spacing across sources ("ShyShy" vs "Shy Shy") — that
+  // alone shouldn't score as an unrelated business.
+  if (na.replace(/\s+/g, "") === nb.replace(/\s+/g, "")) return 0.85;
   const ta = na.split(" ");
   const tb = nb.split(" ");
   const tbSet = new Set(tb);

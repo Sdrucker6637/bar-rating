@@ -4,7 +4,7 @@ import type { Bar } from "./types";
 export const seedBars: Bar[] = [
   {
     id: "b1",
-    name: "ShyShy",
+    name: "Shy Shy",
     status: "visited",
     vibe: 8,
     value: 7,

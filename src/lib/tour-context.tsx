@@ -232,7 +232,14 @@ function nameMatches(resultName: string, barName: string): boolean {
   const a = norm(resultName);
   const b = norm(barName);
   if (!a || !b) return true; // nothing to compare — don't block
-  return a.includes(b) || b.includes(a);
+  if (a.includes(b) || b.includes(a)) return true;
+  // Whitespace-insensitive fallback: the same business is sometimes styled
+  // with different word-spacing across sources ("ShyShy" vs "Shy Shy") —
+  // don't treat that alone as a different business.
+  const compact = (s: string) => s.replace(/\s+/g, "");
+  const ac = compact(a);
+  const bc = compact(b);
+  return ac === bc || ac.includes(bc) || bc.includes(ac);
 }
 
 /** Normalized venue-name comparison for wishlist/leaderboard deduping:
