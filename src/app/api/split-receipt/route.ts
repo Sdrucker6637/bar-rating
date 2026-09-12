@@ -91,6 +91,17 @@ export async function POST(req: Request) {
     if (images.length === 0) {
       return NextResponse.json({ error: "Missing images" }, { status: 400 });
     }
+    // Vision calls are billed per image and this is the most expensive
+    // endpoint in the app, so cap both how many images and how large each
+    // one can be — well above what a real multi-shot receipt ever needs.
+    const MAX_IMAGES = 8;
+    const MAX_IMAGE_BASE64_CHARS = 8_000_000; // ~6MB decoded
+    if (images.length > MAX_IMAGES) {
+      return NextResponse.json({ error: `Too many images (max ${MAX_IMAGES})` }, { status: 400 });
+    }
+    if (images.some((img) => (img.base64 || "").length > MAX_IMAGE_BASE64_CHARS)) {
+      return NextResponse.json({ error: "One or more images is too large" }, { status: 400 });
+    }
 
     const prompt = `You are reading one or more images of the SAME itemized restaurant/bar receipt. Each image may be EITHER a screenshot of a digital receipt OR a photograph of a physical paper receipt — treat both the same way.
 
@@ -140,6 +151,9 @@ Rules:
                 ],
               },
             ],
+            // Caps runaway/pathological output cost per call; a real
+            // itemized receipt response is well under this.
+            generationConfig: { maxOutputTokens: 4096 },
           }),
           signal: controller.signal,
         },

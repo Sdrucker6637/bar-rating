@@ -183,6 +183,9 @@ export async function POST(req: Request) {
           },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
+            // Caps runaway/pathological output cost per call; normal
+            // enrichment responses are a few hundred tokens.
+            generationConfig: { maxOutputTokens: 2048 },
           }),
           signal: controller.signal,
         },
