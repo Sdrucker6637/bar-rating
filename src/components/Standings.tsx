@@ -28,7 +28,7 @@ import ConfirmRemove from "./ConfirmRemove";
 /** The desktop classification grid — shared by the column header and every
  *  StandingRow so the columns line up down the page. */
 export const STANDINGS_GRID =
-  "lg:grid-cols-[3.25rem_minmax(0,1fr)_17rem_4.75rem_3.5rem_2.25rem] lg:gap-x-4";
+  "lg:grid-cols-[3.25rem_minmax(0,1fr)_17rem_5rem_2.25rem] lg:gap-x-4";
 
 /** Phone column head for the scorecards under each row: matches the
  *  row's rank column + gap so the five labels sit over the five figures. */
@@ -39,8 +39,6 @@ export interface StandingProps {
   b: Bar;
   rank: number | null;
   score: number | null | undefined;
-  /** Distance to the leader (overall ranking only); null hides it. */
-  gap: number | null;
   /** Category the board is currently sorted by, if any. */
   highlight: ScoreKey | null;
   battleDecided: boolean;
@@ -50,12 +48,6 @@ export interface StandingProps {
   onEdit: () => void;
   onDelete: () => void;
   onDisqualify: () => void;
-}
-
-export function gapText(gap: number | null): string {
-  if (gap === null) return "";
-  if (gap < 0.005) return "level";
-  return `+${gap.toFixed(2)}`;
 }
 
 /** Row/tile click toggles details — except when the click landed on a real
@@ -297,37 +289,15 @@ function ScoreFigure({
 /* ============================== #1 ====================================== */
 
 export function LeaderFeature({
-  runnerUp,
-  scoreLabel,
   categoryMode,
   ...p
 }: StandingProps & {
-  runnerUp: { name: string; gap: number | null } | null;
-  scoreLabel: string;
   /** Board sorted by a category — this card then shows the OVERALL leader. */
   categoryMode: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
   const { b } = p;
-
-  let leadLine: ReactNode = null;
-  if (runnerUp && runnerUp.gap !== null) {
-    leadLine =
-      runnerUp.gap < 0.005 ? (
-        <>
-          Level with <span className="text-cream">{runnerUp.name}</span>
-          {p.battleDecided ? " — ahead on a Bar Battle" : ""}
-        </>
-      ) : (
-        <>
-          Leads <span className="text-cream">{runnerUp.name}</span> by{" "}
-          <span className="tda-num font-cond text-[1.05rem] font-semibold text-maillot">
-            +{runnerUp.gap.toFixed(2)}
-          </span>
-        </>
-      );
-  }
 
   return (
     <section
@@ -344,20 +314,18 @@ export function LeaderFeature({
 
       <div
         onClick={rowToggle(() => setOpen((o) => !o))}
-        className="relative grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-5 px-5 pb-5 pt-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-x-8 sm:px-8 sm:pb-6 sm:pt-8 lg:grid-cols-[auto_minmax(0,1fr)_auto]"
+        className="relative grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-5 px-5 pb-5 pt-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-x-8 sm:px-8 sm:pb-6 sm:pt-8"
       >
         <div className="order-2 sm:order-1">
           <ScoreSeal
             score={p.score ?? null}
-            label={scoreLabel}
-            size={96}
+            size={104}
             tone="leader"
             countUp
             className="sm:hidden"
           />
           <ScoreSeal
             score={p.score ?? null}
-            label={scoreLabel}
             size={144}
             tone="leader"
             countUp
@@ -385,26 +353,8 @@ export function LeaderFeature({
               &ldquo;{b.notes}&rdquo;
             </p>
           )}
-          {leadLine && (
-            <div className="mt-3 text-[0.9rem] text-mist lg:hidden">{leadLine}</div>
-          )}
         </div>
 
-        {runnerUp && runnerUp.gap !== null && (
-          <div className="order-3 hidden min-w-[11rem] border-l border-line2 pl-8 lg:block">
-            <div className="font-cond text-kicker font-semibold uppercase text-mute">
-              {runnerUp.gap < 0.005 ? "Tied with #2" : "Lead over #2"}
-            </div>
-            <div className="tda-num mt-1.5 font-cond text-[2.6rem] font-semibold leading-none text-maillot">
-              {runnerUp.gap < 0.005 ? "level" : `+${runnerUp.gap.toFixed(2)}`}
-            </div>
-            <div className="mt-2 max-w-[12rem] text-[0.86rem] leading-snug text-mist">
-              {runnerUp.gap < 0.005 && p.battleDecided
-                ? `Ahead of ${runnerUp.name} on a Bar Battle`
-                : runnerUp.name}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="relative flex items-end gap-4 border-t border-line2 px-5 py-4 sm:px-8">
@@ -481,11 +431,6 @@ export function PodiumCard(p: StandingProps & { rank: 2 | 3 }) {
               {p.battleDecided && <BattleMark />}
               <ScoreFigure score={p.score} className="text-[1.85rem] text-cream" />
             </div>
-            {p.gap !== null && (
-              <div className="tda-num mt-1 font-cond text-[0.9rem] font-medium text-mute">
-                {gapText(p.gap)}
-              </div>
-            )}
           </div>
         </div>
         {b.notes && (
@@ -555,16 +500,8 @@ export function StandingRow(p: StandingProps) {
             {p.battleDecided && <BattleMark />}
             <ScoreFigure score={p.score} className="text-[1.5rem] text-cream sm:text-[1.6rem]" />
           </div>
-          {p.gap !== null && (
-            <div className="tda-num mt-1 font-cond text-[0.86rem] font-medium text-mute lg:hidden">
-              {gapText(p.gap)}
-            </div>
-          )}
         </div>
 
-        <div className="tda-num hidden text-right font-cond text-[0.95rem] font-medium text-mute lg:block">
-          {gapText(p.gap)}
-        </div>
 
         <ExpandButton
           open={open}

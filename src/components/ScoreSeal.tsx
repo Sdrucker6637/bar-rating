@@ -48,7 +48,8 @@ export function StarRing({
 }) {
   const t = TONES[tone];
   const r = size / 2;
-  const starRadius = r - size * 0.1;
+  // Stars sit close to the rim so the medallion inside has room to breathe.
+  const starRadius = r - size * 0.085;
   // Floored rather than purely proportional — below ~96px a linear scale
   // shrinks the star past where it reads as a star at all.
   const starScale = Math.max(0.6, (size / 96) * 0.62);
@@ -65,7 +66,7 @@ export function StarRing({
       <circle
         cx={r}
         cy={r}
-        r={r - 4}
+        r={r - Math.max(3, size * 0.028)}
         fill="none"
         stroke={t.ring}
         strokeOpacity={0.45}
@@ -86,11 +87,11 @@ export function StarRing({
         );
       })}
       {/* inner medallion */}
-      <circle cx={r} cy={r} r={r - size * 0.2} fill="url(#tda-seal-fill)" />
+      <circle cx={r} cy={r} r={r - size * 0.16} fill="url(#tda-seal-fill)" />
       <circle
         cx={r}
         cy={r}
-        r={r - size * 0.2}
+        r={r - size * 0.16}
         fill="none"
         stroke={t.inner}
         strokeWidth={1}
@@ -175,7 +176,7 @@ export default function ScoreSeal({
       <div className="relative flex flex-col items-center justify-center">
         <span
           className="tda-num font-serif font-semibold leading-none tracking-[-0.02em]"
-          style={{ fontSize: size * 0.27, color: t.num }}
+          style={{ fontSize: size * (label ? 0.2 : 0.22), color: t.num }}
         >
           {fmt(shown)}
         </span>

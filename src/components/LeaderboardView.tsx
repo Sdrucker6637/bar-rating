@@ -171,7 +171,6 @@ export default function LeaderboardView() {
   const champ = filteredVisited.length > 0 ? filteredVisited[0] : null;
   const scoreOf = (b: Bar) =>
     foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
-  const scoreLabel = foodMode === "with" ? "with food" : "no food";
   const overallMode = sortMode === "overall";
   const highlight: ScoreKey | null = overallMode ? null : sortMode;
 
@@ -188,34 +187,6 @@ export default function LeaderboardView() {
   // The featured leader is the board's #1 (the overall champion), shown
   // only while it's actually in the running.
   const leader = champ && !champ.disqualified ? champ : null;
-  const leaderScore = leader ? scoreOf(leader) : null;
-  // Display-only: distance to the leader, on the overall ranking.
-  const gapFor = (b: Bar): number | null => {
-    if (!overallMode || leaderScore === null || leaderScore === undefined)
-      return null;
-    const s = scoreOf(b);
-    if (s === null || s === undefined || isNaN(s)) return null;
-    return Math.max(0, leaderScore - s);
-  };
-  const runnerUpBar = filteredVisited.find(
-    (b, i) => i > 0 && !b.disqualified,
-  );
-  const runnerUp =
-    leader && runnerUpBar
-      ? (() => {
-          const s = scoreOf(runnerUpBar);
-          return {
-            name: runnerUpBar.name,
-            gap:
-              leaderScore !== null &&
-              leaderScore !== undefined &&
-              s !== null &&
-              s !== undefined
-                ? Math.max(0, leaderScore - s)
-                : null,
-          };
-        })()
-      : null;
 
   // Overall: #1 is the feature, #2–3 the podium, #4+ the field.
   // By category: the feature stays the overall leader and the whole field
@@ -233,7 +204,6 @@ export default function LeaderboardView() {
     b,
     rank,
     score: scoreOf(b),
-    gap: gapFor(b),
     highlight,
     battleDecided: overallMode && battleDecidedIds.has(b.id),
     isFetching: fetchingIds.has(b.id) || detailsPendingIds.has(b.id),
@@ -271,11 +241,8 @@ export default function LeaderboardView() {
         {leader && (
           <LeaderFeature
             {...propsFor(leader, 1)}
-            gap={null}
             battleDecided={battleDecidedIds.has(leader.id)}
             highlight={highlight}
-            runnerUp={runnerUp}
-            scoreLabel={scoreLabel}
             categoryMode={!overallMode}
           />
         )}
@@ -455,7 +422,6 @@ export default function LeaderboardView() {
                 ))}
               </span>
               <span className="text-right">Score</span>
-              <span className="text-right">{overallMode ? "Gap" : ""}</span>
               <span />
             </div>
             <div
