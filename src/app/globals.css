@@ -262,6 +262,15 @@ body {
   display: none;
 }
 
+/* ---------- Basemap: OpenStreetMap tiles turned into a warm night map ----------
+   invert + hue-rotate flips the light OSM style to dark while keeping water
+   and parks their natural hues; the sepia/saturate pass pulls it toward the
+   app's brown-black so the brass heat glow reads as the brightest thing. */
+.tda-heatmap-container .tda-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.88) contrast(0.88)
+    saturate(0.45) sepia(0.22);
+}
+
 /* ---------- Leaflet chrome: zoom controls and the pre-tile ground ---------- */
 .tda-heatmap-container.leaflet-container,
 .tda-heatmap-container .leaflet-container {

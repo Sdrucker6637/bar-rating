@@ -30,11 +30,6 @@ import ConfirmRemove from "./ConfirmRemove";
 export const STANDINGS_GRID =
   "lg:grid-cols-[3.25rem_minmax(0,1fr)_17rem_5rem_2.25rem] lg:gap-x-4";
 
-/** Phone column head for the scorecards under each row: matches the
- *  row's rank column + gap so the five labels sit over the five figures. */
-export const MOBILE_SCORE_HEAD =
-  "grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-3 px-1 sm:grid-cols-[2.75rem_minmax(0,1fr)] sm:gap-x-4 sm:px-3 lg:hidden";
-
 export interface StandingProps {
   b: Bar;
   rank: number | null;
@@ -511,12 +506,11 @@ export function StandingRow(p: StandingProps) {
           className="-mt-0.5 lg:mt-0"
         />
 
-        {/* phones & tablets: the scorecard sits under the name; its column
-            heads are printed once above the field (MOBILE_SCORE_HEAD). */}
+        {/* phones & tablets: the scorecard sits under the name, labeled
+            like the podium tiles. */}
         <Scorecard
           bar={b}
           highlight={p.highlight}
-          labels="none"
           size="sm"
           className="col-span-3 col-start-2 sm:max-w-[28rem] lg:hidden"
         />

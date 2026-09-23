@@ -161,13 +161,17 @@ export default function MapView({ bars }: MapViewProps) {
         remove: () => void;
       };
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        {
-          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-          maxZoom: 19,
-        },
-      ).addTo(map);
+      // CARTO's dark basemap now requires an API key (tiles render an "API
+      // KEY REQUIRED" watermark), so the map uses standard OpenStreetMap
+      // tiles — no key — and darkens them to the app's warm night palette
+      // with a CSS filter on this tile layer only (.tda-tiles in
+      // globals.css), leaving the heat glow and markers untouched.
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+        className: "tda-tiles",
+      }).addTo(map);
 
       // Normalize each bar's score to the range of the bars actually shown, so
       // the best bar glows at the hot end and the worst sits at the cold end —

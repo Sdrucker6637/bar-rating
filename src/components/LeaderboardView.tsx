@@ -14,7 +14,6 @@ import {
   StandingRow,
   HorsCourseRow,
   STANDINGS_GRID,
-  MOBILE_SCORE_HEAD,
 } from "./Standings";
 import type { StandingProps } from "./Standings";
 import { SCORE_CATS } from "./Scorecard";
@@ -424,23 +423,7 @@ export default function LeaderboardView() {
               <span className="text-right">Score</span>
               <span />
             </div>
-            <div
-              aria-hidden="true"
-              className={`mt-3 border-b border-line2 pb-2 ${MOBILE_SCORE_HEAD}`}
-            >
-              <span />
-              <span className="grid grid-cols-5 gap-x-2.5 text-center font-cond text-[0.74rem] font-semibold uppercase tracking-[0.1em] text-mute sm:max-w-[28rem] sm:gap-x-3">
-                {SCORE_CATS.map((c) => (
-                  <span
-                    key={c.key}
-                    className={highlight === c.key ? "text-gold" : ""}
-                  >
-                    {c.label}
-                  </span>
-                ))}
-              </span>
-            </div>
-            <div>
+            <div className="mt-3 border-t border-line2 lg:mt-0 lg:border-t-0">
               {field.map(({ b, rank }) => (
                 <StandingRow key={b.id} {...propsFor(b, rank)} />
               ))}
