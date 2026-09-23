@@ -10,54 +10,48 @@ const STEPS: { key: SplitStep; label: string }[] = [
 ];
 
 /** Five steps, always visible — so "how much is left" never has to be
- *  guessed. Numbered circles echo the Crawl modal's numbered stops: one
- *  "here's the sequence" language shared by both multi-step flows. */
+ *  guessed. Numbered stages with a brass rule that fills as you go; the
+ *  same numbered-stage language as the crawl route. */
 export default function SplitStepper({ step }: { step: SplitStep }) {
   const activeIndex = STEPS.findIndex((s) => s.key === step);
 
   return (
-    <div
-      className="mb-5 flex items-center"
-      role="group"
-      aria-label="Split the Bill progress"
-    >
-      {STEPS.map((s, i) => {
-        const done = i < activeIndex;
-        const current = i === activeIndex;
-        return (
-          <div key={s.key} className="flex flex-1 items-center last:flex-none">
-            <div className="flex flex-col items-center gap-1.5">
+    <div className="mb-6" role="group" aria-label="Split the Bill progress">
+      <div className="grid grid-cols-5 gap-1.5">
+        {STEPS.map((s, i) => {
+          const done = i < activeIndex;
+          const current = i === activeIndex;
+          return (
+            <div key={s.key} className="min-w-0">
               <span
+                aria-hidden="true"
+                className={`block h-[3px] rounded-[1px] transition-colors duration-200 ${
+                  done || current ? "bg-brass" : "bg-line2"
+                } ${current ? "opacity-100" : done ? "opacity-60" : ""}`}
+              />
+              <div
                 aria-current={current ? "step" : undefined}
-                className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full font-mono text-[0.7rem] font-semibold transition-colors duration-150 ${
-                  done
-                    ? "bg-brass text-deep"
-                    : current
-                      ? "border-[1.5px] border-brass text-gold"
-                      : "border border-line2 text-mute"
-                }`}
-              >
-                {done ? <Icon name="check" size={12} /> : i + 1}
-              </span>
-              <span
-                className={`hidden font-mono text-[0.58rem] uppercase tracking-[0.08em] sm:block ${
+                className={`mt-2 flex items-center gap-1.5 font-cond font-semibold uppercase tracking-[0.08em] ${
                   current ? "text-cream" : done ? "text-mist" : "text-mute"
                 }`}
               >
-                {s.label}
-              </span>
+                <span className="tda-num text-[1rem]">
+                  {done ? (
+                    <Icon name="check" size={13} className="text-gold" />
+                  ) : (
+                    String(i + 1).padStart(2, "0")
+                  )}
+                </span>
+                <span
+                  className={`truncate text-[0.88rem] ${current ? "inline" : "hidden sm:inline"}`}
+                >
+                  {s.label}
+                </span>
+              </div>
             </div>
-            {i < STEPS.length - 1 && (
-              <div
-                aria-hidden="true"
-                className={`mx-1.5 h-px flex-1 sm:mx-2 ${
-                  done ? "bg-brass/50" : "bg-line2"
-                }`}
-              />
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

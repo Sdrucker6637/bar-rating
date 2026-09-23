@@ -7,19 +7,20 @@ interface EmptyStateProps {
   hint?: string;
 }
 
-/** Shared empty/loading-adjacent state — a dashed "receipt" rule and a small
- *  editorial voice instead of a bare gray sentence. Kept restrained on purpose. */
+/** Shared empty/loading-adjacent state — an engraved glyph, a line in the
+ *  guide's italic voice, and a plain hint. Restrained on purpose. */
 export default function EmptyState({ icon, title, hint }: EmptyStateProps) {
   return (
-    <div className="border-t border-dashed border-line2 py-10 text-center">
-      <div aria-hidden="true" className="mb-2.5 flex justify-center opacity-60">
-        {icon ?? <Icon name="martini" size={18} />}
+    <div className="flex flex-col items-center px-4 py-12 text-center">
+      <div
+        aria-hidden="true"
+        className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-line2 text-mute"
+      >
+        {icon ?? <Icon name="martini" size={20} />}
       </div>
-      <div className="font-serif text-[1rem] italic text-mist">{title}</div>
+      <div className="font-serif text-[1.15rem] italic text-cream">{title}</div>
       {hint && (
-        <div className="mt-1.5 font-mono text-[0.66rem] uppercase tracking-[0.08em] text-dim">
-          {hint}
-        </div>
+        <div className="mt-1.5 max-w-[46ch] text-[0.88rem] text-mute">{hint}</div>
       )}
     </div>
   );

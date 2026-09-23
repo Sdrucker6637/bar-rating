@@ -1,166 +1,158 @@
-/** Shared Tailwind class strings so repeated UI patterns stay pixel-consistent.
- *  One button language, three weights:
- *  - PRIMARY (brass fill, pill): `findBtnCls` (marquee), `primaryBtnCls`
- *    (modal footer), `btnPrimaryCls` (standalone steps) — the heavy action.
- *  - SECONDARY (dark surface + hairline, squared): `altBtnCls` (marquee),
- *    `secondaryBtnCls` (modal footer), `btnSecondaryCls` (standalone steps).
- *  - TERTIARY/DESTRUCTIVE (quiet, in-card): `ghostBtnCls`/`ghostBtnGreenCls`,
- *    `dqBtnCls` (readable muted-danger), `removeBtnCls` (same family, quieter).
- *  Primary actions are pills, secondary actions are squared — shape reinforces
- *  importance without color shouting. Icons stay small and monochrome. */
+/** Shared Tailwind class strings — the design system's primitives.
+ *
+ *  ONE shape language: 3px corners on every control and surface. Circles are
+ *  reserved for the emblems (ScoreSeal, award insignia) so they stay special.
+ *
+ *  FOUR action weights, and only four:
+ *  - PRIMARY   brass fill, dark type — the one action a screen is about.
+ *              `findBtnCls` (marquee), `primaryBtnCls` (modal footer),
+ *              `btnPrimaryCls` (standalone).
+ *  - SECONDARY warm hairline, parchment type — real but lesser actions.
+ *              `altBtnCls`, `secondaryBtnCls`, `btnSecondaryCls`,
+ *              `addBtnCls`, `visitedBtnCls`, `wishlistBtnCls` (bottle green).
+ *  - TERTIARY  quiet text + icon, no border at rest — in-row actions.
+ *              `ghostBtnCls`, `linkBtnCls`, `replaceBtnCls`.
+ *  - DESTRUCTIVE tertiary at rest (so a list of rows never shouts red), and
+ *              claret only on hover/focus — `dqBtnCls`, `removeBtnCls`. The
+ *              confirm dialog is where claret gets to be loud.
+ *
+ *  Labels on controls are Barlow Condensed caps (race-programme type), not
+ *  tracked monospace. */
 
 const btnBase =
-  "inline-flex items-center justify-center gap-1.5 cursor-pointer font-mono text-[0.78rem] font-semibold uppercase tracking-[0.04em] transition-all duration-150 disabled:cursor-default disabled:opacity-40 disabled:hover:translate-y-0";
+  "inline-flex select-none items-center justify-center gap-2 cursor-pointer rounded-[3px] font-cond text-[0.95rem] font-semibold uppercase leading-none tracking-[0.07em] transition-[background-color,border-color,color,transform,box-shadow] duration-150 active:translate-y-px disabled:cursor-default disabled:opacity-40 disabled:active:translate-y-0";
 
-/** Shared input treatment — a deliberate dark surface, not a default field:
- *  warm espresso fill, warm brass hairline at rest, faint inner depth, brass
- *  focus state. The typeface is the site's editorial serif (Fraunces, the
- *  same family as bar names) rather than the generic form-control sans, so
- *  entered text and placeholder carry the app's editorial character. */
+const primaryFill =
+  "bg-brass text-deep shadow-[inset_0_1px_0_rgba(255,244,220,0.35),0_1px_0_rgba(0,0,0,0.5)] hover:bg-gold disabled:hover:bg-brass";
+
+const secondaryLine =
+  "border border-line2 bg-transparent text-cream hover:border-brass/60 hover:bg-oak disabled:hover:border-line2 disabled:hover:bg-transparent";
+
+/** Shared input treatment — an inset well with a warm hairline and a brass
+ *  focus state. Entered text is set in Fraunces, the same voice as bar names,
+ *  so typing into the app feels like writing in its guide. */
 export const inputCls =
-  "w-full rounded-[6px] border border-[rgba(184,150,95,0.22)] bg-[#171310] px-3.5 py-2.5 font-serif text-[0.88rem] text-cream placeholder:text-mist shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass/20 tda-input transition-colors";
+  "w-full rounded-[3px] border border-line2 bg-well px-3.5 py-2.5 font-serif text-[1rem] text-cream placeholder:text-dim shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] transition-colors focus:border-brass/80 focus:outline-none focus:ring-2 focus:ring-brass/15 tda-input";
 
-/** The one true "primary" marquee CTA — Find Bars, Plan Crawl. */
-export const findBtnCls = `${btnBase} rounded-full bg-brass px-6 py-3 text-deep shadow-lift hover:-translate-y-px hover:bg-gold hover:shadow-panel`;
+/** Form field label — condensed caps, quiet. */
+export const labelCls =
+  "font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist";
 
-/** Secondary marquee action — squared and quiet so it never competes with the
- *  primary. Warm surface, warm brass hairline, warm cream text. */
-export const altBtnCls = `${btnBase} rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-panel px-6 py-3 text-mist hover:-translate-y-px hover:border-brass hover:text-cream`;
+/** Modal / dialog title. */
+export const modalTitleCls =
+  "m-0 font-serif text-[1.5rem] font-semibold leading-tight tracking-[-0.015em] text-cream";
+
+/** The one true primary marquee CTA — Find Bars, Plan Crawl. */
+export const findBtnCls = `${btnBase} ${primaryFill} h-12 px-6`;
+
+/** Secondary marquee action — hairline, never competes with the primary. */
+export const altBtnCls = `${btnBase} ${secondaryLine} h-12 px-6`;
 
 /** Modal footer confirm button. */
-export const primaryBtnCls = `${btnBase} rounded-full flex-1 bg-brass px-4 py-2.5 text-deep shadow-lift hover:bg-gold active:scale-[0.98]`;
+export const primaryBtnCls = `${btnBase} ${primaryFill} h-11 flex-1 px-4`;
 
 /** Modal footer cancel/back button. */
-export const secondaryBtnCls = `${btnBase} rounded-[6px] flex-1 border border-[rgba(184,150,95,0.28)] bg-transparent px-4 py-2.5 text-mist hover:border-brass hover:text-cream active:scale-[0.98]`;
+export const secondaryBtnCls = `${btnBase} border border-line2 bg-transparent text-mist hover:border-mute hover:text-cream h-11 flex-1 px-4`;
 
-/** Standalone primary button (not flex-1) — split-flow continuations. */
-export const btnPrimaryCls = `${btnBase} rounded-full bg-brass px-5 py-2.5 text-deep shadow-lift hover:-translate-y-px hover:bg-gold hover:shadow-panel`;
+/** Standalone primary button (not flex-1). */
+export const btnPrimaryCls = `${btnBase} ${primaryFill} h-11 px-5`;
 
-/** Standalone quiet secondary button (not flex-1) — split-flow back steps. */
-export const btnSecondaryCls = `${btnBase} rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-transparent px-4 py-2.5 text-mist hover:-translate-y-px hover:border-brass hover:text-cream`;
+/** Standalone quiet secondary button (not flex-1). */
+export const btnSecondaryCls = `${btnBase} border border-line2 bg-transparent text-mist hover:border-mute hover:text-cream h-11 px-4`;
 
-/** Dashed "add" CTA (Add a bar you visited, Add to wishlist, Add item) —
- *  rest state carries a clearly visible brass-dashed outline so the control
- *  reads as interactive against the dark walnut background, warming to a
- *  solid brass border on hover without ever becoming a filled gold button. */
-export const addBtnCls =
-  "mt-3 w-full cursor-pointer rounded-lg border border-dashed border-brass/45 bg-transparent px-5 py-3 font-mono text-[0.78rem] uppercase tracking-[0.04em] text-brass transition-colors hover:border-brass hover:bg-[rgba(184,150,95,0.06)]";
+/** "Add" action (Add to wishlist by name, Add item) — a full-width
+ *  secondary with a brass "+", not a dashed placeholder box. */
+export const addBtnCls = `${btnBase} ${secondaryLine} mt-3 h-11 w-full px-5 text-mist hover:text-cream`;
 
-/** Low-emphasis action inside a card footer (Map, Edit) — a quiet bordered
- *  control; navigation actions warm to brass, management actions to green. */
+/** Tertiary in-row action (Map, Edit) — quiet text + icon, no border at
+ *  rest; a faint warm wash on hover. */
 export const ghostBtnCls =
-  "inline-flex cursor-pointer items-center gap-1.5 rounded-[6px] border border-[rgba(184,150,95,0.25)] bg-transparent px-2.5 py-1.5 font-mono text-[0.7rem] text-mist no-underline transition-colors active:scale-[0.97] hover:border-brass hover:text-cream";
+  "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[3px] px-2.5 font-cond text-[0.9rem] font-semibold uppercase tracking-[0.07em] text-mist no-underline transition-colors hover:bg-[rgba(241,232,214,0.05)] hover:text-cream active:translate-y-px";
 
-/** Same shape as ghostBtnCls but for "management" actions (Edit) — a muted
- *  green accent instead of brass, so it reads as a distinct kind of action
- *  rather than identical-looking buttons doing different things. */
-export const ghostBtnGreenCls =
-  "inline-flex cursor-pointer items-center gap-1 rounded-[6px] border border-[rgba(184,150,95,0.25)] bg-transparent px-2.5 py-1.5 font-mono text-[0.7rem] text-mist no-underline transition-colors active:scale-[0.97] hover:border-greenLight hover:text-cream";
+/** Kept for call sites that distinguish "management" actions; it now shares
+ *  the tertiary look — difference is carried by the label, not a color. */
+export const ghostBtnGreenCls = ghostBtnCls;
 
 export const linkBtnCls = ghostBtnCls;
 
-/** Secondary/destructive in-card action (Disqualify) — clearly readable at
- *  rest (red text on a subtle red-tinted border) so it never reads as
- *  disabled, but small and quiet enough to stay below Map/Edit in weight.
- *  Warms slightly on hover without becoming a warning banner. */
+/** Disqualify — tertiary at rest so a board of rows never reads as an error
+ *  list; claret appears only when you reach for it. */
 export const dqBtnCls =
-  "inline-flex cursor-pointer items-center gap-1.5 rounded-[6px] border border-redDeep/55 bg-[rgba(199,118,118,0.05)] px-2.5 py-1.5 font-mono text-[0.7rem] text-red no-underline transition-colors active:scale-[0.97] hover:border-red hover:bg-[rgba(199,118,118,0.1)] hover:text-redLight";
+  "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[3px] px-2.5 font-cond text-[0.9rem] font-semibold uppercase tracking-[0.07em] text-mist no-underline transition-colors hover:bg-[rgba(168,69,63,0.12)] hover:text-red active:translate-y-px";
 
-/** Destructive/quiet action (Remove) — same design family as Disqualify so
- *  the whole action row shares one language: readable red text on a subtle
- *  red-tinted border. One notch quieter than dqBtnCls (fainter border, no
- *  resting fill) so Disqualify stays the more present of the two. */
+/** Remove — same family as Disqualify, one notch quieter at rest. */
 export const removeBtnCls =
-  "inline-flex cursor-pointer items-center gap-1.5 rounded-[6px] border border-redDeep/40 bg-transparent px-2.5 py-1.5 font-mono text-[0.7rem] text-red no-underline transition-colors active:scale-[0.97] hover:border-red hover:bg-[rgba(199,118,118,0.1)] hover:text-redLight";
+  "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[3px] px-2.5 font-cond text-[0.9rem] font-semibold uppercase tracking-[0.07em] text-mute no-underline transition-colors hover:bg-[rgba(168,69,63,0.12)] hover:text-red active:translate-y-px";
 
-/** Filter/mode toggle chip. Combine with chipActiveCls from the caller for the active state. */
+/** Toggle chip (modes, filters, map layer). Squared like every control.
+ *  Combine with chipActiveCls from the caller for the on state. */
 export const chipCls =
-  "inline-flex flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(184,150,95,0.28)] bg-transparent px-3.5 py-1.5 font-mono text-[0.72rem] uppercase tracking-[0.03em] text-mist transition-colors duration-150 hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-40";
+  "inline-flex h-9 flex-shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[3px] border border-line2 bg-transparent px-3 font-cond text-[0.9rem] font-semibold uppercase tracking-[0.07em] text-mist transition-colors duration-150 hover:border-mute hover:text-cream disabled:cursor-default disabled:opacity-40";
 
-/** Utility filter chip (Fits Our Group) — squared rather than pill, so
- *  plain filters read differently from the playful mode toggles below. */
-export const filterChipCls =
-  "inline-flex flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.72rem] uppercase tracking-[0.03em] text-mist transition-colors duration-150 hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-40 sm:px-3.5";
-
-/** Active state for filterChipCls — same important-modifier caveat as chipActiveCls. */
-export const filterChipActiveCls =
-  "!border-brass !bg-brass !text-deep font-semibold";
+/** Utility filter chip — same object as chipCls now (one shape language). */
+export const filterChipCls = chipCls;
 
 // NOTE: the `!` important prefixes are load-bearing. chipCls sets
-// border-line2 / bg-transparent / text-mist, and Tailwind emits those core
-// utilities AFTER the extended brass/gold colors, so without `!` the
-// inactive styles would win and an "active" chip would silently render as
-// inactive. Same reason modeChipActiveCls uses them.
-export const chipActiveCls = "!border-brass !bg-brass !text-deep font-semibold";
+// border/bg/text utilities that Tailwind emits AFTER the extended colors, so
+// without `!` the inactive styles would win and an "on" chip would silently
+// render as off. Same for every *ActiveCls below.
+export const chipActiveCls =
+  "!border-brass/80 !bg-[rgba(201,162,106,0.14)] !text-cream";
 
-/** Active state for "mode" toggles (Baller/Explore) — deliberately a different accent
- *  than chipActiveCls so playful modes read as distinct from plain utility filters. */
-export const modeChipActiveCls =
-  "!border-goldDeep !bg-goldDeep !text-cream font-semibold";
+export const filterChipActiveCls = chipActiveCls;
 
-/** Restrained resting shadow so cards read as physical objects rather than
- *  flat fills — a faint top highlight plus a soft, tight drop shadow.
- *  Deliberately small/tight, not a "floating card" effect. */
-export const cardBaseShadowCls =
-  "shadow-[inset_0_1px_0_rgba(237,230,217,0.025),0_4px_14px_rgba(0,0,0,0.22)]";
+/** "Mode" toggles (Baller/Explore) share the on-state — brass means ON. */
+export const modeChipActiveCls = chipActiveCls;
 
-/** A whisper of warm light catching one corner of a card — reads as the
- *  card sitting in the room's ambient light rather than a flat dark fill.
- *  Background-IMAGE layered on top of the card's own background-COLOR
- *  utility (bg-panel/bg-ink), so both coexist. */
-export const cardWarmSurfaceCls =
-  "bg-[linear-gradient(160deg,rgba(184,150,95,0.045)_0%,transparent_45%)]";
+/** Cards no longer carry drop shadows — depth comes from the surface steps
+ *  (base → panel → oak). Kept as exports so existing call sites compile. */
+export const cardBaseShadowCls = "";
+export const cardWarmSurfaceCls = "";
 
-/** Shared hover feedback for passive (non-button) card containers, so lists feel alive. */
-export const cardHoverCls =
-  "transition-all duration-200 hover:border-line2 hover:shadow-[inset_0_1px_0_rgba(237,230,217,0.05),0_12px_28px_rgba(0,0,0,0.4)]";
+/** Hover feedback for passive containers — a surface step, not a glow. */
+export const cardHoverCls = "transition-colors duration-150 hover:bg-panelHover";
 
-// h-9/w-9 (36px) rather than the old h-7/w-7 (28px) — this is the app's one
-// stepper control (group size, crawl stops, split rounds/units/places) and
-// 28px reads fine but is genuinely fiddly to tap one-handed on a phone.
+/** Plain panel surface for forms and tools. */
+export const surfaceCls = "rounded-[4px] border border-line bg-panel";
+
+/** Split the Bill panels — the same surface; the totals panel adds
+ *  `tda-receipt` for its perforated edge. */
+export const receiptCls = "rounded-[4px] border border-line bg-panel";
+
+// h-9/w-9 (36px) — this is the app's one stepper control (group size, crawl
+// stops, split rounds/units/places); 28px was fiddly to tap one-handed.
 export const groupBtnCls =
-  "flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-ink text-base leading-none text-brass transition-colors hover:border-brass active:scale-[0.94] disabled:cursor-default disabled:opacity-30";
+  "flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[3px] border border-line2 bg-well font-cond text-[1.15rem] leading-none text-cream transition-colors hover:border-brass/70 active:translate-y-px disabled:cursor-default disabled:opacity-30";
 
-/** Vibe tag on bar cards — a small menu label, not a UI badge: warm-black
- *  surface, faint brass hairline, muted cream italic serif. Compact and
- *  quietly editorial, always subordinate to the name, score, and stats. */
+/** Vibe tag — a bar-menu annotation, not a UI badge: italic serif separated
+ *  by middots, with no box around it. */
 export const tagCls =
-  "rounded-[4px] border border-[rgba(184,150,95,0.18)] bg-[#141110] px-2 py-[3px] font-serif text-[0.72rem] italic leading-snug text-creamSoft";
+  "font-serif text-[0.86rem] italic leading-snug text-mist after:ml-2 after:text-dim after:content-['·'] last:after:content-none";
 
-/** Small uppercase mono label used above section/panel titles for editorial hierarchy. */
-export const kickerCls = "font-mono text-kicker uppercase text-gold";
+/** Section label — condensed caps, quiet taupe (not gold: gold is earned). */
+export const kickerCls =
+  "font-cond text-kicker font-semibold uppercase text-mute";
 
-/** "+ Wishlist" in-card action — one green accent shared by every surface
- *  that offers it (search results, crawl stops), so the same action always
- *  looks like the same action. */
-export const wishlistBtnCls =
-  "flex-1 cursor-pointer rounded-[5px] border border-green bg-transparent px-3 py-1.5 font-mono text-[0.72rem] text-greenLight transition-colors hover:bg-green hover:text-cream";
+/** "+ Wishlist" — the wishlist's bottle-green secondary action. */
+export const wishlistBtnCls = `${btnBase} h-9 flex-1 border border-green bg-transparent px-3 text-[0.9rem] text-greenLight hover:bg-[rgba(63,107,78,0.25)] hover:text-cream`;
 
-/** "I visited" — wishlistBtnCls's neutral companion, same warm brass-tinted
- *  border language as the rest of the app's quiet actions. */
-export const visitedBtnCls =
-  "cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream";
+/** "I visited" — neutral secondary companion to wishlistBtnCls. */
+export const visitedBtnCls = `${btnBase} h-9 border border-line2 bg-transparent px-3 text-[0.9rem] text-cream hover:border-brass/60 hover:bg-oak`;
 
-/** "Replace" — swap this suggestion/stop for a fresh one. Shown wherever a
- *  single result can be re-rolled without restarting the whole search. */
-export const replaceBtnCls =
-  "inline-flex cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream disabled:cursor-default disabled:opacity-50";
+/** "Replace" — re-roll a single result; tertiary. */
+export const replaceBtnCls = `${ghostBtnCls} disabled:cursor-default disabled:opacity-50`;
 
-/** Tiny circular "x" used to pull one entry out of a chip/pill (a roster
- *  name, a crew member, a screenshot) — quiet until hovered, then a soft red
- *  wash makes the destructive intent legible. Callers add the size (h-4 w-4
- *  for a text chip, h-5 w-5 over an image). */
+/** Tiny "x" that pulls one entry out of a chip (a roster name, a
+ *  screenshot) — quiet until hovered, then a claret wash. Callers add size. */
 export const miniRemoveBtnCls =
-  "flex flex-shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent text-red/75 transition-colors hover:border-red/40 hover:bg-[rgba(199,118,118,0.12)] hover:text-red";
+  "flex flex-shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent text-mute transition-colors hover:border-red/40 hover:bg-[rgba(168,69,63,0.15)] hover:text-red";
 
-/** Segmented two/three-way toggle (food filter, split method, share mode) —
- *  one squared control language everywhere a screen offers a small closed
- *  set of mutually exclusive modes, rather than each screen inventing its
- *  own pill/box/shape. Pair segmentBtnCls with segmentBtnActiveCls exactly
- *  like chipCls/chipActiveCls — the `!` is load-bearing for the same reason
- *  documented on chipActiveCls above. */
+/** Segmented toggle (food filter, split method, share mode, map layer) — an
+ *  inset well holding squared segments; the active segment is lifted onto
+ *  oak with a brass hairline. The `!` is load-bearing (see chipActiveCls). */
 export const segmentWrapCls =
-  "inline-flex rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-[#141110] p-0.5";
+  "inline-flex rounded-[3px] border border-line2 bg-well p-[3px]";
 export const segmentBtnCls =
-  "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] px-3 py-1.5 font-mono text-[0.7rem] font-semibold uppercase tracking-[0.04em] text-mist transition-colors hover:text-cream disabled:cursor-default disabled:opacity-40";
-export const segmentBtnActiveCls = "!bg-brass !text-deep hover:!text-deep";
+  "inline-flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[2px] px-3 font-cond text-[0.9rem] font-semibold uppercase tracking-[0.07em] text-mute transition-colors hover:text-cream disabled:cursor-default disabled:opacity-40";
+export const segmentBtnActiveCls =
+  "!bg-oak !text-cream shadow-[inset_0_0_0_1px_rgba(201,162,106,0.55)]";

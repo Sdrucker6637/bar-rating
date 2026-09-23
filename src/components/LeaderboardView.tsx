@@ -5,21 +5,28 @@ import { useTour } from "@/lib/tour-context";
 import { avgWithFood, avgWithoutFood } from "@/lib/scoring";
 import { battleDecidedBarIds, pendingBattlePairs } from "@/lib/ranking";
 import type { Bar } from "@/lib/types";
-import BarCard from "./BarCard";
-import ScoreSeal from "./ScoreSeal";
 import TabIntro from "./TabIntro";
 import EmptyState from "./EmptyState";
 import BattleModal from "./modals/BattleModal";
 import {
-  addBtnCls,
+  LeaderFeature,
+  PodiumCard,
+  StandingRow,
+  HorsCourseRow,
+  STANDINGS_GRID,
+  MOBILE_SCORE_HEAD,
+} from "./Standings";
+import type { StandingProps } from "./Standings";
+import { SCORE_CATS } from "./Scorecard";
+import type { ScoreKey } from "./Scorecard";
+import { SectionRule } from "./Ornament";
+import { useFlip } from "@/lib/useFlip";
+import {
+  btnPrimaryCls,
   inputCls,
-  kickerCls,
-  chipCls,
   segmentWrapCls,
   segmentBtnCls,
   segmentBtnActiveCls,
-  cardBaseShadowCls,
-  cardWarmSurfaceCls,
 } from "@/lib/ui";
 import Icon from "./Icon";
 
@@ -162,223 +169,333 @@ export default function LeaderboardView() {
   }, [pendingPairs.length]);
 
   const champ = filteredVisited.length > 0 ? filteredVisited[0] : null;
-  const champScore = champ
-    ? foodMode === "with"
-      ? avgWithFood(champ)
-      : avgWithoutFood(champ)
-    : null;
+  const scoreOf = (b: Bar) =>
+    foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b);
+  const scoreLabel = foodMode === "with" ? "with food" : "no food";
+  const overallMode = sortMode === "overall";
+  const highlight: ScoreKey | null = overallMode ? null : sortMode;
+
+  // Ranks exactly as before: position among non-disqualified bars in the
+  // displayed order; disqualified bars carry no rank.
+  const standings = useMemo(() => {
+    let rankCounter = 0;
+    return displayBars.map((b) => ({
+      b,
+      rank: b.disqualified ? null : ++rankCounter,
+    }));
+  }, [displayBars]);
+
+  // The featured leader is the board's #1 (the overall champion), shown
+  // only while it's actually in the running.
+  const leader = champ && !champ.disqualified ? champ : null;
+  const leaderScore = leader ? scoreOf(leader) : null;
+  // Display-only: distance to the leader, on the overall ranking.
+  const gapFor = (b: Bar): number | null => {
+    if (!overallMode || leaderScore === null || leaderScore === undefined)
+      return null;
+    const s = scoreOf(b);
+    if (s === null || s === undefined || isNaN(s)) return null;
+    return Math.max(0, leaderScore - s);
+  };
+  const runnerUpBar = filteredVisited.find(
+    (b, i) => i > 0 && !b.disqualified,
+  );
+  const runnerUp =
+    leader && runnerUpBar
+      ? (() => {
+          const s = scoreOf(runnerUpBar);
+          return {
+            name: runnerUpBar.name,
+            gap:
+              leaderScore !== null &&
+              leaderScore !== undefined &&
+              s !== null &&
+              s !== undefined
+                ? Math.max(0, leaderScore - s)
+                : null,
+          };
+        })()
+      : null;
+
+  // Overall: #1 is the feature, #2–3 the podium, #4+ the field.
+  // By category: the feature stays the overall leader and the whole field
+  // is re-ranked by that category underneath it.
+  const podium = overallMode
+    ? standings.filter((s) => s.rank === 2 || s.rank === 3)
+    : [];
+  const field = standings.filter(
+    (s) =>
+      s.rank !== null && (overallMode ? s.rank > 3 : true),
+  );
+  const horsCourse = standings.filter((s) => s.rank === null);
+
+  const propsFor = (b: Bar, rank: number | null): StandingProps => ({
+    b,
+    rank,
+    score: scoreOf(b),
+    gap: gapFor(b),
+    highlight,
+    battleDecided: overallMode && battleDecidedIds.has(b.id),
+    isFetching: fetchingIds.has(b.id) || detailsPendingIds.has(b.id),
+    detailsDeferred: detailsDeferredIds.has(b.id),
+    detailsFailed: detailsFailedIds.has(b.id),
+    onEdit: () => editVisited(b),
+    onDelete: () => removeBar(b.id),
+    onDisqualify: () => toggleDisqualify(b),
+  });
+
+  // Re-rankings (food toggle, sort) glide rows to their new places.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const snapshot = useFlip(boardRef);
+
+  const addButton = (
+    <button
+      className={`${btnPrimaryCls} w-full sm:w-auto`}
+      onClick={() => startManualAdd("visited")}
+    >
+      <Icon name="trophy" size={15} />
+      Add a bar you visited &amp; rank it
+    </button>
+  );
 
   return (
     <div>
       <TabIntro
+        kicker="General Classification"
         title="Tonight's Rankings"
         sub="Where we stand — every rated bar ranked by average score across vibe, value, service, food, and drinks."
+        action={addButton}
       />
 
-      {champ && (
-        <div className="relative mb-8 overflow-hidden rounded-lg border border-brass/30 bg-panel">
-          <span
-            aria-hidden="true"
-            className="absolute inset-x-0 top-0 h-px bg-brass/60"
+      <div ref={boardRef}>
+        {leader && (
+          <LeaderFeature
+            {...propsFor(leader, 1)}
+            gap={null}
+            battleDecided={battleDecidedIds.has(leader.id)}
+            highlight={highlight}
+            runnerUp={runnerUp}
+            scoreLabel={scoreLabel}
+            categoryMode={!overallMode}
           />
-          <span
-            aria-hidden="true"
-            className="absolute inset-x-0 top-[5px] h-px bg-brass/20"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_120%_at_15%_-10%,rgba(184,150,95,0.1),transparent_60%)]"
-          />
-          <div className="relative flex flex-col gap-5 px-6 py-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-8 sm:py-7">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 font-mono text-kicker uppercase text-gold">
-                <Icon name="trophy" size={13} />
-                The House Record
-              </div>
-              <div className="mt-2.5 font-serif text-title-lg font-medium leading-tight text-cream sm:text-[1.75rem]">
-                {champ.name}
-              </div>
-              <div className="mt-1.5 font-serif text-[0.85rem] italic text-mist">
-                Nothing else comes close.
-              </div>
-              {champ.neighborhood && (
-                <div className="mt-3 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-mute">
-                  {champ.neighborhood}
+        )}
+
+        {/* The results sheet's controls */}
+        <div className="mb-5 mt-7 flex flex-col gap-2.5 sm:mt-9 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Icon
+              name="search"
+              size={16}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-mute"
+            />
+            <input
+              className={`${inputCls} pl-10`}
+              placeholder="Search name, neighborhood, notes…"
+              aria-label="Search the leaderboard"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          {/* flex-wrap is the safety net on narrow phones: while a tie is
+              pending, the ties control drops to its own line instead of
+              clipping off-screen. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              role="group"
+              aria-label="Food filter"
+              className={`${segmentWrapCls} flex-shrink-0`}
+            >
+              <button
+                type="button"
+                aria-pressed={foodMode === "with"}
+                onClick={() => {
+                  snapshot();
+                  setFoodMode("with");
+                }}
+                className={`${segmentBtnCls} ${
+                  foodMode === "with" ? segmentBtnActiveCls : ""
+                }`}
+              >
+                With food
+              </button>
+              <button
+                type="button"
+                aria-pressed={foodMode === "without"}
+                onClick={() => {
+                  snapshot();
+                  setFoodMode("without");
+                }}
+                className={`${segmentBtnCls} ${
+                  foodMode === "without" ? segmentBtnActiveCls : ""
+                }`}
+              >
+                Without food
+              </button>
+            </div>
+
+            <div className="relative ml-auto lg:ml-0" ref={sortRef}>
+              <button
+                type="button"
+                onClick={() => setSortOpen((o) => !o)}
+                aria-haspopup="listbox"
+                aria-expanded={sortOpen}
+                className={`inline-flex h-[40px] cursor-pointer items-center gap-2 whitespace-nowrap rounded-[3px] border px-3 font-cond text-[0.9rem] font-semibold uppercase tracking-[0.07em] transition-colors duration-150 ${
+                  sortOpen
+                    ? "border-brass/70 bg-oak text-cream"
+                    : "border-line2 bg-transparent text-mist hover:border-mute hover:text-cream"
+                }`}
+              >
+                <span className="hidden text-mute sm:inline">Rank by</span>
+                <span className={overallMode ? "text-cream" : "text-gold"}>
+                  {currentSortLabel}
+                </span>
+                <Icon
+                  name="chevronDown"
+                  size={12}
+                  className={`transition-transform duration-150 ${
+                    sortOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {sortOpen && (
+                <div
+                  role="listbox"
+                  aria-label="Sort leaderboard by"
+                  className="absolute right-0 top-full z-50 mt-1.5 w-48 animate-[tda-rise_160ms_ease-out] overflow-hidden rounded-[4px] border border-line2 bg-oak py-1 shadow-menu"
+                >
+                  {SORT_OPTIONS.map((o) => {
+                    const selected = sortMode === o.key;
+                    return (
+                      <button
+                        key={o.key}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        onClick={() => {
+                          snapshot();
+                          setSortMode(o.key);
+                          setSortOpen(false);
+                        }}
+                        className={`flex w-full cursor-pointer items-center justify-between gap-2 px-3.5 py-2.5 text-left font-cond text-[0.95rem] font-semibold uppercase tracking-[0.07em] transition-colors duration-100 ${
+                          selected
+                            ? "text-cream"
+                            : "text-mist hover:bg-[rgba(241,232,214,0.05)] hover:text-cream"
+                        }`}
+                      >
+                        {o.label}
+                        {selected && (
+                          <Icon name="check" size={13} className="text-gold" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
-            <div className="flex flex-shrink-0 flex-col items-center gap-1.5 sm:self-center">
-              <div className="font-mono text-[0.58rem] uppercase tracking-[0.16em] text-mute">
-                House average
-              </div>
-              <ScoreSeal
-                score={champScore}
-                label={foodMode === "with" ? "with food" : "no food"}
-                size={104}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
-      <button className={addBtnCls} onClick={() => startManualAdd("visited")}>
-        + Add a bar you visited &amp; rank it
-      </button>
-
-      <div className={`${kickerCls} mt-6 mb-2`}>Refine the Field</div>
-      <div
-        className={`mb-4 flex flex-col gap-3 rounded-lg border border-line bg-panel px-4 py-3.5 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
-      >
-        <input
-          className={inputCls}
-          placeholder="Search name, neighborhood, notes…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {/* The food toggle and sort control share one row, with the sort
-            filling the right side; on narrow screens the "Sort by" word
-            hides so the trigger shows just the current sort. That alone
-            still isn't enough room on a real phone once the "Settle N
-            ties" chip appears too (only shown while a tie is pending), so
-            flex-wrap is the safety net — the right-hand group (ties chip +
-            sort) drops to its own line instead of clipping off-screen. */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div role="group" aria-label="Food filter" className={segmentWrapCls}>
-            <button
-              type="button"
-              aria-pressed={foodMode === "with"}
-              onClick={() => setFoodMode("with")}
-              className={`${segmentBtnCls} ${
-                foodMode === "with" ? segmentBtnActiveCls : ""
-              }`}
-            >
-              With food
-            </button>
-            <button
-              type="button"
-              aria-pressed={foodMode === "without"}
-              onClick={() => setFoodMode("without")}
-              className={`${segmentBtnCls} ${
-                foodMode === "without" ? segmentBtnActiveCls : ""
-              }`}
-            >
-              Without food
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2.5">
             {pendingPairs.length > 0 && (
               <button
-                className={`${chipCls} !border-goldDeep/60 !text-gold hover:!border-gold`}
+                className="inline-flex h-[40px] flex-shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-[3px] border border-brass/60 bg-[rgba(201,162,106,0.1)] px-3 font-cond text-[0.9rem] font-semibold uppercase tracking-[0.07em] text-cream transition-colors hover:border-brass hover:bg-[rgba(201,162,106,0.18)]"
                 onClick={() => setBattleOpen(true)}
               >
-                <Icon name="swords" size={12} />
+                <Icon name="swords" size={14} className="text-gold" />
                 Settle {pendingPairs.length} tie
                 {pendingPairs.length === 1 ? "" : "s"}
               </button>
             )}
-            <div className="relative" ref={sortRef}>
-          <button
-            type="button"
-            onClick={() => setSortOpen((o) => !o)}
-            aria-haspopup="listbox"
-            aria-expanded={sortOpen}
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[6px] border px-2 py-1.5 font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors duration-150 ${
-              sortOpen
-                ? "border-brass bg-[rgba(184,150,95,0.08)] text-cream"
-                : "border-[rgba(184,150,95,0.22)] bg-transparent text-mist hover:border-brass hover:text-cream"
-            }`}
-          >
-            <span className="hidden text-mute sm:inline">Sort by</span>{" "}
-            <span
-              className={sortMode === "overall" ? "text-mist" : "text-gold"}
-            >
-              {currentSortLabel}
-            </span>
-            <Icon
-              name="chevronDown"
-              size={10}
-              className={`transition-transform duration-150 ${
-                sortOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-
-          {sortOpen && (
-            <div
-              role="listbox"
-              aria-label="Sort leaderboard by"
-              className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-[8px] border border-line bg-panel py-1.5 shadow-[inset_0_1px_0_rgba(237,230,217,0.04),0_18px_40px_rgba(0,0,0,0.55)]"
-            >
-              {SORT_OPTIONS.map((o) => {
-                const selected = sortMode === o.key;
-                return (
-                  <button
-                    key={o.key}
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    onClick={() => {
-                      setSortMode(o.key);
-                      setSortOpen(false);
-                    }}
-                    className={`flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left font-mono text-[0.72rem] uppercase tracking-[0.04em] transition-colors duration-100 ${
-                      selected
-                        ? "bg-[rgba(184,150,95,0.1)] text-gold"
-                        : "text-mist hover:bg-[rgba(184,150,95,0.06)] hover:text-cream"
-                    }`}
-                  >
-                    {o.label}
-                    {selected && (
-                      <Icon name="check" size={11} className="text-gold" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
           </div>
         </div>
-        </div>
-      </div>
 
-      <div className="mt-4 flex flex-col gap-2.5">
         {filteredVisited.length === 0 && (
           <EmptyState
-            icon={<Icon name="search" size={15} />}
+            icon={<Icon name="search" size={18} />}
             title="No stages match that search yet."
             hint="Try a different name or neighborhood"
           />
         )}
-        {(() => {
-          let rankCounter = 0;
-          return displayBars.map((b) => {
-            const ranked = !b.disqualified;
-            if (ranked) rankCounter++;
-            return (
-              <BarCard
+
+        {podium.length > 0 && (
+          <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {podium.map(({ b, rank }) => (
+              <PodiumCard
                 key={b.id}
-                b={b}
-                rank={ranked ? rankCounter : null}
-                score={foodMode === "with" ? avgWithFood(b) : avgWithoutFood(b)}
-                scoreLabel={foodMode === "with" ? "with food" : "no food"}
-                battleDecided={
-                  sortMode === "overall" && battleDecidedIds.has(b.id)
-                }
-                isFetching={
-                  fetchingIds.has(b.id) || detailsPendingIds.has(b.id)
-                }
-                detailsDeferred={detailsDeferredIds.has(b.id)}
-                detailsFailed={detailsFailedIds.has(b.id)}
-                onNameClick={() => {
-                  if (b.mapsLink) window.open(b.mapsLink, "_blank");
-                }}
-                onEdit={() => editVisited(b)}
-                onDelete={() => removeBar(b.id)}
-                onDisqualify={() => toggleDisqualify(b)}
+                {...propsFor(b, rank)}
+                rank={rank as 2 | 3}
               />
-            );
-          });
-        })()}
+            ))}
+          </div>
+        )}
+
+        {field.length > 0 && (
+          <section aria-label="Classification">
+            <SectionRule
+              label={
+                overallMode
+                  ? "The Field"
+                  : `Ranked by ${currentSortLabel.toLowerCase()}`
+              }
+              meta={`${field.length} bar${field.length === 1 ? "" : "s"}`}
+            />
+            {/* column heads — once, like a printed results sheet */}
+            <div
+              aria-hidden="true"
+              className={`mt-3 hidden border-b border-line2 px-3 pb-2 font-cond text-[0.78rem] font-semibold uppercase tracking-[0.12em] text-mute lg:grid ${STANDINGS_GRID}`}
+            >
+              <span>Pos</span>
+              <span>Bar</span>
+              <span className="grid grid-cols-5 gap-x-3 text-center">
+                {SCORE_CATS.map((c) => (
+                  <span
+                    key={c.key}
+                    className={highlight === c.key ? "text-gold" : ""}
+                  >
+                    {c.label}
+                  </span>
+                ))}
+              </span>
+              <span className="text-right">Score</span>
+              <span className="text-right">{overallMode ? "Gap" : ""}</span>
+              <span />
+            </div>
+            <div
+              aria-hidden="true"
+              className={`mt-3 border-b border-line2 pb-2 ${MOBILE_SCORE_HEAD}`}
+            >
+              <span />
+              <span className="grid grid-cols-5 gap-x-2.5 text-center font-cond text-[0.74rem] font-semibold uppercase tracking-[0.1em] text-mute sm:max-w-[28rem] sm:gap-x-3">
+                {SCORE_CATS.map((c) => (
+                  <span
+                    key={c.key}
+                    className={highlight === c.key ? "text-gold" : ""}
+                  >
+                    {c.label}
+                  </span>
+                ))}
+              </span>
+            </div>
+            <div>
+              {field.map(({ b, rank }) => (
+                <StandingRow key={b.id} {...propsFor(b, rank)} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {horsCourse.length > 0 && (
+          <section aria-label="Disqualified" className="mt-10">
+            <SectionRule
+              label="Hors course"
+              meta="Disqualified"
+              accent="#A8453F"
+            />
+            <div className="mt-2 border-t border-line2">
+              {horsCourse.map(({ b }) => (
+                <HorsCourseRow key={b.id} {...propsFor(b, null)} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
 
       {battleOpen && (

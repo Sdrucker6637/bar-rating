@@ -6,6 +6,7 @@ import { useTour } from "@/lib/tour-context";
 import Icon from "./Icon";
 import type { IconName } from "./Icon";
 import BrandMark from "./BrandMark";
+import Ornament from "./Ornament";
 import LoadingScreen from "./LoadingScreen";
 import InfoModal from "./modals/InfoModal";
 import VisitedFormModal from "./modals/VisitedFormModal";
@@ -52,7 +53,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       className="tda-root tda-atmosphere flex flex-col overflow-hidden"
       style={{
         height: "100dvh",
-        color: "#EDE6D9",
+        color: "#F1E8D6",
         fontFamily: "'Inter', sans-serif",
       }}
     >
@@ -61,7 +62,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <div
-          className="mx-auto max-w-[980px] px-5 pb-8 sm:border-x sm:border-[rgba(184,150,95,0.055)] sm:pb-12"
+          className="mx-auto max-w-[1000px] px-4 pb-8 sm:px-8 sm:pb-12"
           style={{
             // viewport-fit: cover (see layout.tsx) draws the page under the
             // notch/Dynamic Island too, not just the home indicator — pad
@@ -70,74 +71,99 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             paddingTop: "env(safe-area-inset-top)",
           }}
         >
-        <header className="border-b border-[rgba(184,150,95,0.16)] pb-7 pt-12 text-center">
-          <div className="flex items-center justify-center gap-2.5">
+        {/* Masthead — the brand as a publication nameplate: the emblem,
+            the wordmark with its true-italic "Alcoholism" (the only brass
+            in the header), and the tagline in the guide's italic voice. */}
+        <header className="pb-5 pt-9 text-center sm:pb-7 sm:pt-14">
+          <div className="flex items-center justify-center gap-2.5 sm:gap-4">
             <BrandMark
               size={34}
-              className="hidden flex-shrink-0 opacity-90 drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)] sm:block"
+              className="flex-shrink-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] sm:hidden"
             />
-            <h1 className="m-0 font-serif text-display font-medium text-cream">
-              Tour de <span className="italic text-gold">Alcoholism</span>
-              <button
-                type="button"
-                title="How Tour de Alcoholism works"
-                aria-label="How Tour de Alcoholism works"
-                onClick={() => setShowInfo(true)}
-                className="ml-2 inline-flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-full border border-mute bg-transparent align-middle font-mono text-[0.72rem] font-semibold text-gold transition-colors hover:border-gold hover:bg-[rgba(201,168,118,0.1)]"
-              >
-                i
-              </button>
+            <BrandMark
+              size={58}
+              className="hidden flex-shrink-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] sm:block"
+            />
+            <h1 className="m-0 whitespace-nowrap font-serif text-masthead font-semibold text-cream">
+              Tour de{" "}
+              <span className="font-normal italic tracking-[-0.02em] text-gold">
+                Alcoholism
+              </span>
             </h1>
           </div>
-          <div className="mt-3 font-mono text-kicker uppercase text-mute">
-            a running record of the bars we&apos;ve survived
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 sm:mt-4">
+            <span className="font-serif text-[0.95rem] italic text-mist sm:text-[1.05rem]">
+              a running record of the bars we&apos;ve survived
+            </span>
+            <span aria-hidden="true" className="hidden text-dim sm:inline">
+              ·
+            </span>
+            <button
+              type="button"
+              title="How Tour de Alcoholism works"
+              aria-label="How Tour de Alcoholism works"
+              onClick={() => setShowInfo(true)}
+              className="cursor-pointer border-none bg-transparent p-0 font-cond text-[0.82rem] font-semibold uppercase tracking-[0.12em] text-mute underline decoration-line2 decoration-1 underline-offset-[5px] transition-colors hover:text-cream hover:decoration-brass"
+            >
+              How it works
+            </button>
           </div>
         </header>
 
-        {/* Desktop / tablet nav — segmented tabs */}
+        {/* Desktop / tablet nav — a publication section bar: condensed
+            caps between two hairlines, the active section underlined in
+            brass. No boxes, no pills, so it never outweighs the content. */}
         <nav
-          className="mb-8 hidden border-b border-line sm:block"
+          className="mb-10 hidden border-y border-line sm:block"
           aria-label="Sections"
         >
-          <div className="flex items-stretch">
-            {TABS.map((t) => {
+          <div className="flex items-stretch justify-center">
+            {TABS.map((t, i) => {
               const active =
                 pathname === t.route ||
                 (t.route === "/leaderboard" && pathname === "/");
               return (
-                <Link
-                  key={t.route}
-                  href={t.route}
-                  aria-current={active ? "page" : undefined}
-                  className={`relative flex flex-1 items-center justify-center gap-2 whitespace-nowrap border-r border-line px-2 py-3 font-mono text-[0.72rem] uppercase tracking-[0.16em] transition-colors duration-150 first:border-l ${
-                    active ? "text-cream" : "text-mute hover:text-mist"
-                  }`}
-                >
-                  <Icon name={t.icon} size={14} />
-                  {t.label}
-                  <span
-                    aria-hidden="true"
-                    className={`absolute bottom-0 left-1/2 h-[2px] -translate-x-1/2 bg-brass transition-all duration-150 ${
-                      active ? "w-9 opacity-100" : "w-0 opacity-0"
+                <div key={t.route} className="flex items-center">
+                  {i > 0 && (
+                    <span aria-hidden="true" className="text-[0.6rem] text-line2">
+                      ◆
+                    </span>
+                  )}
+                  <Link
+                    href={t.route}
+                    aria-current={active ? "page" : undefined}
+                    className={`group relative flex items-center whitespace-nowrap px-4 py-3.5 font-cond text-[0.98rem] font-semibold uppercase tracking-[0.12em] transition-colors duration-150 md:px-6 ${
+                      active ? "text-cream" : "text-mute hover:text-cream"
                     }`}
-                  />
-                </Link>
+                  >
+                    {t.label}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-x-4 -bottom-px h-[2px] origin-center bg-brass transition-transform duration-200 md:inset-x-6 ${
+                        active ? "scale-x-100" : "scale-x-0 group-hover:scale-x-[0.35] group-hover:bg-line2"
+                      }`}
+                    />
+                  </Link>
+                </div>
               );
             })}
           </div>
         </nav>
-        <div className="h-6 sm:hidden" />
+        <Ornament className="mb-7 sm:hidden" tone="quiet" />
 
+        <div key={pathname} className="tda-page">
         {children}
+        </div>
 
         {saveError && (
-          <div className="mt-10 flex items-center justify-center gap-2 rounded-[6px] border border-redDeep bg-[rgba(199,118,118,0.08)] px-4 py-3 text-center font-mono text-[0.72rem] text-red">
+          <div className="mt-10 flex items-center justify-center gap-2 rounded-[3px] border border-redDeep bg-[rgba(168,69,63,0.1)] px-4 py-3 text-center text-[0.85rem] text-red">
             <span aria-hidden="true">⚠</span>
             Couldn&apos;t save that change — check your connection and try
             again.
           </div>
         )}
-        <div className="mt-10 text-center font-mono text-[0.68rem] text-dim">
+        <Ornament className="mt-14" tone="quiet" />
+        <div className="mt-4 text-center font-serif text-[0.85rem] italic text-dim">
           Shared list — anyone with this page can add stages, rank bars, and
           edit entries.
         </div>
@@ -148,9 +174,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           flex item (not `position: fixed`), always at the bottom of the
           100dvh shell above — see the note on the shell's root div. */}
       <nav
-        className="z-30 flex-shrink-0 border-t border-line bg-[#12100F]/95 backdrop-blur-sm sm:hidden"
+        className="z-30 flex-shrink-0 border-t border-line bg-[#12100E]/95 backdrop-blur-sm sm:hidden"
         style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom) + 6px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)",
         }}
         aria-label="Sections"
       >
@@ -164,17 +190,22 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 key={t.route}
                 href={t.route}
                 aria-current={active ? "page" : undefined}
-                className="flex flex-1 flex-col items-center gap-1 py-3"
+                className="relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 pb-1.5 pt-2.5"
               >
+                {/* active marker: a short brass bar on the nav's top edge */}
                 <span
-                  className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
-                    active ? "border-brass bg-[rgba(201,168,118,0.14)] text-gold" : "border-transparent text-mute"
+                  aria-hidden="true"
+                  className={`absolute left-1/2 top-[-1px] h-[2px] w-7 -translate-x-1/2 bg-brass transition-opacity duration-150 ${
+                    active ? "opacity-100" : "opacity-0"
                   }`}
-                >
-                  <Icon name={t.icon} size={16} />
-                </span>
+                />
+                <Icon
+                  name={t.icon}
+                  size={20}
+                  className={active ? "text-gold" : "text-mute"}
+                />
                 <span
-                  className={`whitespace-nowrap font-mono text-[0.58rem] uppercase tracking-[0.1em] ${
+                  className={`whitespace-nowrap font-cond text-[0.74rem] font-semibold uppercase tracking-[0.08em] ${
                     active ? "text-cream" : "text-mute"
                   }`}
                 >

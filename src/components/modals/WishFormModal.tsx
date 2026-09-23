@@ -2,7 +2,13 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
-import { inputCls, primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
+import {
+  inputCls,
+  labelCls,
+  modalTitleCls,
+  primaryBtnCls,
+  secondaryBtnCls,
+} from "@/lib/ui";
 
 export default function WishFormModal() {
   const { showWishForm, setShowWishForm, wishForm, setWishForm, saveWishForm } =
@@ -12,12 +18,12 @@ export default function WishFormModal() {
 
   return (
     <Modal onClose={() => setShowWishForm(false)}>
-      <h3 className="mt-0 font-serif font-medium text-cream">
+      <h3 className={`${modalTitleCls} mb-5`}>
         Add to wishlist
       </h3>
       <form onSubmit={saveWishForm}>
-        <div className="mb-2.5 flex flex-col gap-1">
-          <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        <div className="mb-3.5 flex flex-col gap-1.5">
+          <label className={labelCls}>
             Name
           </label>
           <input
@@ -27,8 +33,8 @@ export default function WishFormModal() {
             onChange={(e) => setWishForm({ ...wishForm, name: e.target.value })}
           />
         </div>
-        <div className="mb-2.5 flex flex-col gap-1">
-          <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        <div className="mb-3.5 flex flex-col gap-1.5">
+          <label className={labelCls}>
             Neighborhood (optional)
           </label>
           <input
@@ -39,8 +45,8 @@ export default function WishFormModal() {
             }
           />
         </div>
-        <div className="mb-2.5 flex flex-col gap-1">
-          <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        <div className="mb-3.5 flex flex-col gap-1.5">
+          <label className={labelCls}>
             Notes
           </label>
           <input
@@ -51,7 +57,7 @@ export default function WishFormModal() {
             }
           />
         </div>
-        <div className="mt-4 flex gap-2.5">
+        <div className="mt-6 flex gap-2.5">
           <button
             type="button"
             className={secondaryBtnCls}

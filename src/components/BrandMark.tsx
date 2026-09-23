@@ -7,13 +7,19 @@ const STAR_COUNT = 10;
 interface BrandMarkProps {
   size?: number;
   className?: string;
+  /** Stars appear one by one around the mug (loading screen only). */
+  animated?: boolean;
 }
 
 /** The house emblem — a mug ringed by ten stars. ScoreSeal borrows this same
  *  star-ring math in gold, circling a score instead of the mascot formed
  *  here; together they're the one recurring mark that ties the header, the
  *  favicon, and a screen's best number back to the same identity. */
-export default function BrandMark({ size = 32, className = "" }: BrandMarkProps) {
+export default function BrandMark({
+  size = 32,
+  className = "",
+  animated = false,
+}: BrandMarkProps) {
   const center = 36;
   const starRadius = 28;
 
@@ -35,6 +41,13 @@ export default function BrandMark({ size = 32, className = "" }: BrandMarkProps)
             d={STAR_PATH}
             fill="#F7F0E1"
             transform={`translate(${x} ${y}) scale(0.8)`}
+            style={
+              animated
+                ? {
+                    animation: `tda-star-in 260ms ease-out ${i * 90}ms both`,
+                  }
+                : undefined
+            }
           />
         );
       })}
