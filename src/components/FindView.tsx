@@ -6,7 +6,7 @@ import SuggestionCard from "./SuggestionCard";
 import BarCard from "./BarCard";
 import TabIntro from "./TabIntro";
 import EmptyState from "./EmptyState";
-import { addBtnCls, kickerCls } from "@/lib/ui";
+import { btnSecondaryCls } from "@/lib/ui";
 import Icon from "./Icon";
 
 export default function FindView() {
@@ -32,6 +32,7 @@ export default function FindView() {
   return (
     <div>
       <TabIntro
+        kicker="Discover"
         title="Where Are We Drinking Tonight?"
         sub="Search by vibe for fresh spots, roll the dice on a surprise pick, or add a bar to the wishlist by name."
       />
@@ -53,7 +54,7 @@ export default function FindView() {
         />
       )}
       {searchResults.length > 0 && (
-        <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+        <div className="mb-10 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
           {searchResults.map((s) => (
             <SuggestionCard
               key={s.name}
@@ -67,24 +68,29 @@ export default function FindView() {
         </div>
       )}
 
-      <button className={addBtnCls} onClick={() => startManualAdd("wishlist")}>
-        + Add to wishlist by name
-      </button>
-
-      <div className="mt-10 mb-1">
-        <div className={kickerCls}>Wishlist</div>
-        <div className="mt-1 flex items-center gap-3">
-          <h2 className="m-0 font-serif text-title-md font-medium text-cream">
+      <div className="mb-1 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 font-cond text-kicker font-semibold uppercase text-greenLight">
+            <span aria-hidden="true" className="h-[7px] w-[7px] rotate-45 bg-greenBright" />
+            On the list
+            <span className="tda-num font-medium text-mute">
+              · {filteredToTry.length} bar{filteredToTry.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <h2 className="m-0 mt-1.5 font-serif text-title-lg font-semibold text-cream">
             Our Wishlist
           </h2>
-          <div className="h-px flex-1 bg-line" />
-          <span className="font-mono text-[0.7rem] text-mute">
-            {filteredToTry.length} bar{filteredToTry.length === 1 ? "" : "s"}
-          </span>
         </div>
+        <button
+          className={`${btnSecondaryCls} w-full text-cream sm:w-auto`}
+          onClick={() => startManualAdd("wishlist")}
+        >
+          <span className="text-gold">+</span> Add to wishlist by name
+        </button>
       </div>
+      <div aria-hidden="true" className="mt-5 h-px bg-line2" />
 
-      <div className="mt-4 flex flex-col gap-2.5">
+      <div className="flex flex-col">
         {filteredToTry.length === 0 && (
           <EmptyState
             icon={<Icon name="ledger" size={18} />}
@@ -111,7 +117,7 @@ export default function FindView() {
         ))}
       </div>
       {fitsGroupOnly && filteredToTry.length > 0 && (
-        <div className="mt-2 font-mono text-[0.68rem] text-dim">
+        <div className="mt-3 font-serif text-[0.88rem] italic text-dim">
           Filtered to bars that fit your group size.
         </div>
       )}

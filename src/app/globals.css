@@ -15,43 +15,42 @@ body {
 body {
   /* Pre-hydration/no-JS fallback that matches .tda-atmosphere's base tone
      (Shell's root div carries the real layered environment once rendered). */
-  background: #12100f;
+  background: #12100e;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* ---------- the room: a dark, quiet environment ----------
-   An almost-black charcoal base with a barely-there warm undertone.
-   Depth comes from darkness alone: a wide vignette letting the outer
-   edges and corners fall away, and two very broad, low-opacity shadow
-   areas that keep the large canvas from being a flat field. No texture,
-   no grain, no turbulence, no lighting effects — the background stays
-   nearly boring on its own, and typography, brass, and the cards carry
-   the room. */
+/* Tabular, lining figures wherever a number is data. */
+.tda-num {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+/* ---------- the room: a warm, dark, quiet environment ----------
+   Warm brown-black base. Depth comes from darkness and one soft pool of
+   lamplight over the masthead — the "bar light" — plus a wide vignette
+   letting the edges fall away. Still no grain, no noise, no texture: the
+   type, the surfaces, and the brass carry the room. */
 .tda-atmosphere {
-  background-color: #12100f;
+  background-color: #12100e;
   background-image:
-    /* edge vignette on top: outer frame and corners recede, center calm */
+    /* edge vignette: outer frame and corners recede */
     radial-gradient(
       130% 110% at 50% 42%,
       rgba(0, 0, 0, 0) 58%,
-      rgba(0, 0, 0, 0.42) 100%
+      rgba(0, 0, 0, 0.45) 100%
     ),
-    /* broad, soft shadow area, low-left — dark, not a shape */
+    /* a single low pool of warm lamplight above the masthead */
     radial-gradient(
-      90% 70% at 16% 80%,
-      rgba(0, 0, 0, 0.09),
-      rgba(0, 0, 0, 0) 72%
-    ),
-    /* broad, soft shadow area, upper-right — offsets the first */
-    radial-gradient(
-      85% 65% at 84% 10%,
-      rgba(0, 0, 0, 0.08),
-      rgba(0, 0, 0, 0) 72%
+      60% 38% at 50% -6%,
+      rgba(201, 162, 106, 0.085),
+      rgba(201, 162, 106, 0) 70%
     );
-  background-size: 100% 100%, 100% 100%, 100% 100%;
   background-repeat: no-repeat;
 }
 
-/* ---------- pulse animation (skeleton / loading text) ---------- */
+/* ---------- motion vocabulary ---------- */
 @keyframes tda-pulse {
   0%,
   100% {
@@ -62,47 +61,175 @@ body {
   }
 }
 
+/* A score that just changed ticks up into place. */
+@keyframes tda-tick {
+  from {
+    opacity: 0;
+    transform: translateY(35%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Content arriving (details panel, winner name, page intro). */
+@keyframes tda-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tda-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tda-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* An award being struck: lands slightly oversized and settles. */
+@keyframes tda-strike {
+  0% {
+    opacity: 0;
+    transform: scale(1.35) rotate(-12deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.96) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The Bar Battle winner's star ring turning into place. */
+@keyframes tda-crown {
+  from {
+    opacity: 0;
+    transform: scale(0.7) rotate(-36deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Stars of the brand mark appearing one by one (loading screen only). */
+@keyframes tda-star-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Page entrance is opacity-only on purpose: an animated transform here
+   would make this wrapper the containing block for every position:fixed
+   descendant (modals, the sort menu) while it runs. */
+.tda-page {
+  animation: tda-fade 260ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- receipt edge (Split the Bill totals) ----------
+   A torn/perforated bottom edge — the one place a printed-paper detail is
+   literal, because that surface literally is the receipt. */
+.tda-receipt {
+  position: relative;
+  margin-bottom: 10px;
+}
+.tda-receipt::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: -7px;
+  height: 7px;
+  background: radial-gradient(circle at 5px -1px, transparent 5px, #1a1613 5.5px)
+    repeat-x;
+  background-size: 10px 7px;
+}
+
 /* ---------- Heatmap container (also anchors the popup theming below) ---------- */
 .tda-heatmap-container {
   height: 560px;
   width: 100%;
-  border-radius: 8px;
-  border: 1px solid #262029;
-  margin-top: 1rem;
+  border-radius: 4px;
+  border: 1px solid #3a2f28;
   overflow: hidden;
+}
+@media (max-width: 640px) {
+  .tda-heatmap-container {
+    height: 62vh;
+    min-height: 380px;
+  }
 }
 
 /* ---------- Leaflet popup theming ---------- */
 .tda-heatmap-container .leaflet-popup-content-wrapper {
-  background: #1a1714;
-  color: #ede6d9;
-  border-radius: 8px;
-  border: 1px solid #302938;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  background: #241e19;
+  color: #f1e8d6;
+  border-radius: 4px;
+  border: 1px solid #3a2f28;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 .tda-heatmap-container .leaflet-popup-tip {
-  background: #1a1714;
-  border: 1px solid #302938;
+  background: #241e19;
+  border: 1px solid #3a2f28;
 }
 .tda-heatmap-container .leaflet-popup-close-button {
-  color: #857c8e !important;
+  color: #978b78 !important;
 }
 
 /* ---------- Leaflet popup inner content (injected via HTML strings) ---------- */
 .tda-map-popup-name {
   font-family: "Fraunces", serif;
   font-weight: 500;
-  font-size: 1.02rem;
-  color: #ede6d9;
+  font-size: 1.05rem;
+  color: #f1e8d6;
 }
 .tda-map-popup-score {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.82rem;
-  color: #c9a876;
-  margin-top: 0.3rem;
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 0.95rem;
+  color: #d6b47c;
+  margin-top: 0.2rem;
+  font-variant-numeric: tabular-nums;
 }
 .tda-map-popup-score.tda-muted {
-  color: #a79eb2;
+  color: #8db89a;
 }
 
 /* ---------- 16px inputs on small screens stop iOS Safari auto-zoom ---------- */
@@ -115,9 +242,14 @@ body {
 
 /* ---------- accessible focus ring for the dark theme (default outline is invisible) ---------- */
 :focus-visible {
-  outline: 2px solid #c9a876;
+  outline: 2px solid #c9a26a;
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 3px;
+}
+
+::selection {
+  background: rgba(201, 162, 106, 0.35);
+  color: #f1e8d6;
 }
 
 /* ---------- horizontal-scrolling nav / chip rows: hide scrollbar, keep scroll ---------- */
@@ -128,4 +260,40 @@ body {
 }
 .tda-scroll-x::-webkit-scrollbar {
   display: none;
+}
+
+/* ---------- Basemap: OpenStreetMap tiles turned into a warm night map ----------
+   invert + hue-rotate flips the light OSM style to dark while keeping water
+   and parks their natural hues; the sepia/saturate pass pulls it toward the
+   app's brown-black so the brass heat glow reads as the brightest thing. */
+.tda-heatmap-container .tda-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.88) contrast(0.88)
+    saturate(0.45) sepia(0.22);
+}
+
+/* ---------- Leaflet chrome: zoom controls and the pre-tile ground ---------- */
+.tda-heatmap-container.leaflet-container,
+.tda-heatmap-container .leaflet-container {
+  background: #15110e;
+}
+.tda-heatmap-container .leaflet-bar {
+  border: 1px solid #3a2f28;
+  border-radius: 3px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.tda-heatmap-container .leaflet-bar a {
+  background: #241e19;
+  color: #d8cebc;
+  border-bottom-color: #3a2f28;
+}
+.tda-heatmap-container .leaflet-bar a:hover {
+  background: #2e261f;
+  color: #f1e8d6;
+}
+.tda-heatmap-container .leaflet-control-attribution {
+  background: rgba(18, 16, 14, 0.75);
+  color: #8a7f6f;
+}
+.tda-heatmap-container .leaflet-control-attribution a {
+  color: #b7ab95;
 }

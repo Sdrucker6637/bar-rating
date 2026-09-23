@@ -9,6 +9,7 @@ export default function MapPage() {
   return (
     <div>
       <TabIntro
+        kicker="Heat map"
         title="Tour Map"
         sub="Every stop on the tour — top-rated visits glow warm, wishlist spots cluster by neighborhood."
       />

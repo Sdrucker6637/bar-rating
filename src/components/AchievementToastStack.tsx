@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTour } from "@/lib/tour-context";
 import { ACHIEVEMENTS_BY_KEY } from "@/lib/achievements";
 import type { AchievementUnlock } from "@/lib/types";
+import Insignia from "./Insignia";
 
 const VISIBLE_MS = 4200;
 
@@ -39,23 +40,22 @@ function Toast({
   return (
     <div
       role="status"
-      className={`pointer-events-auto flex w-[min(360px,calc(100vw-32px))] items-center gap-3 rounded-[10px] border border-goldDeep/50 bg-panel px-4 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(237,230,217,0.04)] transition-all duration-300 ease-out motion-reduce:transition-opacity ${
+      className={`pointer-events-auto relative flex w-[min(380px,calc(100vw-32px))] items-center gap-3.5 overflow-hidden rounded-[4px] border border-line2 bg-oak px-4 py-3.5 shadow-panel transition-all duration-300 ease-out motion-reduce:transition-opacity ${
         shown && !leaving
           ? "translate-y-0 opacity-100"
           : "translate-y-3 opacity-0"
       }`}
     >
-      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-brass/40 bg-[radial-gradient(circle_at_35%_30%,#E5B93F,#8A6D2F_75%)] text-[1.05rem] leading-none shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.25)]">
-        {def.icon}
-      </div>
+      <span aria-hidden="true" className="absolute inset-x-0 top-0 h-[2px] bg-brass/80" />
+      <Insignia icon={def.icon} category={def.category} size={46} strike={shown} />
       <div className="min-w-0">
-        <div className="font-mono text-[0.58rem] uppercase tracking-[0.13em] text-gold">
-          Achievement Unlocked
+        <div className="font-cond text-[0.78rem] font-semibold uppercase tracking-[0.13em] text-gold">
+          Achievement unlocked
         </div>
-        <div className="mt-0.5 truncate font-serif text-[0.95rem] font-medium text-cream">
+        <div className="mt-0.5 truncate font-serif text-[1.08rem] font-semibold text-cream">
           {def.name}
         </div>
-        <div className="mt-0.5 truncate text-[0.74rem] text-mist">
+        <div className="mt-0.5 truncate text-[0.82rem] text-mist">
           {def.desc}
         </div>
       </div>

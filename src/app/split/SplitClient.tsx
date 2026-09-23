@@ -1317,6 +1317,7 @@ export default function SplitClient() {
   return (
     <div>
       <TabIntro
+        kicker="Settle up"
         title="Split the Bill"
         sub="Add your crew, snap the itemized receipts for each place, and divide every tab fairly — no math required."
       />

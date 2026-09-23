@@ -2,7 +2,13 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
-import { inputCls, primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
+import {
+  inputCls,
+  labelCls,
+  modalTitleCls,
+  primaryBtnCls,
+  secondaryBtnCls,
+} from "@/lib/ui";
 
 export default function VisitedFormModal() {
   const {
@@ -29,12 +35,12 @@ export default function VisitedFormModal() {
 
   return (
     <Modal onClose={() => setShowVisitedForm(false)}>
-      <h3 className="mt-0 font-serif font-medium text-cream">
+      <h3 className={`${modalTitleCls} mb-5`}>
         {visitedForm.id ? "Rank this bar" : "Rank a bar you visited"}
       </h3>
       <form onSubmit={saveVisitedForm}>
-        <div className="mb-2.5 flex flex-col gap-1">
-          <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        <div className="mb-3.5 flex flex-col gap-1.5">
+          <label className={labelCls}>
             Name
           </label>
           <input
@@ -44,10 +50,10 @@ export default function VisitedFormModal() {
             onChange={(e) => set({ name: e.target.value })}
           />
         </div>
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-x-3 sm:grid-cols-3">
           {scoreFields.map(([label, key]) => (
-            <div key={key} className="mb-2.5 flex flex-col gap-1">
-              <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+            <div key={key} className="mb-3.5 flex flex-col gap-1.5">
+              <label className={labelCls}>
                 {label}
               </label>
               <input
@@ -62,8 +68,8 @@ export default function VisitedFormModal() {
             </div>
           ))}
         </div>
-        <div className="mb-2.5 flex flex-col gap-1">
-          <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        <div className="mb-3.5 flex flex-col gap-1.5">
+          <label className={labelCls}>
             Notes
           </label>
           <input
@@ -72,7 +78,7 @@ export default function VisitedFormModal() {
             onChange={(e) => set({ notes: e.target.value })}
           />
         </div>
-        <div className="mt-4 flex gap-2.5">
+        <div className="mt-6 flex gap-2.5">
           <button
             type="button"
             className={secondaryBtnCls}

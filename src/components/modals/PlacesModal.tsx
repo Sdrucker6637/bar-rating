@@ -2,7 +2,7 @@
 
 import { useTour } from "@/lib/tour-context";
 import Modal from "./Modal";
-import { primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
+import { modalTitleCls, primaryBtnCls, secondaryBtnCls } from "@/lib/ui";
 import Icon from "../Icon";
 
 export default function PlacesModal() {
@@ -13,32 +13,30 @@ export default function PlacesModal() {
 
   return (
     <Modal onClose={() => setPlacesModal(null)}>
-      <h3 className="mt-0 font-serif font-medium text-cream">
-        Confirm the location
-      </h3>
-      <p className="mb-0.5 font-mono text-[0.8rem] text-gold">
+      <h3 className={modalTitleCls}>Confirm the location</h3>
+      <p className="mb-0.5 mt-2 font-serif text-[1.05rem] italic text-cream">
         &ldquo;{suggestion.name}&rdquo;
       </p>
       {suggestion.address && (
-        <p className="mb-4 flex items-center gap-1.5 font-mono text-[0.7rem] text-mute">
+        <p className="mb-4 mt-1 flex items-center gap-1.5 text-[0.84rem] text-mute">
           <Icon name="pin" size={12} />
           {suggestion.address}
         </p>
       )}
 
       {searching ? (
-        <div className="py-6 text-center font-mono text-[0.8rem] text-mute">
+        <div className="animate-[tda-pulse_1.6s_ease-in-out_infinite] py-8 text-center font-serif text-[0.98rem] italic text-mute">
           Looking up on Google Places…
         </div>
       ) : results.length === 0 ? (
         <div>
-          <p className="text-[0.85rem] leading-normal text-cream">
+          <p className="mt-4 text-[0.92rem] leading-normal text-cream">
             No matching open bar found on Google Places.
           </p>
-          <p className="mb-1 text-[0.85rem] leading-normal text-cream">
+          <p className="mb-1 text-[0.92rem] leading-normal text-mist">
             Double check the spelling, or it may be permanently closed.
           </p>
-          <div className="mt-4 flex gap-2.5">
+          <div className="mt-6 flex gap-2.5">
             <button
               className={secondaryBtnCls}
               onClick={() => setPlacesModal(null)}
@@ -55,24 +53,24 @@ export default function PlacesModal() {
         </div>
       ) : (
         <div>
-          <div className="mb-3.5 font-mono text-[0.68rem] uppercase tracking-[0.08em] text-cream">
+          <div className="mb-3 mt-4 font-cond text-kicker font-semibold uppercase text-mute">
             Select the correct location
           </div>
           {results.map((r, i) => (
             <div
               key={i}
-              className="mb-2 cursor-pointer rounded-lg border border-line2 bg-ink px-4 py-3 transition-colors duration-150 hover:border-brass hover:bg-panelHover"
+              className="mb-2 cursor-pointer rounded-[4px] border border-line2 bg-panel px-4 py-3 transition-colors duration-150 hover:border-brass/70 hover:bg-[#2A221C]"
               onClick={() => confirmPlaceSelection(r)}
             >
-              <div className="font-serif text-base font-medium text-cream">
+              <div className="font-serif text-[1.08rem] font-semibold text-cream">
                 {r.name}
               </div>
-              <div className="mt-1 font-mono text-[0.72rem] leading-[1.4] text-mist">
+              <div className="mt-1 text-[0.84rem] leading-[1.4] text-mist">
                 {r.address}
               </div>
             </div>
           ))}
-          <div className="mt-5 flex gap-2.5">
+          <div className="mt-6 flex gap-2.5">
             <button
               className={secondaryBtnCls}
               onClick={() => setPlacesModal(null)}

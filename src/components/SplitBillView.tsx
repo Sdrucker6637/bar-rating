@@ -108,7 +108,7 @@ interface SplitBillViewProps {
 /** Compact inline number input for manual tax/tip entry — the app's dark
  *  input treatment at a small size so it sits naturally in the totals row. */
 const taxTipInputCls =
-  "w-20 rounded-[5px] border border-[rgba(184,150,95,0.25)] bg-[#141110] px-2 py-1 font-mono text-[0.85rem] text-cream shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass/20";
+  "w-20 rounded-[3px] border border-line2 bg-well px-2 py-1 font-mono text-[0.85rem] text-cream shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass/20";
 
 // mb-3 rather than m-0: every call site follows this straight with a field,
 // a description line, or a chip row that itself carries no top margin, so
@@ -116,7 +116,7 @@ const taxTipInputCls =
 // bill?" directly above the name input) everywhere this component is used.
 function PanelHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-3 mt-0 font-serif text-[1.35rem] font-medium text-cream">
+    <h2 className="mb-3 mt-0 font-serif text-[1.45rem] font-semibold tracking-[-0.01em] text-cream">
       {children}
     </h2>
   );
@@ -179,19 +179,19 @@ export default function SplitBillView(props: SplitBillViewProps) {
       <>
         <SplitStepper step={step} />
         <div
-          className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+          className={`my-4 rounded-[4px] border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
         >
         <PanelHeading>Who&apos;s splitting the bill?</PanelHeading>
         {people.length > 0 && (
           <div className="mb-3.5">
-            <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+            <div className="mb-1.5 font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
               People
             </div>
             <div className="flex flex-wrap gap-1.5">
               {people.map((p) => (
                 <span
                   key={p.id}
-                  className="inline-flex items-center gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-2.5 py-1.5"
+                  className="inline-flex items-center gap-2 rounded-[3px] border border-line2 bg-well px-2.5 py-1.5"
                 >
                   <span className="font-serif text-[0.88rem] font-medium leading-tight text-cream">
                     {p.name}
@@ -227,7 +227,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
           />
           <button
             type="submit"
-            className="cursor-pointer rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-transparent px-4 py-2.5 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.04em] text-mist transition-all duration-150 hover:-translate-y-px hover:border-brass hover:text-cream"
+            className="cursor-pointer inline-flex h-11 items-center rounded-[3px] border border-line2 bg-transparent px-4 font-cond text-[0.95rem] font-semibold uppercase tracking-[0.07em] text-cream transition-colors hover:border-brass/60 hover:bg-oak"
           >
             Add
           </button>
@@ -266,7 +266,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
       <>
         <SplitStepper step={step} />
         <div
-          className={`my-4 rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+          className={`my-4 rounded-[4px] border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
         >
         <PanelHeading>How many places did you go?</PanelHeading>
         <div className="mb-4 font-mono text-[0.68rem] text-mute">
@@ -311,10 +311,10 @@ export default function SplitBillView(props: SplitBillViewProps) {
         {places.map((place, i) => (
           <div
             key={place.id}
-            className={`rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+            className={`rounded-[4px] border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
           >
             <div className="mb-2.5 flex flex-col gap-1">
-              <label className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+              <label className="font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
                 Place {i + 1} name (optional — we&apos;ll try to read it off the
                 receipt)
               </label>
@@ -328,7 +328,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
 
             <label
               htmlFor={`tda-receipt-upload-${place.id}`}
-              className="mb-3 flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[10px] border-[1.5px] border-dashed border-[rgba(184,150,95,0.3)] bg-[#171310] p-6 text-center transition-colors duration-150 hover:border-brass hover:bg-panelHover"
+              className="mb-3 flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[4px] border border-dashed border-line2 bg-well p-6 text-center transition-colors duration-150 hover:border-brass hover:bg-panelHover"
             >
               <Icon name="receipt" size={26} className="text-brass/80" />
               <div className="font-serif text-[1rem] font-medium text-cream">
@@ -365,11 +365,11 @@ export default function SplitBillView(props: SplitBillViewProps) {
                   <div key={shot.id} className="relative">
                     <img
                       src={shot.previewUrl}
-                      className="block h-[90px] w-[70px] rounded-md border border-[rgba(184,150,95,0.22)] object-cover"
+                      className="block h-[90px] w-[70px] rounded-md border border-line2 object-cover"
                     />
                     <button
                       onClick={() => onRemoveScreenshot(i, shot.id)}
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-[rgba(184,150,95,0.22)] bg-[#171310] font-mono text-[0.65rem] text-red"
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-line2 bg-well font-mono text-[0.65rem] text-red"
                     >
                       ✕
                     </button>
@@ -453,7 +453,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
         </div>
 
         <div
-          className={`rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+          className={`rounded-[4px] border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
         >
           <PanelHeading>{placeLabel(place, activePlaceIndex)}</PanelHeading>
 
@@ -471,18 +471,18 @@ export default function SplitBillView(props: SplitBillViewProps) {
           />
 
           {place.parseError && (
-            <div className="mb-3 rounded-lg border border-redDeep bg-[#171310] px-3 py-2.5 font-mono text-[0.72rem] text-red">
+            <div className="mb-3 rounded-[4px] border border-redDeep bg-well px-3 py-2.5 font-mono text-[0.72rem] text-red">
               Couldn&apos;t read this receipt: {place.parseError}
             </div>
           )}
           {place.items.length === 0 && !place.parseError && (
-            <div className="mb-3 rounded-lg border border-[rgba(184,150,95,0.22)] bg-[#171310] px-3 py-2.5 font-mono text-[0.72rem] text-mute">
+            <div className="mb-3 rounded-[4px] border border-line2 bg-well px-3 py-2.5 font-mono text-[0.72rem] text-mute">
               No items yet — tap + Add item to enter them by hand, or go back
               to try the receipt again.
             </div>
           )}
 
-          <div className="mb-1 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+          <div className="mb-1 font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
             Who was here
           </div>
           {crew.length > 0 ? (
@@ -490,7 +490,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
               {crew.map((p) => (
                 <span
                   key={p.id}
-                  className="inline-flex items-center gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-2.5 py-1.5"
+                  className="inline-flex items-center gap-2 rounded-[3px] border border-line2 bg-well px-2.5 py-1.5"
                 >
                   <span
                     className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-greenLight"
@@ -596,14 +596,14 @@ export default function SplitBillView(props: SplitBillViewProps) {
               return (
                 <div
                   key={it.id}
-                  className="rounded-lg border border-line bg-panel px-5 py-4"
+                  className="rounded-[4px] border border-line bg-panel px-5 py-4"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 truncate font-serif text-[1.1rem] font-medium text-cream">
                       {it.name || "(unnamed item)"}
                     </div>
                     <button
-                      className="flex-shrink-0 cursor-pointer rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist hover:border-redDeep hover:text-red"
+                      className="h-8 flex-shrink-0 cursor-pointer rounded-[3px] border-none bg-transparent px-2 font-cond text-[0.88rem] font-semibold uppercase tracking-[0.07em] text-mute transition-colors hover:bg-[rgba(168,69,63,0.12)] hover:text-red"
                       onClick={() => onRemoveItem(activePlaceIndex, it.id)}
                     >
                       Remove
@@ -613,7 +613,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                     <span>${it.price.toFixed(2)}</span>
                     {q > 1 && <span>· Qty {q}</span>}
                     {includedIds.length > 1 && (
-                      <span className="rounded-full border border-goldDeep bg-[rgba(138,109,47,0.15)] px-2 py-0.5 font-mono text-[0.66rem] text-gold">
+                      <span className="rounded-[2px] border border-line2 px-1.5 py-0.5 font-mono text-[0.72rem] text-creamSoft">
                         ÷ {includedIds.length} ways
                       </span>
                     )}
@@ -636,10 +636,10 @@ export default function SplitBillView(props: SplitBillViewProps) {
                       return (
                         <button
                           key={p.id}
-                          className={`cursor-pointer rounded-full border px-3 py-1.5 font-mono text-[0.72rem] ${
+                          className={`inline-flex h-8 cursor-pointer items-center rounded-[3px] border px-3 font-cond text-[0.92rem] font-semibold tracking-[0.03em] transition-colors ${
                             included
-                              ? "border-greenLight text-greenLight"
-                              : "border-[rgba(184,150,95,0.28)] text-mist disabled:opacity-40"
+                              ? "border-brass/80 bg-[rgba(201,162,106,0.14)] text-cream"
+                              : "border-line2 text-mute hover:text-cream disabled:opacity-40"
                           }`}
                           onClick={() =>
                             onToggleIncluded(activePlaceIndex, it.id, p.id)
@@ -650,10 +650,10 @@ export default function SplitBillView(props: SplitBillViewProps) {
                       );
                     })}
                     <button
-                      className={`cursor-pointer rounded-full border px-3 py-1.5 font-mono text-[0.72rem] ${
+                      className={`inline-flex h-8 cursor-pointer items-center rounded-[3px] border px-3 font-cond text-[0.88rem] font-semibold uppercase tracking-[0.07em] transition-colors ${
                         isEvenlySplit
-                          ? "border-goldDeep bg-goldDeep text-cream"
-                          : "border-[rgba(184,150,95,0.28)] text-mist"
+                          ? "border-brass bg-brass text-deep"
+                          : "border-line2 text-mist hover:text-cream"
                       }`}
                       onClick={() =>
                         onSplitEvenly(activePlaceIndex, it.id, splitTargetIds)
@@ -664,7 +664,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                     </button>
                   </div>
                   {includedIds.length > 0 && (
-                    <div className="mt-[0.65rem] flex flex-col gap-[0.4rem] border-t border-dashed border-[rgba(184,150,95,0.22)] pt-[0.6rem]">
+                    <div className="mt-[0.65rem] flex flex-col gap-[0.4rem] border-t border-dashed border-line2 pt-[0.6rem]">
                       {crew
                         .filter((p) => includedIds.includes(p.id))
                         .map((p) => {
@@ -714,7 +714,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
                               ) : (
                                 <span />
                               )}
-                              <span className="font-mono text-[0.8rem] text-gold">
+                              <span className="tda-num font-mono text-[0.85rem] text-cream">
                                 ${cost.toFixed(2)}
                               </span>
                             </div>
@@ -770,7 +770,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
           )}
 
           {crew.length > 0 && (
-            <div className="mt-4 flex flex-col gap-1.5 rounded-lg border border-[rgba(184,150,95,0.22)] bg-[#171310] p-3">
+            <div className="mt-4 flex flex-col gap-1.5 rounded-[4px] border border-line2 bg-well p-3">
               {crew.map((p) => (
                 <div
                   key={p.id}
@@ -826,7 +826,7 @@ export default function SplitBillView(props: SplitBillViewProps) {
         if (crew.length === 0) return null;
         return (<div
             key={place.id}
-            className={`rounded-lg border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
+            className={`rounded-[4px] border border-line bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
           >
             <PanelHeading>{placeLabel(place, i)}</PanelHeading>
             <div className="flex flex-col gap-1.5">
@@ -846,20 +846,26 @@ export default function SplitBillView(props: SplitBillViewProps) {
         );
       })}
 
-      <div
-        className={`rounded-lg border border-brass bg-panel p-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
-      >
-        <PanelHeading>Grand total</PanelHeading>
-        <div className="flex flex-col gap-2.5">
+      {/* The bar tab: the one screen that literally is a receipt, so it
+          gets dotted leaders and a torn edge. */}
+      <div className="tda-receipt rounded-t-[4px] border border-b-0 border-line bg-panel px-5 pb-5 pt-5 sm:px-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <PanelHeading>Grand total</PanelHeading>
+          <span className="font-cond text-kicker font-semibold uppercase text-mute">
+            The tab
+          </span>
+        </div>
+        <div className="flex flex-col border-t border-dashed border-line2 pt-1">
           {people.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between rounded-lg border border-line bg-panel px-5 py-4"
-            >
-              <div className="font-serif text-[1.1rem] font-medium text-cream">
+            <div key={p.id} className="flex items-baseline gap-3 py-2.5">
+              <div className="font-serif text-[1.15rem] font-medium text-cream">
                 {p.name}
               </div>
-              <div className="font-mono text-[1.3rem] font-semibold text-gold">
+              <span
+                aria-hidden="true"
+                className="min-w-[1.5rem] flex-1 -translate-y-1 border-b border-dotted border-line2"
+              />
+              <div className="tda-num font-mono text-[1.2rem] font-semibold text-cream">
                 ${(grandTotals.perPersonTotal[p.id] || 0).toFixed(2)}
               </div>
             </div>
@@ -946,9 +952,9 @@ function AddItemControl({
   return (
     <form
       onSubmit={submit}
-      className="mt-3 rounded-lg border border-[rgba(184,150,95,0.28)] bg-[#171310] p-3"
+      className="mt-3 rounded-[4px] border border-line2 bg-well p-3"
     >
-      <div className="mb-2 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+      <div className="mb-2 font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
         Add item
       </div>
       <div className="flex flex-col gap-2">
@@ -1027,7 +1033,7 @@ function PaidBySelector({
 }) {
   return (
     <div className="mb-3.5">
-      <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+      <div className="mb-1.5 font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
         Who paid?
       </div>
       {crew.length === 0 ? (
@@ -1067,7 +1073,7 @@ function SplitMethodToggle({
 }) {
   return (
     <div className="mb-3.5">
-      <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+      <div className="mb-1.5 font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
         Split method
       </div>
       <div
@@ -1152,7 +1158,7 @@ function EvenSplitSection({
     <div className="mt-2">
       <div className="mb-3.5">
         <div className="mb-1.5 flex items-center justify-between">
-          <div className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+          <div className="font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
             Bill items
           </div>
           <div className="font-mono text-[0.68rem] text-mute">
@@ -1160,7 +1166,7 @@ function EvenSplitSection({
           </div>
         </div>
         {place.items.length === 0 ? (
-          <div className="rounded-lg border border-[rgba(184,150,95,0.22)] bg-[#141110] px-3 py-2.5 font-mono text-[0.72rem] text-mute">
+          <div className="rounded-[4px] border border-line2 bg-well px-3 py-2.5 font-mono text-[0.72rem] text-mute">
             No items yet — add the bill&apos;s total as one item below.
           </div>
         ) : (
@@ -1221,7 +1227,7 @@ function EvenSplitSection({
       </div>
 
       <div className="mb-2.5 flex items-center justify-between gap-2.5">
-        <div className="font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+        <div className="font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
           Total rounds
         </div>
         <div className="flex items-center gap-2 font-mono text-[0.9rem]">
@@ -1244,7 +1250,7 @@ function EvenSplitSection({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-[rgba(184,150,95,0.22)]">
+      <div className="overflow-hidden rounded-[4px] border border-line2">
         {crew.map((p) => {
           const excluded = place.evenExcluded.includes(p.id);
           const rounds = place.evenRounds[p.id] ?? maxRounds;
@@ -1257,7 +1263,7 @@ function EvenSplitSection({
           return (
             <div
               key={p.id}
-              className="border-b border-[rgba(184,150,95,0.12)] bg-[#171310] px-3 py-2.5 last:border-b-0"
+              className="border-b border-line2 bg-well px-3 py-2.5 last:border-b-0"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -1265,7 +1271,7 @@ function EvenSplitSection({
                     {p.name}
                   </div>
                   <div
-                    className={`font-mono text-[0.66rem] uppercase tracking-[0.04em] ${
+                    className={`font-cond text-[0.8rem] font-semibold uppercase tracking-[0.08em] ${
                       excluded ? "text-red" : "text-mute"
                     }`}
                   >
@@ -1273,10 +1279,10 @@ function EvenSplitSection({
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-[0.85rem] text-gold">
+                  <div className="tda-num font-mono text-[0.9rem] text-cream">
                     ${share.toFixed(2)}
                   </div>
-                  <div className="font-mono text-[0.62rem] uppercase tracking-[0.04em] text-mute">
+                  <div className="font-cond text-[0.8rem] font-semibold uppercase tracking-[0.08em] text-mute">
                     share
                   </div>
                 </div>
@@ -1316,10 +1322,10 @@ function EvenSplitSection({
                 )}
                 <button
                   onClick={() => onToggleEvenExcluded(activePlaceIndex, p.id)}
-                  className={`inline-flex cursor-pointer items-center rounded-[5px] border px-2 py-1 font-mono text-[0.66rem] uppercase tracking-[0.03em] transition-colors ${
+                  className={`inline-flex cursor-pointer items-center rounded-[3px] border px-2 py-1 font-cond text-[0.8rem] font-semibold uppercase tracking-[0.08em] transition-colors ${
                     excluded
                       ? "border-greenLight/60 text-greenLight hover:border-greenLight"
-                      : "border-[rgba(184,150,95,0.28)] text-mute hover:border-redDeep hover:text-red"
+                      : "border-line2 text-mute hover:border-redDeep hover:text-red"
                   }`}
                 >
                   {excluded ? "Include" : "Exclude"}
@@ -1331,25 +1337,25 @@ function EvenSplitSection({
       </div>
 
       {!hasPayingParticipant && (
-        <div className="mt-2.5 rounded-lg border border-redDeep bg-[#171310] px-3 py-2.5 font-mono text-[0.72rem] text-red">
+        <div className="mt-2.5 rounded-[4px] border border-redDeep bg-well px-3 py-2.5 font-mono text-[0.72rem] text-red">
           At least one person needs participation — raise a round count or
           include someone.
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between rounded-lg border border-[rgba(184,150,95,0.22)] bg-[#141110] px-3 py-2.5">
-        <div className="font-mono text-[0.72rem] uppercase tracking-[0.05em] text-mute">
+      <div className="mt-3 flex items-center justify-between rounded-[4px] border border-line2 bg-well px-3 py-2.5">
+        <div className="font-cond text-[0.9rem] font-semibold uppercase tracking-[0.08em] text-mist">
           Total
         </div>
         <div className="font-mono text-[0.85rem] text-cream">
           ${(billTotalCents / 100).toFixed(2)}
         </div>
       </div>
-      <div className="mt-1.5 flex items-center justify-between rounded-lg border border-brass/40 bg-[#141110] px-3 py-2.5">
-        <div className="font-mono text-[0.72rem] uppercase tracking-[0.05em] text-brass">
+      <div className="mt-1.5 flex items-center justify-between rounded-[4px] border border-brass/40 bg-well px-3 py-2.5">
+        <div className="font-cond text-[0.9rem] font-semibold uppercase tracking-[0.08em] text-gold">
           Total allocated
         </div>
-        <div className="font-mono text-[0.85rem] font-semibold text-gold">
+        <div className="tda-num font-mono text-[0.95rem] font-semibold text-gold">
           ${(allocatedCents / 100).toFixed(2)}
         </div>
       </div>
@@ -1383,7 +1389,7 @@ function ShareResults({
 
   return (
     <div>
-      <div className="mb-1.5 font-mono text-[0.68rem] uppercase tracking-[0.05em] text-mute">
+      <div className="mb-1.5 font-cond text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-mist">
         Share results
       </div>
       <label className="mb-2.5 flex cursor-pointer items-center gap-2 font-mono text-[0.72rem] text-mist">
@@ -1426,7 +1432,7 @@ function ShareResults({
       {hasPeople && (
         <div className="mt-2.5 flex flex-col gap-1.5">
           {mode === "group" ? (
-            <div className="flex items-center justify-between gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-[3px] border border-line2 bg-well px-3 py-2">
               <div className="min-w-0 flex-1">
                 <div className="truncate font-serif text-[0.85rem] font-medium text-cream">
                   Group
@@ -1437,7 +1443,7 @@ function ShareResults({
               </div>
               <button
                 type="button"
-                className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-[3px] border border-line2 bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream"
                 onClick={() => onSendSms(active.group)}
               >
                 <Icon name="message" size={11} /> Send
@@ -1447,7 +1453,7 @@ function ShareResults({
             active.individuals.map((m) => (
               <div
                 key={m.personId}
-                className="flex items-center justify-between gap-2 rounded-[6px] border border-[rgba(184,150,95,0.2)] bg-[#141110] px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-[3px] border border-line2 bg-well px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-serif text-[0.85rem] font-medium text-cream">
@@ -1466,7 +1472,7 @@ function ShareResults({
                 {!m.excluded && (
                   <button
                     type="button"
-                    className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-[5px] border border-[rgba(184,150,95,0.28)] bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream"
+                    className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-[3px] border border-line2 bg-transparent px-2.5 py-1 font-mono text-[0.7rem] text-mist transition-colors hover:border-brass hover:text-cream"
                     onClick={() => onSendSms(m.message)}
                   >
                     <Icon name="message" size={11} /> Send
@@ -1531,7 +1537,7 @@ function AddPersonToPlaceButton({
       />
       <button
         type="submit"
-        className="inline-flex cursor-pointer items-center gap-1 rounded-[6px] border border-[rgba(184,150,95,0.28)] bg-transparent px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.04em] text-brass transition-colors hover:border-brass hover:bg-[rgba(184,150,95,0.08)] hover:text-cream"
+        className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[3px] border border-line2 bg-transparent px-3 font-cond text-[0.9rem] font-semibold uppercase tracking-[0.07em] text-cream transition-colors hover:border-brass/60 hover:bg-oak"
       >
         Add
       </button>

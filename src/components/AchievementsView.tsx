@@ -5,61 +5,8 @@ import { useTour } from "@/lib/tour-context";
 import { ACHIEVEMENTS, type AchievementCategory } from "@/lib/achievements";
 import TabIntro from "./TabIntro";
 import Icon from "./Icon";
-import {
-  chipCls,
-  chipActiveCls,
-  kickerCls,
-  cardBaseShadowCls,
-  cardWarmSurfaceCls,
-} from "@/lib/ui";
-
-const CATEGORY_META: Record<
-  AchievementCategory,
-  { label: string; dot: string; rail: string; medalFrom: string; medalTo: string }
-> = {
-  exploration: {
-    label: "Exploration",
-    dot: "bg-silverLight",
-    rail: "bg-silverLight",
-    medalFrom: "#C9C6CE",
-    medalTo: "#726F78",
-  },
-  rating: {
-    label: "Rating",
-    dot: "bg-gold",
-    rail: "bg-gold",
-    medalFrom: "#E5B93F",
-    medalTo: "#8A6D2F",
-  },
-  battle: {
-    label: "Leaderboard & Bar Battle",
-    dot: "bg-redLight",
-    rail: "bg-redLight",
-    medalFrom: "#D98F8F",
-    medalTo: "#9A4B4B",
-  },
-  wishlist: {
-    label: "Wishlist",
-    dot: "bg-greenLight",
-    rail: "bg-greenLight",
-    medalFrom: "#7FA88E",
-    medalTo: "#1F2E28",
-  },
-  crawl: {
-    label: "Crawl Planning",
-    dot: "bg-blueLight",
-    rail: "bg-blueLight",
-    medalFrom: "#7FA8C9",
-    medalTo: "#3F566B",
-  },
-  split: {
-    label: "Split the Bill",
-    dot: "bg-bronzeLight",
-    rail: "bg-bronzeLight",
-    medalFrom: "#C08E5F",
-    medalTo: "#A9784F",
-  },
-};
+import Insignia, { INSIGNIA_TONES } from "./Insignia";
+import { SectionRule } from "./Ornament";
 
 const CATEGORY_ORDER: AchievementCategory[] = [
   "exploration",
@@ -95,7 +42,6 @@ export default function AchievementsView() {
 
   const total = ACHIEVEMENTS.length;
   const unlockedCount = unlockedByKey.size;
-  const pct = total > 0 ? Math.round((unlockedCount / total) * 1000) / 10 : 0;
 
   const mostRecent = useMemo(() => {
     if (achievementUnlocks.length === 0) return null;
@@ -105,39 +51,89 @@ export default function AchievementsView() {
     ? ACHIEVEMENTS.find((a) => a.key === mostRecent.key)
     : null;
 
-  const visibleCategories =
-    filter === "all" ? CATEGORY_ORDER : [filter];
+  const visibleCategories = filter === "all" ? CATEGORY_ORDER : [filter];
+
+  const tabCls = (on: boolean) =>
+    `relative flex-shrink-0 cursor-pointer whitespace-nowrap border-none bg-transparent px-3 py-3 font-cond text-[0.92rem] font-semibold uppercase tracking-[0.08em] transition-colors ${
+      on ? "text-cream" : "text-mute hover:text-cream"
+    }`;
 
   return (
     <div>
       <TabIntro
+        kicker="Awards"
         title="The Trophy Case"
         sub="Badges unlock automatically as bars get rated, ranked, disqualified, crawled to, and split. There's no login here, so nothing is credited to a person — every badge just belongs to the house."
       />
 
+      {/* The house tally: a big count, and one tick per award — like marks
+          chalked on a bar tab. */}
+      <div className="mb-8 grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-end sm:gap-10">
+        <div>
+          <div className="font-cond text-kicker font-semibold uppercase text-mute">
+            House tally
+          </div>
+          <div className="tda-num mt-1 font-cond font-semibold leading-none">
+            <span className="text-[3.4rem] text-cream">{unlockedCount}</span>
+            <span className="text-[1.6rem] text-mute"> / {total}</span>
+          </div>
+          <div className="mt-1 font-serif text-[0.95rem] italic text-mist">
+            awards earned
+          </div>
+        </div>
+        <div className="min-w-0">
+          <div
+            role="img"
+            aria-label={`${unlockedCount} of ${total} awards earned`}
+            className="flex h-8 items-end gap-[3px]"
+          >
+            {ACHIEVEMENTS.map((a, i) => {
+              const on = unlockedByKey.has(a.key);
+              return (
+                <span
+                  key={a.key}
+                  className={`min-w-0 flex-1 rounded-[1px] ${
+                    on ? "bg-brass" : "bg-line2"
+                  } ${(i + 1) % 5 === 0 ? "h-full" : "h-[70%]"}`}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-3 flex items-start gap-2 text-[0.86rem] leading-relaxed text-mute">
+            <Icon name="lock" size={13} className="mt-1 flex-shrink-0" />
+            <span>
+              <b className="font-semibold text-mist">
+                Every badge is a one-time unlock.
+              </b>{" "}
+              Once earned it&apos;s locked in for good — disqualifying or
+              editing a bar later never takes one back.
+            </span>
+          </div>
+        </div>
+      </div>
+
       {mostRecentDef && (
-        <div className="relative mb-6 overflow-hidden rounded-lg border border-brass/30 bg-panel">
-          <span
-            aria-hidden="true"
-            className="absolute inset-x-0 top-0 h-px bg-brass/60"
-          />
+        <div className="relative mb-9 overflow-hidden rounded-[4px] border border-line2 bg-oak">
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-[2px] bg-brass/80" />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_120%_at_15%_-10%,rgba(184,150,95,0.1),transparent_60%)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_120%_at_0%_0%,rgba(201,162,106,0.1),transparent_65%)]"
           />
-          <div className="relative flex items-center gap-4 px-5 py-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-brass/40 bg-[radial-gradient(circle_at_35%_30%,#E5B93F,#8A6D2F_75%)] text-[1.2rem] leading-none shadow-lift">
-              {mostRecentDef.icon}
-            </div>
+          <div className="relative flex items-center gap-4 px-5 py-5 sm:gap-6 sm:px-7">
+            <Insignia
+              icon={mostRecentDef.icon}
+              category={mostRecentDef.category}
+              size={68}
+            />
             <div className="min-w-0">
-              <div className="font-mono text-[0.6rem] uppercase tracking-[0.13em] text-gold">
+              <div className="font-cond text-kicker font-semibold uppercase text-gold">
                 Just unlocked
               </div>
-              <div className="mt-0.5 truncate font-serif text-[1rem] text-cream">
-                <b className="font-semibold text-gold">{mostRecentDef.name}</b>
-                {mostRecent!.context ? ` — ${mostRecent!.context}` : ""}
+              <div className="mt-1 font-serif text-[1.45rem] font-semibold leading-tight text-cream">
+                {mostRecentDef.name}
               </div>
-              <div className="mt-0.5 font-mono text-[0.68rem] text-mute">
+              <div className="mt-1 text-[0.88rem] text-mist">
+                {mostRecent!.context ? `${mostRecent!.context} · ` : ""}
                 {fmtDate(mostRecent!.unlockedAt)}
               </div>
             </div>
@@ -145,144 +141,101 @@ export default function AchievementsView() {
         </div>
       )}
 
-      <div className="mb-6">
-        <div className="flex items-baseline justify-between gap-3 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-mute">
-          <span>House progress</span>
-          <b className="font-serif text-[1rem] normal-case tracking-normal text-cream">
-            {unlockedCount} / {total} unlocked
-          </b>
-        </div>
-        <div className="mt-2 h-2.5 overflow-hidden rounded-full border border-line2 bg-skeleton">
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${pct}%`,
-              background:
-                "linear-gradient(90deg,#2E6E8C 0%, #4A8FB0 22%, #8A6D2F 50%, #D9A83C 78%, #FFE3A0 100%)",
-            }}
-          />
-        </div>
-        <div className="mt-2 flex items-start gap-1.5 font-mono text-[0.66rem] leading-relaxed text-mute">
-          <Icon name="lock" size={11} className="mt-0.5 flex-shrink-0" />
-          <span>
-            <b className="font-semibold text-mist">
-              Every badge is a one-time unlock.
-            </b>{" "}
-            Once earned it&apos;s locked in for good — disqualifying or
-            editing a bar later never takes one back.
-          </span>
-        </div>
-      </div>
-
-      <div
-        className={`mb-6 flex flex-wrap items-center justify-center gap-2.5 rounded-lg border border-line bg-panel px-4 py-3.5 ${cardBaseShadowCls} ${cardWarmSurfaceCls}`}
-      >
-        <button
-          className={`${chipCls} ${filter === "all" ? chipActiveCls : ""}`}
-          onClick={() => setFilter("all")}
-        >
-          All <span className="opacity-70">{total}</span>
-        </button>
-        {CATEGORY_ORDER.map((c) => (
-          <button
-            key={c}
-            className={`${chipCls} ${filter === c ? chipActiveCls : ""}`}
-            onClick={() => setFilter(c)}
-          >
-            {CATEGORY_META[c].label}{" "}
-            <span className="opacity-70">{byCategory.get(c)!.length}</span>
+      {/* category tabs — the same underline language as the site nav */}
+      <div className="tda-scroll-x -mx-4 mb-8 border-b border-line px-4 sm:mx-0 sm:px-0">
+        <div className="flex min-w-max items-stretch">
+          <button className={tabCls(filter === "all")} onClick={() => setFilter("all")}>
+            All <span className="tda-num text-mute">{total}</span>
+            {filter === "all" && (
+              <span aria-hidden="true" className="absolute inset-x-3 -bottom-px h-[2px] bg-brass" />
+            )}
           </button>
-        ))}
+          {CATEGORY_ORDER.map((c) => (
+            <button key={c} className={tabCls(filter === c)} onClick={() => setFilter(c)}>
+              {INSIGNIA_TONES[c].label}{" "}
+              <span className="tda-num text-mute">{byCategory.get(c)!.length}</span>
+              {filter === c && (
+                <span aria-hidden="true" className="absolute inset-x-3 -bottom-px h-[2px] bg-brass" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {visibleCategories.map((cat) => {
         const defs = byCategory.get(cat)!;
-        const meta = CATEGORY_META[cat];
+        const tone = INSIGNIA_TONES[cat];
+        const earned = defs.filter((d) => unlockedByKey.has(d.key));
+        const locked = defs.filter((d) => !unlockedByKey.has(d.key));
         return (
-          <section key={cat} className="mt-8 first:mt-0">
-            <div className="mb-3.5 flex items-baseline justify-between gap-3 border-b border-brass/[0.14] pb-2">
-              <div className={`${kickerCls} flex items-center gap-2`}>
-                <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
-                {meta.label}
-              </div>
-              <div className="font-mono text-[0.68rem] text-mute">
-                {defs.length} badges
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {defs.map((def) => {
-                const unlock = unlockedByKey.get(def.key);
-                const locked = !unlock;
-                return (
-                  <div
-                    key={def.key}
-                    className={`relative overflow-hidden rounded-lg border bg-panel py-4 pl-[18px] pr-4 ${cardBaseShadowCls} ${cardWarmSurfaceCls} ${
-                      locked ? "border-line/60" : "border-line"
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`absolute inset-y-0 left-0 w-[5px] ${
-                        locked ? "bg-line2" : meta.rail
-                      }`}
-                    />
+          <section key={cat} className="mb-11 last:mb-0">
+            <SectionRule
+              label={tone.label}
+              accent={tone.metalDark}
+              meta={`${earned.length} of ${defs.length} earned`}
+            />
+
+            {earned.length > 0 && (
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {earned.map((def) => {
+                  const unlock = unlockedByKey.get(def.key)!;
+                  return (
                     <div
-                      className={`flex items-start gap-3 ${locked ? "opacity-45" : ""}`}
+                      key={def.key}
+                      className="relative flex items-start gap-4 rounded-[4px] border border-line bg-panel p-4"
                     >
-                      <div
-                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-cream/10 text-[1.05rem] leading-none"
-                        style={{
-                          background: locked
-                            ? "#221C17"
-                            : `radial-gradient(circle at 35% 30%, ${meta.medalFrom}, ${meta.medalTo} 75%)`,
-                          filter: locked ? "grayscale(1) brightness(0.75)" : undefined,
-                        }}
-                      >
-                        {def.icon}
-                      </div>
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-x-0 top-0 h-[2px] opacity-70"
+                        style={{ background: tone.metal }}
+                      />
+                      <Insignia icon={def.icon} category={cat} size={54} />
                       <div className="min-w-0 flex-1">
-                        <div
-                          className={`font-serif text-[1.02rem] font-medium leading-snug ${
-                            locked ? "text-mist" : "text-cream"
-                          }`}
-                        >
+                        <div className="font-serif text-[1.12rem] font-semibold leading-tight text-cream">
                           {def.name}
                         </div>
-                        <div className="mt-1.5 text-[0.82rem] leading-[1.5] text-mist">
+                        <div className="mt-1 text-[0.86rem] leading-snug text-mist">
                           {def.desc}
+                        </div>
+                        <div className="mt-2.5 font-cond text-[0.82rem] font-semibold uppercase tracking-[0.08em] text-mute">
+                          <span className="text-gold">Earned</span>
+                          <span className="normal-case tracking-normal">
+                            {" · "}
+                            {unlock.context ? `${unlock.context} · ` : ""}
+                            {fmtDate(unlock.unlockedAt)}
+                          </span>
                         </div>
                       </div>
                     </div>
-                    <div
-                      className={`relative z-10 mt-3 flex flex-wrap items-center gap-2 border-t border-[rgba(184,150,95,0.14)] pt-2.5 font-mono text-[0.64rem] ${
-                        locked ? "text-dim" : "text-mute"
-                      }`}
-                    >
-                      {locked ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-line2 bg-[rgba(110,100,87,0.1)] px-1.5 py-0.5">
-                          <Icon name="lock" size={9} /> Locked
-                        </span>
-                      ) : (
-                        <>
-                          <span className="rounded-[4px] border border-[rgba(201,168,118,0.3)] bg-[rgba(201,168,118,0.1)] px-1.5 py-0.5 tracking-[0.04em] text-gold">
-                            Earned
-                          </span>
-                          <span>
-                            {unlock!.context ? `${unlock!.context} · ` : ""}
-                            {fmtDate(unlock!.unlockedAt)}
-                          </span>
-                        </>
-                      )}
+                  );
+                })}
+              </div>
+            )}
+
+            {locked.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {locked.map((def) => (
+                  <div
+                    key={def.key}
+                    className="flex flex-col items-center rounded-[4px] border border-line/70 px-3 pb-3.5 pt-4 text-center"
+                  >
+                    <Insignia icon={def.icon} category={cat} size={40} locked />
+                    <span className="sr-only">Locked:</span>
+                    <div className="mt-2.5 font-serif text-[0.98rem] font-medium leading-tight text-mist">
+                      {def.name}
+                    </div>
+                    <div className="mt-1 text-[0.8rem] leading-snug text-dim">
+                      {def.desc}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </section>
         );
       })}
 
-      <div className="mt-10 text-center font-mono text-[0.68rem] text-dim">
+      <div className="mt-10 text-center font-serif text-[0.88rem] italic text-dim">
         Shared list, shared trophies — anyone with this page unlocks for the
         whole house.
       </div>

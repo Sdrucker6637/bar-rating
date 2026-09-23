@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Bar } from "@/lib/types";
 import { avgWithFood, avgWithoutFood, fmt } from "@/lib/scoring";
 import { HEAT_GRADIENTS, HEAT_DOT_COLOR } from "@/lib/constants";
-import { chipCls, chipActiveCls } from "@/lib/ui";
+import { segmentWrapCls, segmentBtnCls, segmentBtnActiveCls } from "@/lib/ui";
+import EmptyState from "./EmptyState";
+import Icon from "./Icon";
 
 interface MapViewProps {
   bars: Bar[];
@@ -159,13 +161,17 @@ export default function MapView({ bars }: MapViewProps) {
         remove: () => void;
       };
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        {
-          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-          maxZoom: 19,
-        },
-      ).addTo(map);
+      // CARTO's dark basemap now requires an API key (tiles render an "API
+      // KEY REQUIRED" watermark), so the map uses standard OpenStreetMap
+      // tiles — no key — and darkens them to the app's warm night palette
+      // with a CSS filter on this tile layer only (.tda-tiles in
+      // globals.css), leaving the heat glow and markers untouched.
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+        className: "tda-tiles",
+      }).addTo(map);
 
       // Normalize each bar's score to the range of the bars actually shown, so
       // the best bar glows at the hot end and the worst sits at the cold end —
@@ -234,7 +240,7 @@ export default function MapView({ bars }: MapViewProps) {
           // Cream ring separates each bar from the heat glow behind it — the
           // fill keeps the score-graded color, the ring makes the dot itself
           // pop against both the warm glow and the dark tiles.
-          color: "#EDE6D9",
+          color: "#F1E8D6",
           weight: 2,
           fillColor: dotColor,
           fillOpacity: 1,
@@ -256,27 +262,45 @@ export default function MapView({ bars }: MapViewProps) {
     };
   }, [geoBars, mode]);
 
+  const layerToggle = (
+    <div role="group" aria-label="Map layer" className={segmentWrapCls}>
+      <button
+        type="button"
+        aria-pressed={mode === "visited"}
+        className={`${segmentBtnCls} ${mode === "visited" ? segmentBtnActiveCls : ""}`}
+        onClick={() => setMode("visited")}
+      >
+        Visited
+      </button>
+      <button
+        type="button"
+        aria-pressed={mode === "wishlist"}
+        className={`${segmentBtnCls} ${mode === "wishlist" ? segmentBtnActiveCls : ""}`}
+        onClick={() => setMode("wishlist")}
+      >
+        Wishlist
+      </button>
+    </div>
+  );
+
   if (geoBars.length === 0) {
     return (
       <div>
-        <div className="mb-4 inline-flex gap-1.5">
-          <button
-            className={`${chipCls} ${mode === "visited" ? chipActiveCls : ""}`}
-            onClick={() => setMode("visited")}
-          >
-            Visited
-          </button>
-          <button
-            className={`${chipCls} ${mode === "wishlist" ? chipActiveCls : ""}`}
-            onClick={() => setMode("wishlist")}
-          >
-            Wishlist
-          </button>
-        </div>
-        <div className="py-10 text-center font-mono text-[0.85rem] text-mute">
-          {mode === "visited"
-            ? "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."
-            : "No wishlist bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."}
+        <div className="mb-2">{layerToggle}</div>
+        <div className="rounded-[4px] border border-line bg-panel">
+          <EmptyState
+            icon={<Icon name="pin" size={20} />}
+            title={
+              mode === "visited"
+                ? "No visited bars on the map yet."
+                : "No wishlist bars on the map yet."
+            }
+            hint={
+              mode === "visited"
+                ? "No visited bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."
+                : "No wishlist bars have coordinates yet — coordinates are captured automatically when you add a bar through the Google Places lookup."
+            }
+          />
         </div>
       </div>
     );
@@ -286,35 +310,27 @@ export default function MapView({ bars }: MapViewProps) {
     <div>
       <div className="relative">
         <div ref={mapNodeRef} className="tda-heatmap-container" />
-        <div className="absolute right-3 top-3 z-[1000] inline-flex gap-1 rounded-full border border-line2 bg-[rgba(23,20,27,0.9)] p-1 shadow-[0_2px_10px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-          <button
-            className={`${chipCls} !px-2.5 !py-1 ${mode === "visited" ? chipActiveCls : ""}`}
-            onClick={() => setMode("visited")}
-          >
-            Visited
-          </button>
-          <button
-            className={`${chipCls} !px-2.5 !py-1 ${mode === "wishlist" ? chipActiveCls : ""}`}
-            onClick={() => setMode("wishlist")}
-          >
-            Wishlist
-          </button>
+        <div className="absolute right-3 top-3 z-[1000] rounded-[4px] bg-[rgba(18,16,14,0.85)] shadow-menu backdrop-blur-sm">
+          {layerToggle}
         </div>
       </div>
-      <div className="mt-4 font-mono text-[0.72rem] text-mute">
-        {geoBars.length} bar{geoBars.length === 1 ? "" : "s"} plotted.
-      </div>
-      <div className="mt-2.5 flex items-center gap-2.5 font-mono text-[0.68rem] text-mute">
-        bottom tier
-        <span
-          className="h-2 w-[120px] rounded-[4px]"
-          style={{
-            background: `linear-gradient(90deg, ${Object.values(
-              HEAT_GRADIENTS[mode],
-            ).join(",")})`,
-          }}
-        />
-        {mode === "visited" ? "top rated" : "denser cluster"}
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="font-cond text-[0.95rem] font-semibold uppercase tracking-[0.08em] text-mist">
+          <span className="tda-num text-cream">{geoBars.length}</span> bar
+          {geoBars.length === 1 ? "" : "s"} plotted
+        </div>
+        <div className="flex items-center gap-3 font-cond text-[0.85rem] font-semibold uppercase tracking-[0.08em] text-mute">
+          {mode === "visited" ? "Bottom tier" : "Sparse"}
+          <span
+            className="h-[6px] w-[140px] rounded-[1px]"
+            style={{
+              background: `linear-gradient(90deg, ${Object.values(
+                HEAT_GRADIENTS[mode],
+              ).join(",")})`,
+            }}
+          />
+          {mode === "visited" ? "Top rated" : "Denser cluster"}
+        </div>
       </div>
     </div>
   );
