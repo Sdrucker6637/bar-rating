@@ -84,10 +84,9 @@ function Meta({ b, className = "" }: { b: Bar; className?: string }) {
     parts.push(
       <span
         key="picker"
-        className="inline-flex items-center gap-1 whitespace-nowrap"
+        className="whitespace-nowrap"
         title={picker.isApp ? "The app chose this bar" : `Picked by ${picker.name}`}
       >
-        <Icon name={picker.isApp ? "dice" : "users"} size={11} className="text-dim" />
         <span className="font-serif italic text-mist">
           {picker.isApp ? "the app's pick" : `${picker.name}'s pick`}
         </span>

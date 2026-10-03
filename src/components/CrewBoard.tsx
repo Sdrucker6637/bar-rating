@@ -23,14 +23,6 @@ const PODIUM_METAL: Record<number, string> = { 2: "#C4C1C7", 3: "#B57E52" };
 function PickerName({ e, className = "" }: { e: CrewEntry; className?: string }) {
   return (
     <span className={`inline-flex min-w-0 items-center gap-2 ${className}`}>
-      {e.isApp && (
-        <span
-          aria-hidden="true"
-          className="inline-flex h-[1.5em] w-[1.5em] flex-shrink-0 items-center justify-center rounded-[3px] border border-brass/50 bg-[rgba(201,162,106,0.12)] text-gold"
-        >
-          <Icon name="dice" size={15} />
-        </span>
-      )}
       <span className="truncate">{e.name}</span>
     </span>
   );

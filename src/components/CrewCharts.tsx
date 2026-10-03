@@ -6,7 +6,6 @@ import { fmt } from "@/lib/scoring";
 import { SCORE_CATS } from "./Scorecard";
 import type { ScoreKey } from "./Scorecard";
 import { SectionRule } from "./Ornament";
-import Icon from "./Icon";
 
 /* ------------------------------------------------------------------------
  * By the numbers — two charts under the crew board, both single-hue (brass)
@@ -51,7 +50,6 @@ function binOf(v: number): number {
 function NameCell({ e }: { e: CrewEntry }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5 font-serif text-[0.98rem] text-cream">
-      {e.isApp && <Icon name="dice" size={13} className="flex-shrink-0 text-gold" />}
       <span className="truncate">{e.name}</span>
     </span>
   );
