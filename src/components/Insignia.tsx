@@ -12,6 +12,7 @@ export const INSIGNIA_TONES: Record<
   wishlist: { metal: "#D3CFD6", metalDark: "#77727C", enamel: "#1F1D22", label: "Wishlist" },
   crawl: { metal: "#A9C0D1", metalDark: "#3D5467", enamel: "#17212A", label: "Crawl Planning" },
   split: { metal: "#DDAE84", metalDark: "#8F5A34", enamel: "#2A1A10", label: "Split the Bill" },
+  crew: { metal: "#CDB0C6", metalDark: "#6E4A66", enamel: "#24171F", label: "The Crew" },
 };
 
 const BEADS = 28;

@@ -8,6 +8,7 @@ import type { Bar } from "@/lib/types";
 import TabIntro from "./TabIntro";
 import EmptyState from "./EmptyState";
 import BattleModal from "./modals/BattleModal";
+import CrewBoard from "./CrewBoard";
 import {
   LeaderFeature,
   PodiumCard,
@@ -28,6 +29,11 @@ import {
   segmentBtnActiveCls,
 } from "@/lib/ui";
 import Icon from "./Icon";
+
+// Which classification is showing — bars, or the people who picked them.
+// Module-level so it survives tab switches, like autoBattlePrompted.
+type BoardView = "bars" | "crew";
+let lastBoardView: BoardView = "bars";
 
 // Session-scoped (module-level, survives tab switches): the Bar Battle modal
 // auto-opens the first time an unresolved tie is seen, but never re-pops on
@@ -91,6 +97,11 @@ export default function LeaderboardView() {
   );
 
   const [battleOpen, setBattleOpen] = useState(false);
+  const [view, setViewState] = useState<BoardView>(lastBoardView);
+  const setView = (v: BoardView) => {
+    lastBoardView = v;
+    setViewState(v);
+  };
 
   const [sortMode, setSortMode] = useState<SortMode>("overall");
   // The six sort options live behind one compact control so the filter row
@@ -230,12 +241,49 @@ export default function LeaderboardView() {
   return (
     <div>
       <TabIntro
-        kicker="General Classification"
-        title="Tonight's Rankings"
-        sub="Where we stand — every rated bar ranked by average score across vibe, value, service, food, and drinks."
+        kicker={view === "bars" ? "General Classification" : "Individual Classification"}
+        title={view === "bars" ? "Tonight's Rankings" : "Who Picks Best"}
+        sub={
+          view === "bars"
+            ? "Where we stand — every rated bar ranked by average score across vibe, value, service, food, and drinks."
+            : "Every person — and the app — ranked by the average score of the bars they picked. Same name, same person: every “Spencer” pools into one Spencer."
+        }
         action={addButton}
       />
 
+      {/* Bars / Crew — the same underline tabs as the Trophy Case */}
+      <div role="tablist" aria-label="Leaderboard" className="-mx-4 mb-7 flex border-b border-line px-4 sm:mx-0 sm:px-0">
+        {(
+          [
+            { key: "bars", label: "Bars", icon: "trophy" },
+            { key: "crew", label: "The Crew", icon: "users" },
+          ] as const
+        ).map((t) => {
+          const on = view === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setView(t.key)}
+              className={`relative inline-flex cursor-pointer items-center gap-2 whitespace-nowrap border-none bg-transparent px-3 py-3 font-cond text-[0.95rem] font-semibold uppercase tracking-[0.08em] transition-colors ${
+                on ? "text-cream" : "text-mute hover:text-cream"
+              }`}
+            >
+              <Icon name={t.icon} size={14} className={on ? "text-gold" : ""} />
+              {t.label}
+              {on && (
+                <span aria-hidden="true" className="absolute inset-x-3 -bottom-px h-[2px] bg-brass" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {view === "crew" ? (
+        <CrewBoard />
+      ) : (
       <div ref={boardRef}>
         {leader && (
           <LeaderFeature
@@ -446,6 +494,7 @@ export default function LeaderboardView() {
           </section>
         )}
       </div>
+      )}
 
       {battleOpen && (
         <BattleModal

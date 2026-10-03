@@ -5,6 +5,7 @@ import type { MouseEvent, ReactNode } from "react";
 import type { Bar } from "@/lib/types";
 import { fmt } from "@/lib/scoring";
 import { displayDescription } from "@/lib/parse";
+import { pickerOf } from "@/lib/crew";
 import { ghostBtnCls, dqBtnCls, removeBtnCls, tagCls } from "@/lib/ui";
 import Icon from "./Icon";
 import ScoreSeal from "./ScoreSeal";
@@ -70,20 +71,41 @@ function BarName({ b, className }: { b: Bar; className: string }) {
 }
 
 function Meta({ b, className = "" }: { b: Bar; className?: string }) {
-  if (!b.neighborhood && !(b.bathroomBonus > 0)) return null;
+  const picker = pickerOf(b);
+  const parts: ReactNode[] = [];
+  if (b.neighborhood) parts.push(<span key="hood">{b.neighborhood}</span>);
+  if (b.bathroomBonus > 0)
+    parts.push(
+      <span key="bonus" className="whitespace-nowrap text-gold" title="Bathroom bonus">
+        +{fmtSub(b.bathroomBonus)} bathroom bonus
+      </span>,
+    );
+  if (picker)
+    parts.push(
+      <span
+        key="picker"
+        className="inline-flex items-center gap-1 whitespace-nowrap"
+        title={picker.isApp ? "The app chose this bar" : `Picked by ${picker.name}`}
+      >
+        <Icon name={picker.isApp ? "dice" : "users"} size={11} className="text-dim" />
+        <span className="font-serif italic text-mist">
+          {picker.isApp ? "the app's pick" : `${picker.name}'s pick`}
+        </span>
+      </span>,
+    );
+  if (parts.length === 0) return null;
   return (
     <div className={`text-[0.84rem] leading-snug text-mute ${className}`}>
-      {b.neighborhood}
-      {b.neighborhood && b.bathroomBonus > 0 && (
-        <span aria-hidden="true" className="px-1.5 text-dim">
-          ·
+      {parts.map((part, i) => (
+        <span key={i}>
+          {i > 0 && (
+            <span aria-hidden="true" className="px-1.5 text-dim">
+              ·
+            </span>
+          )}
+          {part}
         </span>
-      )}
-      {b.bathroomBonus > 0 && (
-        <span className="whitespace-nowrap text-gold" title="Bathroom bonus">
-          +{fmtSub(b.bathroomBonus)} bathroom bonus
-        </span>
-      )}
+      ))}
     </div>
   );
 }

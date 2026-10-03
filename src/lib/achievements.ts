@@ -19,6 +19,7 @@
 import type { Bar, RankingBattle } from "./types";
 import { avgWithFood, avgWithoutFood, estimateWalkMinutes, haversineMeters } from "./scoring";
 import { rankEntries } from "./ranking";
+import { crewStandings, pickerOf } from "./crew";
 
 export type AchievementCategory =
   | "exploration"
@@ -26,7 +27,8 @@ export type AchievementCategory =
   | "battle"
   | "wishlist"
   | "crawl"
-  | "split";
+  | "split"
+  | "crew";
 
 export interface AchievementDef {
   key: string;
@@ -129,6 +131,20 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: "dead_even", name: "Dead Even", desc: "Everyone's share comes out exactly equal.", category: "split", icon: "⚖️" },
   { key: "whos_paying", name: "Who's Paying?", desc: "One person covers the entire bill.", category: "split", icon: "🙋" },
   { key: "generous_to_a_fault", name: "Generous to a Fault", desc: "One person pays more than 75% of the bill.", category: "split", icon: "🎁" },
+
+  // ---- The Crew (who picked it) ----
+  { key: "calling_dibs", name: "Calling Dibs", desc: "Put your name on a bar you ranked.", category: "crew", icon: "✋" },
+  { key: "the_whole_crew", name: "The Whole Crew", desc: "4 different people have picked a bar.", category: "crew", icon: "👯" },
+  { key: "tastemaker", name: "Tastemaker", desc: "One person picks 5 rated bars.", category: "crew", icon: "🍷" },
+  { key: "kingmaker", name: "Kingmaker", desc: "Someone's pick is the #1 bar overall.", category: "crew", icon: "👑" },
+  { key: "hat_trick", name: "Hat Trick", desc: "One person owns the entire podium.", category: "crew", icon: "🎩" },
+  { key: "golden_palate", name: "Golden Palate", desc: "3+ picks, and every one of them scores 8 or higher.", category: "crew", icon: "👅" },
+  { key: "you_picked_this", name: "You Picked This?", desc: "Someone's pick scores 4 or below overall.", category: "crew", icon: "🫵" },
+  { key: "scapegoat", name: "Scapegoat", desc: "Someone's pick gets disqualified.", category: "crew", icon: "🙈" },
+  { key: "trust_the_process", name: "Trust the Process", desc: "Rank 5 bars the app chose for you.", category: "crew", icon: "🤖" },
+  { key: "rise_of_the_machines", name: "Rise of the Machines", desc: "A bar the app chose reaches the top 3.", category: "crew", icon: "🦾" },
+  { key: "skynet_was_right", name: "Skynet Was Right", desc: "The app's picks out-average every person's (3+ picks each).", category: "crew", icon: "🛰️" },
+  { key: "human_after_all", name: "Human After All", desc: "A person's picks out-average the app's (3+ picks each).", category: "crew", icon: "🧠" },
 ];
 
 export const ACHIEVEMENTS_BY_KEY: Map<string, AchievementDef> = new Map(
@@ -607,6 +623,62 @@ export function checkSplitAchievements(
     const totalCents = payingCents.reduce((a, c) => a + c, 0);
     if (totalCents > 0 && payingCents.some((c) => c > totalCents * 0.75))
       out.push("generous_to_a_fault");
+  }
+  return out;
+}
+
+/** The Crew set — achievements about WHO picked the bars. Unlike the rest
+ *  of the catalog these can name a person: the context is the picker whose
+ *  record made it true (the first one found, best-ranked first), so the
+ *  trophy case reads "Kingmaker · Spencer". Scores use the with-food
+ *  average, the leaderboard's default view — the same convention as the
+ *  battle-derived checks. Returns key → context. */
+export function checkCrewAchievements(
+  bars: Bar[],
+  battles: RankingBattle[],
+): Map<string, string | undefined> {
+  const out = new Map<string, string | undefined>();
+  const add = (key: string, context?: string) => {
+    if (!out.has(key)) out.set(key, context);
+  };
+  const visited = bars.filter((b) => b.status === "visited");
+  const crew = crewStandings(bars, battles, "with");
+  const people = crew.filter((e) => !e.isApp);
+  const app = crew.find((e) => e.isApp) ?? null;
+
+  const firstCredited = [...visited]
+    .filter((b) => {
+      const p = pickerOf(b);
+      return p && !p.isApp;
+    })
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))[0];
+  if (firstCredited) add("calling_dibs", people.find((e) => e.picks.some((p) => p.bar.id === firstCredited.id))?.name);
+
+  if (people.length >= 4) add("the_whole_crew");
+
+  people.forEach((e) => {
+    if (e.scoredCount >= 5) add("tastemaker", e.name);
+    if (e.holdsLead) add("kingmaker", e.name);
+    if (e.picks.filter((p) => p.rank !== null && p.rank <= 3).length >= 3) add("hat_trick", e.name);
+    const scored = e.picks.filter((p) => p.score !== null);
+    if (scored.length >= 3 && scored.every((p) => (p.score as number) >= 8)) add("golden_palate", e.name);
+    const dud = scored.find((p) => (p.score as number) <= 4);
+    if (dud) add("you_picked_this", `${e.name} · ${dud.bar.name}`);
+    const dq = e.picks.find((p) => p.bar.disqualified);
+    if (dq) add("scapegoat", `${e.name} · ${dq.bar.name}`);
+  });
+
+  if (app) {
+    if (app.scoredCount >= 5) add("trust_the_process");
+    const podium = app.picks.find((p) => p.rank !== null && p.rank <= 3);
+    if (podium) add("rise_of_the_machines", podium.bar.name);
+    const qualified = people.filter((e) => e.scoredCount >= 3 && e.average !== null);
+    if (app.scoredCount >= 3 && app.average !== null && qualified.length > 0) {
+      if (qualified.every((e) => (app.average as number) > (e.average as number)))
+        add("skynet_was_right");
+      const human = qualified.find((e) => (e.average as number) > (app.average as number));
+      if (human) add("human_after_all", human.name);
+    }
   }
   return out;
 }
