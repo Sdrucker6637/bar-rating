@@ -85,7 +85,7 @@ function PickStrip({ entries }: { entries: CrewEntry[] }) {
       <figcaption className="mb-1 text-[0.86rem] text-mute">
         Each dot is one bar they picked; the tall tick is their average.
       </figcaption>
-      <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_2.75rem] gap-x-3 sm:grid-cols-[8rem_minmax(0,1fr)_3.25rem]">
+      <div className="grid grid-cols-[6.75rem_minmax(0,1fr)_2.75rem] gap-x-3 sm:grid-cols-[8rem_minmax(0,1fr)_3.25rem]">
         {entries.map((e) => {
           const scored = e.picks.filter((p) => p.score !== null);
           // Dots that would overlap (within ~a dot's width) get nudged apart
@@ -225,7 +225,7 @@ function CatHeatmap({ entries }: { entries: CrewEntry[] }) {
       <table className="w-full table-fixed border-separate border-spacing-[3px]">
         <thead>
           <tr>
-            <th className="w-[5.5rem] sm:w-[8rem]" />
+            <th className="w-[6.75rem] sm:w-[8rem]" />
             {SCORE_CATS.map((c) => (
               <th
                 key={c.key}
