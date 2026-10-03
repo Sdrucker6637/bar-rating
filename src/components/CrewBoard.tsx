@@ -9,6 +9,7 @@ import ScoreSeal from "./ScoreSeal";
 import EmptyState from "./EmptyState";
 import Icon from "./Icon";
 import { SectionRule } from "./Ornament";
+import CrewCharts from "./CrewCharts";
 
 /* ------------------------------------------------------------------------
  * The Crew — a second classification, of people rather than bars. Each
@@ -310,7 +311,7 @@ export default function CrewBoard() {
         <EmptyState
           icon={<Icon name="users" size={18} />}
           title="Nobody's claimed a bar yet."
-          hint="When you rank a bar, fill in “Picked by” with whoever found it — or mark that the app chose it. Picks pool by name, so every “Spencer” counts toward the same Spencer."
+          hint="When you rank a bar, fill in “Picked by” with whoever found it — or mark that the app chose it. Names match even if capitalization or spacing differs, so each person's picks always add up in one place."
         />
         {uncredited.length > 0 && (
           <UncreditedList
@@ -352,6 +353,8 @@ export default function CrewBoard() {
           </div>
         </section>
       )}
+
+      {ranked.length > 0 && <CrewCharts entries={ranked} />}
 
       {app && people.length > 0 && <ManVsMachine people={people} app={app} />}
 

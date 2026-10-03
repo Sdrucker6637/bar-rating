@@ -246,7 +246,7 @@ export default function LeaderboardView() {
         sub={
           view === "bars"
             ? "Where we stand — every rated bar ranked by average score across vibe, value, service, food, and drinks."
-            : "Every person — and the app — ranked by the average score of the bars they picked. Same name, same person: every “Spencer” pools into one Spencer."
+            : "Every person — and the app — ranked by the average score of the bars they picked. Names match even if capitalization or spacing differs, so each person's picks always add up in one place."
         }
         action={addButton}
       />
