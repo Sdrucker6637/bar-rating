@@ -25,7 +25,13 @@ function fmtDate(ts: number): string {
 }
 
 export default function AchievementsView() {
-  const { achievementUnlocks } = useTour();
+  const { achievementUnlocks: storedUnlocks } = useTour();
+  // Only count unlocks for badges still in the catalog — the shared doc can
+  // hold unlocks for badges that were later retired.
+  const achievementUnlocks = useMemo(
+    () => storedUnlocks.filter((u) => ACHIEVEMENTS.some((a) => a.key === u.key)),
+    [storedUnlocks],
+  );
   const [filter, setFilter] = useState<"all" | AchievementCategory>("all");
 
   const unlockedByKey = useMemo(
