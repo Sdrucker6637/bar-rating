@@ -15,7 +15,6 @@ const CATEGORY_ORDER: AchievementCategory[] = [
   "wishlist",
   "crawl",
   "split",
-  "crew",
 ];
 
 function fmtDate(ts: number): string {
@@ -64,7 +63,7 @@ export default function AchievementsView() {
       <TabIntro
         kicker="Awards"
         title="The Trophy Case"
-        sub="Badges unlock automatically as bars get rated, ranked, disqualified, crawled to, and split. Every badge belongs to the house — though The Crew badges name whoever picked the bar that earned them."
+        sub="Badges unlock automatically as bars get rated, ranked, disqualified, crawled to, and split. There's no login here, so nothing is credited to a person — every badge just belongs to the house."
       />
 
       {/* The house tally: a big count, and one tick per award — like marks

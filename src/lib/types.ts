@@ -70,13 +70,6 @@ export interface Bar {
    *  "reinstated a bar you'd disqualified" be checked from current state
    *  alone, without needing a change history. */
   wasDisqualified?: boolean;
-  /** Who picked this bar, exactly as typed into the ranking form (trimmed).
-   *  Matched case-insensitively on the crew board — see src/lib/crew.ts.
-   *  Empty/absent means nobody was credited. Ignored when appPicked. */
-  addedBy?: string;
-  /** True when the app chose this bar (Surprise Us, Nearby, a crawl stop)
-   *  rather than a person — credited to "The App" on the crew board. */
-  appPicked?: boolean;
 }
 
 /** A Google Places result, possibly enriched with Gemini flavor text. */
@@ -134,10 +127,6 @@ export interface VisitedForm {
   drinks: string;
   bathroomBonus: string;
   notes: string;
-  /** Who picked it — a person's name (blank = nobody credited). */
-  addedBy: string;
-  /** "The app chose it" — wins over addedBy when true. */
-  appPicked: boolean;
 }
 
 export interface WishForm {

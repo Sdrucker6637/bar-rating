@@ -12,7 +12,6 @@ import React, {
 import type { FormEvent, ReactNode } from "react";
 import { db } from "./firebase";
 import { base, DOC_PATH, emptyVisitedForm, emptyWishForm } from "./constants";
-import { cleanPickerName, originIsAppPick } from "./crew";
 import { seedBars } from "./seed";
 import { avgWithFood, avgWithoutFood, haversineMeters } from "./scoring";
 import { pendingBattlePairs, rankEntries } from "./ranking";
@@ -33,7 +32,6 @@ import { SURPRISE_VIBES } from "./constants";
 import {
   checkCrawlPlanAchievements,
   checkDerivedAchievements,
-  checkCrewAchievements,
   checkDominoEffect,
   checkFullSend,
   checkMenaceToSobriety,
@@ -832,19 +830,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
     if (checkMenaceToSobriety(lastCrawlStopNamesRef.current, bars)) {
       derived.add("menace_to_sobriety");
     }
-    // The Crew set carries a context (the person credited), so it's
-    // merged separately rather than folded into the plain key set.
-    const crew = checkCrewAchievements(bars, rankingBattles);
     const already = new Set(achievementUnlocksRef.current.map((u) => u.key));
-    const fresh: Array<{ key: string; context?: string }> = [
-      ...[...derived].filter((k) => !crew.has(k)).map((key) => ({ key })),
-      ...[...crew.entries()].map(([key, context]) =>
-        context !== undefined ? { key, context } : { key },
-      ),
-    ].filter((e) => !already.has(e.key));
+    const fresh = [...derived].filter((k) => !already.has(k));
     if (fresh.length === 0) return;
     achievementBackfillDoneRef.current = true;
-    void unlockAchievements(fresh);
+    void unlockAchievements(fresh.map((key) => ({ key })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bars, rankingBattles, capacityFilterMisses, unlockAchievements]);
 
@@ -1737,11 +1727,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
       if (placesModal.suggestion._placeIntent === "visited") {
         setVisitedSuggestion(merged);
-        setVisitedForm({
-          ...emptyVisitedForm,
-          name: merged.name,
-          appPicked: originIsAppPick(merged._origin),
-        });
+        setVisitedForm({ ...emptyVisitedForm, name: merged.name });
         setPlacesModal(null);
         setShowVisitedForm(true);
       } else if (placesModal.suggestion._placeIntent === "crawlStart") {
@@ -1784,7 +1770,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
         b.name.toLowerCase().includes(q) ||
         (b.neighborhood || "").toLowerCase().includes(q) ||
         (b.notes || "").toLowerCase().includes(q) ||
-        (b.addedBy || "").toLowerCase().includes(q) ||
         (b.tags || []).some((t) => t.toLowerCase().includes(q))
       );
     });
@@ -1999,11 +1984,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const rankSuggestion = useCallback((s: PlaceResult) => {
     setVisitedSuggestion(s);
-    setVisitedForm({
-      ...emptyVisitedForm,
-      name: s.name,
-      appPicked: originIsAppPick(s._origin),
-    });
+    setVisitedForm({ ...emptyVisitedForm, name: s.name });
     setShowVisitedForm(true);
   }, []);
 
@@ -2025,10 +2006,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
         drinks: cleanNum(visitedForm.drinks),
         bathroomBonus: cleanNum(visitedForm.bathroomBonus) || 0,
         notes: visitedForm.notes.trim(),
-        // Always written as concrete values (never undefined — Firestore
-        // rejects those), so clearing the field on edit really clears it.
-        addedBy: visitedForm.appPicked ? "" : cleanPickerName(visitedForm.addedBy),
-        appPicked: visitedForm.appPicked,
       };
       let record: Bar | undefined;
       // Speed Dating ("wishlist a bar and visit it within 24 hours") is
@@ -2195,8 +2172,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
       drinks: "",
       bathroomBonus: "",
       notes: b.notes || "",
-      addedBy: b.addedBy || "",
-      appPicked: b.appPicked ?? (!b.addedBy && originIsAppPick(b.origin)),
     });
     setShowVisitedForm(true);
   }, []);
@@ -2213,8 +2188,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
       drinks: b.drinks == null ? "" : String(b.drinks),
       bathroomBonus: b.bathroomBonus == null ? "" : String(b.bathroomBonus),
       notes: b.notes || "",
-      addedBy: b.addedBy || "",
-      appPicked: !!b.appPicked,
     });
     setShowVisitedForm(true);
   }, []);

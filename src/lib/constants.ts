@@ -41,8 +41,6 @@ export const emptyVisitedForm: VisitedForm = {
   drinks: "",
   bathroomBonus: "",
   notes: "",
-  addedBy: "",
-  appPicked: false,
 };
 
 export const emptyWishForm: WishForm = {
